@@ -1,0 +1,68 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nats-jetstream"
+version = "0.0.0"
+description = ''
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+keywords = []
+authors = [{ name = "Casper Beyer", email = "caspervonb@octet.dev" }]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = []
+
+[project.urls]
+Documentation = "https://github.com/TODO/nats-core#readme"
+Issues = "https://github.com/TODO/nats-core/issues"
+Source = "https://github.com/TODO/nats-core"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.sdist]
+include = ["src/nats"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nats"]
+
+[tool.hatch.envs.hatch-test]
+dependencies = [
+    "nats-client@ file:../nats-client",
+    "nats-server @ file:../nats-server",
+]
+extra-dependencies = ["pytest-asyncio", "pytest-xdist"]
+
+[tool.hatch.envs.default.scripts]
+test = "echo hello"
+
+[tool.hatch.envs.types]
+extra-dependencies = ["mypy>=1.0.0"]
+
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/nats tests}"
+
+[tool.coverage.run]
+source_pkgs = ["nats_core", "tests"]
+branch = true
+parallel = true
+omit = ["src/nats_core/__about__.py"]
+
+[tool.coverage.paths]
+nats_core = ["src/nats_core", "*/nats-core/src/nats_core"]
+tests = ["tests", "*/nats-core/tests"]
+
+[tool.coverage.report]
+exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
