@@ -415,26 +415,22 @@ class PullConsumer(Consumer):
         callback: MessageCallback,
         *,
         max_messages: int = 100,
-        max_wait: float | None = None,
+        max_wait: float = 30.0,
         heartbeat: float | None = None,
         max_bytes: int | None = None,
-        expires: float = 30.0,
     ) -> MessageHandler:
         """Start consuming messages with a callback function.
 
         Args:
             callback: Async function to call for each message
             max_messages: Maximum number of messages to request per batch
-            max_wait: Deprecated (use expires instead)
+            max_wait: Request expiration time in seconds
             heartbeat: Heartbeat interval in seconds
             max_bytes: Maximum bytes per batch
-            expires: Request expiration time in seconds
 
         Returns:
             MessageHandler that processes messages with the callback
         """
-        if max_wait is not None:
-            expires = max_wait
 
         # Get a message stream (callback-unaware, minimal background processing)
         # Support both max_messages and max_bytes together (like Go's PullMaxMessagesWithBytesLimit)
@@ -442,7 +438,7 @@ class PullConsumer(Consumer):
             max_messages=max_messages,
             max_bytes=max_bytes,
             heartbeat=heartbeat,
-            max_wait=expires
+            max_wait=max_wait
         )
 
         # Higher-level callback handling: create a task that iterates over the stream

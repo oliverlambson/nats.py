@@ -146,8 +146,8 @@ class Consumer(Protocol):
         self,
         callback: Callable[[Message], Awaitable[None]],
         *,
-        max_messages: int = 1,
-        max_wait: float | None = None,
+        max_messages: int = 100,
+        max_wait: float = 30.0,
         heartbeat: float | None = None,
         max_bytes: int | None = None,
     ) -> MessageStream:
