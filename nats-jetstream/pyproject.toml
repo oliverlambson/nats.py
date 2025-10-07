@@ -1,68 +1,48 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "nats-jetstream"
 version = "0.0.0"
-description = ''
+description = 'Python library for managing NATS servers for development and testing'
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 license = "MIT"
-keywords = []
-authors = [{ name = "Casper Beyer", email = "caspervonb@octet.dev" }]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
+keywords = ["nats", "messaging", "testing"]
+authors = [
+  { name = "Casper Beyer", email = "casper@synadia.com" },
 ]
-dependencies = []
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+  "nats-client",
+]
+
+[dependency-groups]
+dev = [
+  "nats-server",
+]
+
+[tool.uv.sources]
+nats-client = { workspace = true }
+nats-server = { workspace = true }
 
 [project.urls]
-Documentation = "https://github.com/TODO/nats-core#readme"
-Issues = "https://github.com/TODO/nats-core/issues"
-Source = "https://github.com/TODO/nats-core"
+Documentation = "https://github.com/nats-io/nats.py"
+Issues = "https://github.com/nats-io/nats.py/issues"
+Source = "https://github.com/nats-io/nats.py"
 
-[tool.hatch.metadata]
-allow-direct-references = true
+[tool.setuptools.packages.find]
+where = ["src"]
 
-[tool.hatch.build.targets.sdist]
-include = ["src/nats"]
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/nats"]
-
-[tool.hatch.envs.hatch-test]
-dependencies = [
-    "nats-client@ file:../nats-client",
-    "nats-server @ file:../nats-server",
-]
-extra-dependencies = ["pytest-asyncio", "pytest-xdist"]
-
-[tool.hatch.envs.default.scripts]
-test = "echo hello"
-
-[tool.hatch.envs.types]
-extra-dependencies = ["mypy>=1.0.0"]
-
-[tool.hatch.envs.types.scripts]
-check = "mypy --install-types --non-interactive {args:src/nats tests}"
-
-[tool.coverage.run]
-source_pkgs = ["nats_core", "tests"]
-branch = true
-parallel = true
-omit = ["src/nats_core/__about__.py"]
-
-[tool.coverage.paths]
-nats_core = ["src/nats_core", "*/nats-core/src/nats_core"]
-tests = ["tests", "*/nats-core/tests"]
-
-[tool.coverage.report]
-exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"
+asyncio_mode = "auto"

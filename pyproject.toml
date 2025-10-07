@@ -10,7 +10,7 @@ dev = [
 ]
 
 [tool.uv]
-workspace = { members = ["nats", "nats-server", "nats-client"] }
+workspace = { members = ["nats", "nats-server", "nats-client", "nats-jetstream"] }
 
 [tool.mypy]
 files = ["nats/src"]
