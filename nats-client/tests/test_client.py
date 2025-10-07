@@ -503,7 +503,7 @@ async def test_cluster_reconnect_sequential_shutdown(cluster_size):
         # Connect to the first server - cluster will gossip other servers via INFO
         client = await connect(
             cluster.servers[0].client_url,
-            timeout=2.0,
+            timeout=0.5,
             allow_reconnect=True,
             reconnect_time_wait=0.0,
             no_randomize=True
