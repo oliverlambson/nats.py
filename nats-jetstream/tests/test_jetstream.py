@@ -515,7 +515,6 @@ async def test_create_consumer_with_invalid_stream_fails(jetstream: JetStream):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="FIXME")
 async def test_create_consumer_with_duplicate_name_fails(jetstream: JetStream):
     """Test that creating a consumer with a duplicate name fails."""
     # Create a stream and consumer
@@ -527,7 +526,7 @@ async def test_create_consumer_with_duplicate_name_fails(jetstream: JetStream):
     )
 
     # Try to create a consumer with the same name
-    with pytest.raises(Exception):  # TODO: Define specific error type
+    with pytest.raises(ValueError, match="Consumer 'test_consumer' already exists"):
         await jetstream.create_consumer(
             stream_name="test_stream",
             name="test_consumer",
@@ -554,6 +553,19 @@ async def test_update_consumer_via_jetstream(jetstream: JetStream):
     )
 
     assert updated_consumer.info.config.max_deliver == 20
+
+
+@pytest.mark.asyncio
+async def test_update_nonexistent_consumer_fails(jetstream: JetStream):
+    """Test that updating a non-existent consumer fails."""
+    # Create a stream
+    await jetstream.create_stream(name="test_stream", subjects=["FOO.*"])
+
+    # Try to update a non-existent consumer
+    with pytest.raises(ValueError, match="consumer does not exist"):
+        await jetstream.update_consumer(
+            stream_name="test_stream", consumer_name="nonexistent", max_deliver=20
+        )
 
 
 @pytest.mark.asyncio

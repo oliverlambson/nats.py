@@ -531,6 +531,7 @@ class Stream:
                 name = durable_name
 
         request = {
+            "action": action,
             "stream_name": self._name,
             "config": {
                 **config,
