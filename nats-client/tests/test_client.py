@@ -525,17 +525,16 @@ async def test_cluster_reconnect_sequential_shutdown(cluster_size):
         # Shut down servers one by one (shut down the server we're connected to)
         for i in range(len(cluster.servers) - 1):  # Keep last server running
             # Find which server the client is currently connected to using server_info
-            connected_host = client.server_info.host
             connected_port = client.server_info.port
 
-            # Find the matching server in the cluster
+            # Find the matching server in the cluster by port
             server_to_shutdown = None
             for server in cluster.servers:
-                if server.host == connected_host and server.port == connected_port:
+                if server.port == connected_port:
                     server_to_shutdown = server
                     break
 
-            assert server_to_shutdown is not None, f"Could not find server for {connected_host}:{connected_port}"
+            assert server_to_shutdown is not None, f"Could not find server for port {connected_port}"
 
             # Shutdown the connected server
             await server_to_shutdown.shutdown()
