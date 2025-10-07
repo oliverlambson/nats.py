@@ -1022,6 +1022,7 @@ async def connect(
     reconnect_time_wait: float = 2.0,
     reconnect_time_wait_max: float = 10.0,
     reconnect_jitter: float = 0.1,
+    reconnect_timeout: float | None = None,
     no_randomize: bool = False,
 ) -> Client:
     """Connect to a NATS server.
@@ -1034,6 +1035,7 @@ async def connect(
         reconnect_time_wait: Initial wait time between reconnection attempts
         reconnect_time_wait_max: Maximum wait time between reconnection attempts
         reconnect_jitter: Jitter factor for reconnection attempts
+        reconnect_timeout: Timeout for individual reconnection attempts (defaults to timeout value)
         no_randomize: Whether to disable randomizing the server pool
 
     Returns:
@@ -1098,6 +1100,7 @@ async def connect(
                 reconnect_time_wait=reconnect_time_wait,
                 reconnect_time_wait_max=reconnect_time_wait_max,
                 reconnect_jitter=reconnect_jitter,
+                reconnect_timeout=reconnect_timeout if reconnect_timeout is not None else timeout,
                 no_randomize=no_randomize,
             )
 
