@@ -66,10 +66,10 @@ def test_message_creation_with_basic_data():
         headers=Headers({"X-Test": ["value"]}),
     )
 
-    assert msg.data() == b"test data"
-    assert msg.subject() == "test.subject"
-    assert msg.reply_to() == "test.reply"
-    assert msg.headers() == Headers({"X-Test": ["value"]})
+    assert msg.data == b"test data"
+    assert msg.subject == "test.subject"
+    assert msg.reply_to == "test.reply"
+    assert msg.headers == Headers({"X-Test": ["value"]})
 
 
 def test_message_with_explicit_metadata():
@@ -91,7 +91,7 @@ def test_message_with_explicit_metadata():
         metadata=metadata,
     )
 
-    msg_metadata = msg.metadata()
+    msg_metadata = msg.metadata
     assert msg_metadata.sequence.consumer == 10
     assert msg_metadata.sequence.stream == 20
     assert msg_metadata.num_delivered == 3
@@ -110,7 +110,7 @@ def test_message_metadata_parsed_from_reply_subject():
         headers=None,
     )
 
-    metadata = msg.metadata()
+    metadata = msg.metadata
     assert metadata.stream == "stream"
     assert metadata.consumer == "consumer"
     assert metadata.sequence.stream == 100
@@ -126,7 +126,7 @@ def test_message_headers_returns_none_when_not_set():
         headers=None,
     )
 
-    assert msg.headers() is None
+    assert msg.headers is None
 
 
 def test_message_reply_to_returns_empty_string_when_not_set():
@@ -138,7 +138,7 @@ def test_message_reply_to_returns_empty_string_when_not_set():
         headers=None,
     )
 
-    assert msg.reply_to() == ""
+    assert msg.reply_to == ""
 
 
 @pytest.mark.asyncio
@@ -236,7 +236,7 @@ async def test_message_nak_triggers_redelivery(jetstream: JetStream):
     async for msg in batch:
         messages.append(msg)
     msg = messages[0]
-    original_delivery_count = msg.metadata().num_delivered
+    original_delivery_count = msg.metadata.num_delivered
 
     # Nak the message
     await msg.nak()
@@ -251,8 +251,8 @@ async def test_message_nak_triggers_redelivery(jetstream: JetStream):
         messages.append(msg)
     assert len(messages) == 1
     redelivered_msg = messages[0]
-    assert redelivered_msg.data() == b"test message"
-    assert redelivered_msg.metadata().num_delivered > original_delivery_count
+    assert redelivered_msg.data == b"test message"
+    assert redelivered_msg.metadata.num_delivered > original_delivery_count
 
 
 @pytest.mark.asyncio
@@ -299,7 +299,7 @@ async def test_message_nak_with_delay_redelivers_after_delay(
     async for msg in batch:
         messages.append(msg)
     assert len(messages) == 1
-    assert messages[0].data() == b"test message"
+    assert messages[0].data == b"test message"
 
 
 @pytest.mark.asyncio
@@ -527,10 +527,10 @@ async def test_fetch_and_acknowledge_multiple_messages(jetstream: JetStream):
 
     # Check each message has correct metadata
     for i, msg in enumerate(messages):
-        assert msg.data() == f"message {i}".encode()
-        assert msg.metadata().stream == "test-multi-stream"
-        assert msg.metadata().consumer == "test-multi-consumer"
-        assert msg.metadata().sequence.stream == i + 1
+        assert msg.data == f"message {i}".encode()
+        assert msg.metadata.stream == "test-multi-stream"
+        assert msg.metadata.consumer == "test-multi-consumer"
+        assert msg.metadata.sequence.stream == i + 1
 
     # Acknowledge all messages
     for msg in messages:
