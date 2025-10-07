@@ -143,6 +143,18 @@ class PullMessageBatch(MessageBatch):
 class PullMessageStream(MessageStream):
     """Continuous message stream for pull consumers, similar to Rust's Stream."""
 
+    _consumer: PullConsumer
+    _subscription: Subscription
+    _batch: int
+    _max_bytes: int | None
+    _heartbeat: float | None
+    _expires: float
+    _terminated: bool
+    _pending_messages: int
+    _pending_bytes: int
+    _request_task: asyncio.Task[None] | None
+    _started: bool
+
     def __init__(
         self,
         consumer: PullConsumer,
