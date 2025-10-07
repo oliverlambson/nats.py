@@ -505,8 +505,8 @@ async def test_cluster_reconnect_sequential_shutdown(cluster_size):
             cluster.servers[0].client_url,
             timeout=2.0,
             allow_reconnect=True,
-            reconnect_time_wait=0.1,
-            no_randomize=True  # Keep server pool in order (no randomization)
+            reconnect_time_wait=0.0,
+            no_randomize=True
         )
 
         client.add_reconnected_callback(on_reconnect)
