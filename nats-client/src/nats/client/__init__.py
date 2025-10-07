@@ -461,10 +461,11 @@ class Client(AbstractAsyncContextManager["Client"]):
         """Handle INFO from server."""
         self._server_info = ServerInfo.from_protocol(info)
         # Update server pool with new cluster URLs from INFO
-        servers = [self._server_pool[0]]  # Keep the original connection address first
         if self._server_info.connect_urls:
-            servers.extend(self._server_info.connect_urls)
-        self._server_pool = servers
+            # Add new servers from connect_urls, avoiding duplicates
+            for url in self._server_info.connect_urls:
+                if url not in self._server_pool:
+                    self._server_pool.append(url)
 
     async def _handle_error(self, error: str) -> None:
         """Handle ERR from server."""
@@ -624,10 +625,11 @@ class Client(AbstractAsyncContextManager["Client"]):
                                 self._last_server = server
 
                                 # Update server pool with new cluster URLs after reconnection
-                                servers = [self._server_pool[0]]  # Keep the original connection address first
                                 if new_server_info.connect_urls:
-                                    servers.extend(new_server_info.connect_urls)
-                                self._server_pool = servers
+                                    # Add new servers from connect_urls, avoiding duplicates
+                                    for url in new_server_info.connect_urls:
+                                        if url not in self._server_pool:
+                                            self._server_pool.append(url)
 
                                 for sid, subscription in list(
                                         self._subscriptions.items()):
