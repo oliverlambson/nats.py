@@ -6,6 +6,7 @@ from .types import (
     ApiStats,
     ConsumerConfig,
     ConsumerInfo,
+    LostStreamData,
     Placement,
     PublishAck,
     Republish,
@@ -16,15 +17,16 @@ from .types import (
     StreamState,
     SubjectTransform,
     Tier,
-    LostStreamData,
 )
 
 __all__ = [
     "Client",
-    "ApiStats",
     "AccountInfo",
-    "Tier",
     "AccountLimits",
+    "ApiStats",
+    "ConsumerConfig",
+    "ConsumerInfo",
+    "LostStreamData"
     "Placement",
     "PublishAck",
     "Republish",
@@ -34,7 +36,5 @@ __all__ = [
     "StreamSource",
     "StreamState",
     "SubjectTransform",
-    "ConsumerInfo",
-    "ConsumerConfig",
-    "LostStreamData"
+    "Tier",
 ]
