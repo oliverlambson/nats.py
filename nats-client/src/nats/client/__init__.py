@@ -665,6 +665,10 @@ class Client(AbstractAsyncContextManager["Client"]):
 
                                 return
 
+                            except (asyncio.CancelledError, TimeoutError) as e:
+                                logger.error("Failed to connect to %s: %s", server, type(e).__name__)
+                                self._last_server = server
+                                continue
                             except Exception:
                                 logger.exception("Failed to connect to %s", server)
                                 self._last_server = server
