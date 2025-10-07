@@ -26,7 +26,7 @@ __all__ = [
     "ApiStats",
     "ConsumerConfig",
     "ConsumerInfo",
-    "LostStreamData"
+    "LostStreamData",
     "Placement",
     "PublishAck",
     "Republish",
