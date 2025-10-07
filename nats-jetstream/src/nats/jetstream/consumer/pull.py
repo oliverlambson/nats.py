@@ -36,11 +36,6 @@ class MessageHandler:
         self._task = task
         self._message_stream = message_stream
 
-    @property
-    def is_active(self) -> bool:
-        """Check if the consume task is still active."""
-        return not self._task.done() and self._message_stream.is_active
-
     async def stop(self):
         """Stop the consume task and clean up resources."""
         self._task.cancel()
