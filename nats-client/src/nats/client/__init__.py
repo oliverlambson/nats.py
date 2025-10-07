@@ -504,15 +504,12 @@ class Client(AbstractAsyncContextManager["Client"]):
 
         old_status = self._status
         self._status = ClientStatus.CLOSED
-        if self._read_task and isinstance(
-                self._read_task, asyncio.Task) and not self._read_task.done():
+        if self._read_task and not self._read_task.done():
             self._read_task.cancel()
             with contextlib.suppress(asyncio.CancelledError, RuntimeError):
                 await self._read_task
 
-        if self._write_task and isinstance(
-                self._write_task,
-                asyncio.Task) and not self._write_task.done():
+        if self._write_task and not self._write_task.done():
             self._write_task.cancel()
             with contextlib.suppress(asyncio.CancelledError, RuntimeError):
                 await self._write_task
@@ -534,165 +531,165 @@ class Client(AbstractAsyncContextManager["Client"]):
                             logger.exception("Error in disconnected callback")
 
                 self._reconnecting = True
-            self._reconnect_attempts_counter = 0
-            self._reconnect_time = self._reconnect_time_wait
+                self._reconnect_attempts_counter = 0
+                self._reconnect_time = self._reconnect_time_wait
 
-            while self._reconnect_attempts == 0 or self._reconnect_attempts_counter < self._reconnect_attempts:
-                if not self._allow_reconnect:
+                while self._reconnect_attempts == 0 or self._reconnect_attempts_counter < self._reconnect_attempts:
+                    if not self._allow_reconnect:
+                        logger.info(
+                            "Reconnection aborted - allow_reconnect flag disabled"
+                        )
+                        break
+
+                    self._reconnect_attempts_counter += 1
                     logger.info(
-                        "Reconnection aborted - allow_reconnect flag disabled"
-                    )
-                    break
-
-                self._reconnect_attempts_counter += 1
-                logger.info(
-                    "Reconnection attempt %s", self._reconnect_attempts_counter
-                )
-
-                try:
-                    actual_wait = self._reconnect_time * (
-                        1 + random.random() * self._reconnect_jitter
+                        "Reconnection attempt %s", self._reconnect_attempts_counter
                     )
 
-                    logger.info(
-                        "Waiting %.2fs before reconnection attempt",
-                        actual_wait
-                    )
-                    await asyncio.sleep(actual_wait)
+                    try:
+                        actual_wait = self._reconnect_time * (
+                            1 + random.random() * self._reconnect_jitter
+                        )
 
-                    for server in self._server_pool:
-                        if server == self._last_server and len(
-                                self._server_pool) > 1:
-                            continue
+                        logger.info(
+                            "Waiting %.2fs before reconnection attempt",
+                            actual_wait
+                        )
+                        await asyncio.sleep(actual_wait)
 
-                        logger.info("Trying to reconnect to %s", server)
+                        for server in self._server_pool:
+                            if server == self._last_server and len(
+                                    self._server_pool) > 1:
+                                continue
 
-                        if "://" in server:
-                            parsed_url = urlparse(server)
-                        else:
-                            scheme = "tls" if self._server_info.tls_required else "nats"
+                            logger.info("Trying to reconnect to %s", server)
 
-                            if not server.startswith("[") and server.count(":") > 1:
-                                last_colon = server.rfind(":")
-                                try:
-                                    port_val = int(server[last_colon + 1:])
-                                    if 0 <= port_val <= 65535:
-                                        host_part = server[:last_colon]
-                                        server = f"[{host_part}]:{port_val}"
-                                except ValueError:
-                                    server = f"[{server}]"
-
-                            parsed_url = urlparse(f"{scheme}://{server}")
-
-                        host = parsed_url.hostname
-                        port = parsed_url.port or 4222
-                        scheme = parsed_url.scheme
-
-                        try:
-                            if scheme in ("tls", "wss"):
-                                ssl_context = ssl.create_default_context()
-                                connection = await asyncio.wait_for(
-                                    open_tcp_connection(
-                                        host, port, ssl_context=ssl_context
-                                    ),
-                                    timeout=self._reconnect_timeout,
-                                )
+                            if "://" in server:
+                                parsed_url = urlparse(server)
                             else:
-                                connection = await asyncio.wait_for(
-                                    open_tcp_connection(host, port),
-                                    timeout=self._reconnect_timeout,
-                                )
+                                scheme = "tls" if self._server_info.tls_required else "nats"
 
-                            msg = await parse(connection)
-                            if not msg or msg.op != "INFO":
-                                msg = "Expected INFO message"
-                                raise RuntimeError(msg)
-
-                            new_server_info = ServerInfo.from_protocol(msg.info)
-                            logger.info(
-                                "Reconnected to %s (version %s)",
-                                new_server_info.server_id,
-                                new_server_info.version
-                            )
-
-                            connect_info = ConnectInfo(
-                                verbose=False,
-                                pedantic=False,
-                                lang="python",
-                                version=__version__,
-                                protocol=1,
-                                headers=True,
-                            )
-                            logger.debug(
-                                "->> CONNECT %s", json.dumps(connect_info)
-                            )
-                            await connection.write(
-                                encode_connect(connect_info)
-                            )
-
-                            self._connection = connection
-                            self._server_info = new_server_info
-                            self._status = ClientStatus.CONNECTED
-                            self._last_server = server
-
-                            self._server_pool = _collect_servers(
-                                new_server_info,
-                                no_randomize=self._no_randomize
-                            )
-
-                            for sid, subscription in list(
-                                    self._subscriptions.items()):
-                                subject = subscription.subject
-                                queue_group = subscription.queue_group
-                                logger.debug(
-                                    "->> SUB %s %s %s", subject, sid,
-                                    queue_group
-                                )
-                                await self._connection.write(
-                                    encode_sub(subject, sid, queue_group)
-                                )
-
-                            await self._force_flush()
-
-                            self._read_task = asyncio.create_task(
-                                self._read_loop()
-                            )
-                            self._write_task = asyncio.create_task(
-                                self._write_loop()
-                            )
-
-                            self._reconnecting = False
-                            self._reconnect_attempts_counter = 0
-                            self._reconnect_time = self._reconnect_time_wait
-
-                            if self._reconnected_callbacks:
-                                for callback in self._reconnected_callbacks:
+                                if not server.startswith("[") and server.count(":") > 1:
+                                    last_colon = server.rfind(":")
                                     try:
-                                        callback()
-                                    except Exception:
-                                        logger.exception(
-                                            "Error in reconnected callback"
-                                        )
+                                        port_val = int(server[last_colon + 1:])
+                                        if 0 <= port_val <= 65535:
+                                            host_part = server[:last_colon]
+                                            server = f"[{host_part}]:{port_val}"
+                                    except ValueError:
+                                        server = f"[{server}]"
 
-                            return
+                                parsed_url = urlparse(f"{scheme}://{server}")
 
-                        except Exception:
-                            logger.exception("Failed to connect to %s", server)
-                            self._last_server = server
-                            continue
+                            host = parsed_url.hostname
+                            port = parsed_url.port or 4222
+                            scheme = parsed_url.scheme
 
-                    logger.error("Failed to connect to any server in the pool")
+                            try:
+                                if scheme in ("tls", "wss"):
+                                    ssl_context = ssl.create_default_context()
+                                    connection = await asyncio.wait_for(
+                                        open_tcp_connection(
+                                            host, port, ssl_context=ssl_context
+                                        ),
+                                        timeout=self._reconnect_timeout,
+                                    )
+                                else:
+                                    connection = await asyncio.wait_for(
+                                        open_tcp_connection(host, port),
+                                        timeout=self._reconnect_timeout,
+                                    )
 
-                    self._reconnect_time = min(
-                        self._reconnect_time * 2, self._reconnect_time_wait_max
-                    )
+                                msg = await parse(connection)
+                                if not msg or msg.op != "INFO":
+                                    msg = "Expected INFO message"
+                                    raise RuntimeError(msg)
 
-                except Exception:
-                    logger.exception("Reconnection attempt failed")
+                                new_server_info = ServerInfo.from_protocol(msg.info)
+                                logger.info(
+                                    "Reconnected to %s (version %s)",
+                                    new_server_info.server_id,
+                                    new_server_info.version
+                                )
 
-            logger.error("Reconnection failed after maximum attempts")
-            self._reconnecting = False
-            self._status = ClientStatus.CLOSED
+                                connect_info = ConnectInfo(
+                                    verbose=False,
+                                    pedantic=False,
+                                    lang="python",
+                                    version=__version__,
+                                    protocol=1,
+                                    headers=True,
+                                )
+                                logger.debug(
+                                    "->> CONNECT %s", json.dumps(connect_info)
+                                )
+                                await connection.write(
+                                    encode_connect(connect_info)
+                                )
+
+                                self._connection = connection
+                                self._server_info = new_server_info
+                                self._status = ClientStatus.CONNECTED
+                                self._last_server = server
+
+                                self._server_pool = _collect_servers(
+                                    new_server_info,
+                                    no_randomize=self._no_randomize
+                                )
+
+                                for sid, subscription in list(
+                                        self._subscriptions.items()):
+                                    subject = subscription.subject
+                                    queue_group = subscription.queue_group
+                                    logger.debug(
+                                        "->> SUB %s %s %s", subject, sid,
+                                        queue_group
+                                    )
+                                    await self._connection.write(
+                                        encode_sub(subject, sid, queue_group)
+                                    )
+
+                                await self._force_flush()
+
+                                self._read_task = asyncio.create_task(
+                                    self._read_loop()
+                                )
+                                self._write_task = asyncio.create_task(
+                                    self._write_loop()
+                                )
+
+                                self._reconnecting = False
+                                self._reconnect_attempts_counter = 0
+                                self._reconnect_time = self._reconnect_time_wait
+
+                                if self._reconnected_callbacks:
+                                    for callback in self._reconnected_callbacks:
+                                        try:
+                                            callback()
+                                        except Exception:
+                                            logger.exception(
+                                                "Error in reconnected callback"
+                                            )
+
+                                return
+
+                            except Exception:
+                                logger.exception("Failed to connect to %s", server)
+                                self._last_server = server
+                                continue
+
+                        logger.error("Failed to connect to any server in the pool")
+
+                        self._reconnect_time = min(
+                            self._reconnect_time * 2, self._reconnect_time_wait_max
+                        )
+
+                    except Exception:
+                        logger.exception("Reconnection attempt failed")
+
+                logger.error("Reconnection failed after maximum attempts")
+                self._reconnecting = False
+                self._status = ClientStatus.CLOSED
 
     async def _force_flush(self) -> None:
         """Flush pending messages to the server."""
