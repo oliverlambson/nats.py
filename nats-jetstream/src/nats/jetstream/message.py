@@ -14,14 +14,6 @@ from .util import new_inbox
 if TYPE_CHECKING:
     from . import JetStream
 
-__all__ = [
-    "Headers",
-    "Message",
-    "Metadata",
-    "SequencePair",
-]
-
-
 @dataclass
 class SequencePair:
     """Sequence information for a message."""
@@ -316,3 +308,10 @@ class Message:
 
         payload = f"+TERM {reason}".encode()
         await self._jetstream.client.publish(self._reply_to, payload)
+
+__all__ = [
+    "Headers",
+    "Message",
+    "Metadata",
+    "SequencePair",
+]
