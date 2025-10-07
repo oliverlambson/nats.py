@@ -111,29 +111,6 @@ class ServerInfo:
         )
 
 
-def _collect_servers(server_info: ServerInfo,
-                     *,
-                     no_randomize: bool = False) -> list[str]:
-    """Collect servers from server info.
-
-    Args:
-        server_info: Server information
-        no_randomize: Whether to disable randomizing the server pool
-
-    Returns:
-        List of server addresses
-    """
-    servers = [f"{server_info.host}:{server_info.port}"]
-
-    if server_info.connect_urls:
-        servers.extend(server_info.connect_urls)
-
-    if not no_randomize:
-        random.shuffle(servers)
-
-    return servers
-
-
 class Client(AbstractAsyncContextManager["Client"]):
     """High-level NATS client."""
 
@@ -197,6 +174,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         connection: Connection,
         server_info: ServerInfo,
         *,
+        servers: list[str],
         allow_reconnect: bool = True,
         reconnect_attempts: int = 10,
         reconnect_time_wait: float = 2.0,
@@ -210,6 +188,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         Args:
             connection: NATS connection
             server_info: Server information
+            servers: List of server addresses for the server pool
             allow_reconnect: Whether to automatically reconnect if the connection is lost
             reconnect_attempts: Maximum number of reconnection attempts (0 for unlimited)
             reconnect_time_wait: Initial wait time between reconnection attempts
@@ -233,9 +212,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         self._last_error = None
 
         # Server pool management
-        self._server_pool = _collect_servers(
-            server_info, no_randomize=no_randomize
-        )
+        self._server_pool = servers
 
         # Reconnection state
         self._reconnect_attempts = 0
@@ -483,9 +460,11 @@ class Client(AbstractAsyncContextManager["Client"]):
     async def _handle_info(self, info: dict) -> None:
         """Handle INFO from server."""
         self._server_info = ServerInfo.from_protocol(info)
-        self._server_pool = _collect_servers(
-            self._server_info, no_randomize=self._no_randomize
-        )
+        # Update server pool with new cluster URLs from INFO
+        servers = [self._server_pool[0]]  # Keep the original connection address first
+        if self._server_info.connect_urls:
+            servers.extend(self._server_info.connect_urls)
+        self._server_pool = servers
 
     async def _handle_error(self, error: str) -> None:
         """Handle ERR from server."""
@@ -561,7 +540,15 @@ class Client(AbstractAsyncContextManager["Client"]):
                         )
                         await asyncio.sleep(actual_wait)
 
-                        for server in self._server_pool:
+                        # Create a shuffled copy of the server pool if randomization is enabled
+                        servers_to_try = self._server_pool.copy()
+                        if not self._no_randomize and len(servers_to_try) > 1:
+                            # Shuffle all but the first (original) server
+                            tail = servers_to_try[1:]
+                            random.shuffle(tail)
+                            servers_to_try = [servers_to_try[0]] + tail
+
+                        for server in servers_to_try:
                             if server == self._last_server and len(
                                     self._server_pool) > 1:
                                 continue
@@ -636,10 +623,11 @@ class Client(AbstractAsyncContextManager["Client"]):
                                 self._status = ClientStatus.CONNECTED
                                 self._last_server = server
 
-                                self._server_pool = _collect_servers(
-                                    new_server_info,
-                                    no_randomize=self._no_randomize
-                                )
+                                # Update server pool with new cluster URLs after reconnection
+                                servers = [self._server_pool[0]]  # Keep the original connection address first
+                                if new_server_info.connect_urls:
+                                    servers.extend(new_server_info.connect_urls)
+                                self._server_pool = servers
 
                                 for sid, subscription in list(
                                         self._subscriptions.items()):
@@ -1090,9 +1078,15 @@ async def connect(
                 server_info.version
             )
 
+            # Build server pool: start with the URL we connected to, then add cluster URLs
+            servers = [f"{host}:{port}"]
+            if server_info.connect_urls:
+                servers.extend(server_info.connect_urls)
+
             client = Client(
                 connection,
                 server_info,
+                servers=servers,
                 allow_reconnect=allow_reconnect,
                 reconnect_attempts=reconnect_attempts,
                 reconnect_time_wait=reconnect_time_wait,
