@@ -473,7 +473,7 @@ async def test_subscription_receives_messages_after_reconnection(server):
         server.client_url,
         timeout=1.0,
         allow_reconnect=True,
-        reconnect_attempts=10,
+        reconnect_max_attempts=10,
         reconnect_time_wait=1.0,
     )
 

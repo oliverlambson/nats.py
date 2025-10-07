@@ -176,7 +176,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         *,
         servers: list[str],
         allow_reconnect: bool = True,
-        reconnect_attempts: int = 10,
+        reconnect_max_attempts: int = 10,
         reconnect_time_wait: float = 2.0,
         reconnect_time_wait_max: float = 10.0,
         reconnect_jitter: float = 0.1,
@@ -190,7 +190,7 @@ class Client(AbstractAsyncContextManager["Client"]):
             server_info: Server information
             servers: List of server addresses for the server pool
             allow_reconnect: Whether to automatically reconnect if the connection is lost
-            reconnect_attempts: Maximum number of reconnection attempts (0 for unlimited)
+            reconnect_max_attempts: Maximum number of reconnection attempts (0 for unlimited)
             reconnect_time_wait: Initial wait time between reconnection attempts
             reconnect_time_wait_max: Maximum wait time between reconnection attempts
             reconnect_jitter: Jitter factor for reconnection attempts
@@ -200,7 +200,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         self._connection = connection
         self._server_info = server_info
         self._allow_reconnect = allow_reconnect
-        self._reconnect_max_attempts = reconnect_attempts
+        self._reconnect_max_attempts = reconnect_max_attempts
         self._reconnect_time_wait = reconnect_time_wait
         self._reconnect_time_wait_max = reconnect_time_wait_max
         self._reconnect_jitter = reconnect_jitter
@@ -1018,7 +1018,7 @@ async def connect(
     *,
     timeout: float = 2.0,
     allow_reconnect: bool = True,
-    reconnect_attempts: int = 10,
+    reconnect_max_attempts: int = 10,
     reconnect_time_wait: float = 2.0,
     reconnect_time_wait_max: float = 10.0,
     reconnect_jitter: float = 0.1,
@@ -1096,7 +1096,7 @@ async def connect(
                 server_info,
                 servers=servers,
                 allow_reconnect=allow_reconnect,
-                reconnect_attempts=reconnect_attempts,
+                reconnect_max_attempts=reconnect_max_attempts,
                 reconnect_time_wait=reconnect_time_wait,
                 reconnect_time_wait_max=reconnect_time_wait_max,
                 reconnect_jitter=reconnect_jitter,

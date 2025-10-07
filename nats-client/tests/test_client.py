@@ -505,6 +505,7 @@ async def test_cluster_reconnect_sequential_shutdown(cluster_size):
             cluster.servers[0].client_url,
             timeout=0.5,
             allow_reconnect=True,
+            reconnect_max_attempts=60,
             reconnect_time_wait=0.0,
             no_randomize=True
         )
