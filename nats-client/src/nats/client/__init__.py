@@ -145,7 +145,7 @@ class Client(AbstractAsyncContextManager["Client"]):
 
     # Reconnection configuration
     _allow_reconnect: bool
-    _reconnect_attempts: int
+    _reconnect_max_attempts: int
     _reconnect_time_wait: float
     _reconnect_time_wait_max: float
     _reconnect_jitter: float
@@ -157,8 +157,8 @@ class Client(AbstractAsyncContextManager["Client"]):
     _last_server: str | None
 
     # Reconnection state
-    _reconnect_attempts_counter: int
     _reconnecting: bool
+    _reconnect_attempts: int
     _reconnect_time: float
     _reconnect_lock: asyncio.Lock
 
@@ -221,7 +221,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         self._connection = connection
         self._server_info = server_info
         self._allow_reconnect = allow_reconnect
-        self._reconnect_attempts = reconnect_attempts
+        self._reconnect_max_attempts = reconnect_attempts
         self._reconnect_time_wait = reconnect_time_wait
         self._reconnect_time_wait_max = reconnect_time_wait_max
         self._reconnect_jitter = reconnect_jitter
@@ -238,7 +238,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         )
 
         # Reconnection state
-        self._reconnect_attempts_counter = 0
+        self._reconnect_attempts = 0
         self._reconnecting = False
         self._reconnect_time = self._reconnect_time_wait
         self._reconnect_lock = asyncio.Lock()
@@ -535,19 +535,19 @@ class Client(AbstractAsyncContextManager["Client"]):
                             logger.exception("Error in disconnected callback")
 
                 self._reconnecting = True
-                self._reconnect_attempts_counter = 0
+                self._reconnect_attempts = 0
                 self._reconnect_time = self._reconnect_time_wait
 
-                while self._reconnect_attempts == 0 or self._reconnect_attempts_counter < self._reconnect_attempts:
+                while self._reconnect_max_attempts == 0 or self._reconnect_attempts < self._reconnect_max_attempts:
                     if not self._allow_reconnect:
                         logger.info(
                             "Reconnection aborted - allow_reconnect flag disabled"
                         )
                         break
 
-                    self._reconnect_attempts_counter += 1
+                    self._reconnect_attempts += 1
                     logger.info(
-                        "Reconnection attempt %s", self._reconnect_attempts_counter
+                        "Reconnection attempt %s", self._reconnect_attempts
                     )
 
                     try:
@@ -663,7 +663,7 @@ class Client(AbstractAsyncContextManager["Client"]):
                                 )
 
                                 self._reconnecting = False
-                                self._reconnect_attempts_counter = 0
+                                self._reconnect_attempts = 0
                                 self._reconnect_time = self._reconnect_time_wait
 
                                 if self._reconnected_callbacks:
