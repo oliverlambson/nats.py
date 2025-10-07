@@ -413,6 +413,7 @@ class PullConsumer(Consumer):
     async def consume(
         self,
         callback: MessageCallback,
+        *,
         max_messages: int = 100,
         max_wait: float | None = None,
         heartbeat: float | None = None,

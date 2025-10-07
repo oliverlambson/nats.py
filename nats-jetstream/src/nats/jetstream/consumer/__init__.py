@@ -145,6 +145,7 @@ class Consumer(Protocol):
     async def consume(
         self,
         callback: Callable[[Message], Awaitable[None]],
+        *,
         max_messages: int = 1,
         max_wait: float | None = None,
         heartbeat: float | None = None,
