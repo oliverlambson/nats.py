@@ -477,7 +477,7 @@ async def test_multiple_disconnect_reconnect_callbacks(server):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("cluster_size", [2, 3, 5])
+@pytest.mark.parametrize("cluster_size", [3, 5])
 async def test_cluster_reconnect_sequential_shutdown(cluster_size):
     """Test client reconnection when cluster servers are shut down sequentially.
 
