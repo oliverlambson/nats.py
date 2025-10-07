@@ -514,7 +514,10 @@ class Client(AbstractAsyncContextManager["Client"]):
             with contextlib.suppress(asyncio.CancelledError, RuntimeError):
                 await self._write_task
 
-        await self._connection.close()
+        try:
+            await self._connection.close()
+        except Exception:
+            logger.debug("Error closing connection", exc_info=True)
 
         # Use lock to prevent concurrent reconnection attempts
         async with self._reconnect_lock:
