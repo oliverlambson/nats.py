@@ -88,50 +88,6 @@ async def test_consumer_fetch_with_max_wait(jetstream: JetStream):
     assert len(received) == 0
 
 
-@pytest.mark.skip("Heartbeat functionality removed for layered approach")
-@pytest.mark.asyncio
-async def test_consumer_fetch_with_heartbeat(jetstream: JetStream):
-    """Test fetching with heartbeat enabled."""
-    # Create a stream
-    stream = await jetstream.create_stream(
-        name="test_heartbeat", subjects=["HEARTBEAT.*"]
-    )
-
-    # Publish a few messages
-    messages = []
-    for i in range(3):
-        message = f"heartbeat {i}".encode()
-        _ack = await jetstream.publish(f"HEARTBEAT.{i}", message)
-        messages.append((f"HEARTBEAT.{i}", message))
-
-    # Create a pull consumer
-    consumer = await stream.create_consumer(
-        name="heartbeat_consumer",
-        durable_name="heartbeat_consumer",
-        filter_subject="HEARTBEAT.*",
-        deliver_policy="all"
-    )
-
-    # Fetch with heartbeat enabled
-    batch = await consumer.fetch(
-        max_messages=5,  # Request more than available
-        max_wait=1.0,
-        heartbeat=0.1,  # 100ms heartbeats
-    )
-
-    # Collect all messages from the batch
-    received = []
-    async for msg in batch:
-        received.append((msg.subject, msg.data))
-        # Acknowledge the message
-        await msg.ack()
-
-    # Verify we received only the available messages
-    assert len(received) == 3
-    for i in range(3):
-        assert received[i] == messages[i]
-
-
 @pytest.mark.asyncio
 async def test_consumer_fetch_nowait(jetstream: JetStream):
     """Test fetching messages with nowait option enabled.
