@@ -32,6 +32,9 @@ MessageCallback = Callable[[Message], Awaitable[None]]
 class MessageHandler:
     """Handler for message consumption with callback processing."""
 
+    _task: asyncio.Task[None]
+    _message_stream: PullMessageStream
+
     def __init__(self, task: asyncio.Task, message_stream: PullMessageStream):
         self._task = task
         self._message_stream = message_stream
