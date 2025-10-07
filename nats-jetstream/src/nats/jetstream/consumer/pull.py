@@ -55,6 +55,13 @@ class MessageHandler:
 
 class PullMessageBatch(MessageBatch):
 
+    _subscription: Subscription
+    _pending_messages: int
+    _jetstream: Any
+    _terminated: bool
+    _error: Exception | None
+    _deadline: float | None
+
     def __init__(
         self, subscription: Subscription, batch_size: int, jetstream,
         max_wait: float | None
