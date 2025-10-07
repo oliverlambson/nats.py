@@ -316,6 +316,9 @@ class PullMessageStream(MessageStream):
 
 class PullConsumer(Consumer):
 
+    _stream: Stream
+    _info: ConsumerInfo
+
     def __init__(self, stream: Stream, info: ConsumerInfo):
         self._stream = stream
         self._info = info
