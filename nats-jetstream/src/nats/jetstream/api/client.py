@@ -10,8 +10,6 @@ from typing import (
     TypeGuard,
     Unpack,
     cast,
-    get_args,
-    get_origin,
     overload,
 )
 
@@ -23,7 +21,6 @@ from .types import (
     ConsumerInfoResponse,
     ConsumerListResponse,
     ConsumerNamesResponse,
-    Error as ApiError,
     ErrorResponse,
     StreamCreateRequest,
     StreamCreateResponse,
@@ -41,6 +38,9 @@ from .types import (
     StreamPurgeResponse,
     StreamUpdateRequest,
     StreamUpdateResponse,
+)
+from .types import (
+    Error as ApiError,
 )
 
 if TYPE_CHECKING:

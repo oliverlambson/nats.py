@@ -7,7 +7,8 @@ from typing import AsyncGenerator, Generator
 import pytest
 import pytest_asyncio
 from nats.client import Client, connect
-from nats.jetstream import JetStream, new as new_jetstream
+from nats.jetstream import JetStream
+from nats.jetstream import new as new_jetstream
 from nats.server import Server, run
 
 

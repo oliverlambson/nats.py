@@ -1,7 +1,6 @@
 """Tests for StreamConfig None semantics for unlimited values."""
 
 import pytest
-
 from nats.jetstream.stream import StreamConfig
 
 

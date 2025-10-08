@@ -1,7 +1,6 @@
 """Tests for JetStream API client functionality."""
 
-import pytest
-from typing import TypedDict, Required, NotRequired
+from typing import NotRequired, Required, TypedDict
 
 from nats.jetstream.api.client import check_response
 
