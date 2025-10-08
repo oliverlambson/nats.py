@@ -111,9 +111,74 @@ class StreamConfig:
     @classmethod
     def from_response(cls, config: api.StreamConfig) -> StreamConfig:
         """Create a StreamConfig from an API response"""
-        # Convert the TypedDict to a dict and filter out None values
-        config_dict = {k: v for k, v in config.items() if v is not None}
-        return cls(**config_dict)
+        max_age = config.get("max_age", 0)
+        max_bytes = config.get("max_bytes", -1)
+        max_consumers = config.get("max_consumers", -1)
+        max_msgs = config.get("max_msgs", -1)
+        num_replicas = config.get("num_replicas", 1)
+        retention = config.get("retention", "limits")
+        storage = config.get("storage", "file")
+
+        allow_direct = config.get("allow_direct")
+        allow_msg_ttl = config.get("allow_msg_ttl")
+        allow_rollup_hdrs = config.get("allow_rollup_hdrs")
+        compression = config.get("compression")
+        deny_delete = config.get("deny_delete")
+        deny_purge = config.get("deny_purge")
+        description = config.get("description")
+        discard = config.get("discard")
+        discard_new_per_subject = config.get("discard_new_per_subject")
+        duplicate_window = config.get("duplicate_window")
+        first_seq = config.get("first_seq")
+        max_msg_size = config.get("max_msg_size")
+        max_msgs_per_subject = config.get("max_msgs_per_subject")
+        metadata = config.get("metadata")
+        mirror = config.get("mirror")
+        mirror_direct = config.get("mirror_direct")
+        name = config.get("name")
+        no_ack = config.get("no_ack")
+        placement = config.get("placement")
+        republish = config.get("republish")
+        sealed = config.get("sealed")
+        sources = config.get("sources")
+        subjects = config.get("subjects")
+        subject_transform = config.get("subject_transform")
+        template_owner = config.get("template_owner")
+
+        return cls(
+            max_age=max_age,
+            max_bytes=max_bytes,
+            max_consumers=max_consumers,
+            max_msgs=max_msgs,
+            num_replicas=num_replicas,
+            retention=retention,
+            storage=storage,
+            allow_direct=allow_direct,
+            allow_msg_ttl=allow_msg_ttl,
+            allow_rollup_hdrs=allow_rollup_hdrs,
+            compression=compression,
+            deny_delete=deny_delete,
+            deny_purge=deny_purge,
+            description=description,
+            discard=discard,
+            discard_new_per_subject=discard_new_per_subject,
+            duplicate_window=duplicate_window,
+            first_seq=first_seq,
+            max_msg_size=max_msg_size,
+            max_msgs_per_subject=max_msgs_per_subject,
+            metadata=metadata,
+            mirror=mirror,
+            mirror_direct=mirror_direct,
+            name=name,
+            no_ack=no_ack,
+            placement=placement,
+            republish=republish,
+            sealed=sealed,
+            sources=sources,
+            subjects=subjects,
+            subject_transform=subject_transform,
+            template_owner=template_owner,
+        )
 
 
 @dataclass
