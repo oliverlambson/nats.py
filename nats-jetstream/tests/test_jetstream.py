@@ -2,6 +2,7 @@
 
 import pytest
 from nats.jetstream import JetStream, StreamInfo
+from nats.jetstream.api.client import Error
 
 
 @pytest.mark.asyncio
@@ -562,7 +563,7 @@ async def test_update_nonexistent_consumer_fails(jetstream: JetStream):
     await jetstream.create_stream(name="test_stream", subjects=["FOO.*"])
 
     # Try to update a non-existent consumer
-    with pytest.raises(ValueError, match="consumer does not exist"):
+    with pytest.raises(Error, match="consumer does not exist"):
         await jetstream.update_consumer(
             stream_name="test_stream", consumer_name="nonexistent", max_deliver=20
         )
