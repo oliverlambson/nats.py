@@ -8,38 +8,39 @@ from typing import (
     Any,
     Literal,
     TypeGuard,
-    TypeVar,
     Unpack,
     cast,
+    get_args,
+    get_origin,
     overload,
 )
 
 from .types import (
-    AccountInfoResponse,
+    AccountInfoResponse_AccountInfo,
     ConsumerCreateRequest,
-    ConsumerCreateResponse,
-    ConsumerDeleteResponse,
-    ConsumerInfoResponse,
+    ConsumerCreateResponse_ConsumerInfo,
+    ConsumerDeleteResponse_Variant1,
+    ConsumerInfoResponse_ConsumerInfo,
     ConsumerListResponse,
     ConsumerNamesResponse,
     Error as ApiError,
     ErrorResponse,
     StreamCreateRequest,
-    StreamCreateResponse,
-    StreamDeleteResponse,
+    StreamCreateResponse_StreamInfo,
+    StreamDeleteResponse_Variant1,
     StreamInfoRequest,
-    StreamInfoResponse,
+    StreamInfoResponse_StreamInfo,
     StreamListResponse,
     StreamMsgDeleteRequest,
-    StreamMsgDeleteResponse,
+    StreamMsgDeleteResponse_Variant1,
     StreamMsgGetRequest,
-    StreamMsgGetResponse,
+    StreamMsgGetResponse_Variant1,
     StreamNamesRequest,
     StreamNamesResponse,
     StreamPurgeRequest,
-    StreamPurgeResponse,
+    StreamPurgeResponse_Variant1,
     StreamUpdateRequest,
-    StreamUpdateResponse,
+    StreamUpdateResponse_StreamInfo,
 )
 
 if TYPE_CHECKING:
@@ -69,18 +70,33 @@ class Error(Exception):
         )
 
 
-ResponseT = TypeVar("ResponseT")
-
-
 def is_error_response(data: Any) -> TypeGuard[ErrorResponse]:
     return isinstance(data, dict) and "error" in data
 
 
-def check_response(
+def check_response[ResponseT](
     data: Any, expected_type: type[ResponseT]
 ) -> tuple[bool, set[str] | None, set[str] | None]:
-    # TODO check for missing and unknown keys
-    return True, None, None
+    if not isinstance(data, dict):
+        return False, None, None
+
+    # Get expected keys from TypedDict annotations
+    expected_keys = set(expected_type.__annotations__.keys())
+    actual_keys = set(data.keys())
+
+    # Find missing required keys and unknown keys
+    missing_keys = expected_keys - actual_keys
+    unknown_keys = actual_keys - expected_keys
+
+    # Filter out optional keys from missing_keys
+    # TypedDict stores required/optional info in __required_keys__ (Python 3.9+)
+    if hasattr(expected_type, '__required_keys__'):
+        required_keys = expected_type.__required_keys__
+        missing_keys = missing_keys & required_keys
+
+    is_valid = len(missing_keys) == 0
+
+    return is_valid, unknown_keys if unknown_keys else None, missing_keys if missing_keys else None
 
 
 class Client:
@@ -89,15 +105,15 @@ class Client:
         self._client = client
         self._prefix = prefix
 
-    async def account_info(self) -> AccountInfoResponse:
+    async def account_info(self) -> AccountInfoResponse_AccountInfo:
         return await self.request_json(
             f"{self._prefix}.INFO",
-            response_type=AccountInfoResponse,
+            response_type=AccountInfoResponse_AccountInfo,
         )
 
     async def consumer_create(
         self, **request: Unpack[ConsumerCreateRequest]
-    ) -> ConsumerCreateResponse:
+    ) -> ConsumerCreateResponse_ConsumerInfo:
         stream_name = request.get("stream_name")
         if not stream_name:
             raise ValueError("stream_name is required")
@@ -113,23 +129,23 @@ class Client:
         return await self.request_json(
             f"{self._prefix}.CONSUMER.CREATE.{stream_name}.{consumer_name}",
             request,
-            response_type=ConsumerCreateResponse,
+            response_type=ConsumerCreateResponse_ConsumerInfo,
         )
 
     async def consumer_delete(
         self, stream_name: str, consumer_name: str
-    ) -> ConsumerDeleteResponse:
+    ) -> ConsumerDeleteResponse_Variant1:
         return await self.request_json(
             f"{self._prefix}.CONSUMER.DELETE.{stream_name}.{consumer_name}",
-            response_type=ConsumerDeleteResponse,
+            response_type=ConsumerDeleteResponse_Variant1,
         )
 
     async def consumer_info(
         self, stream_name: str, consumer_name: str
-    ) -> ConsumerInfoResponse:
+    ) -> ConsumerInfoResponse_ConsumerInfo:
         return await self.request_json(
             f"{self._prefix}.CONSUMER.INFO.{stream_name}.{consumer_name}",
-            response_type=ConsumerInfoResponse,
+            response_type=ConsumerInfoResponse_ConsumerInfo,
         )
 
     async def consumer_list(self, stream_name: str, offset: int | None = None) -> ConsumerListResponse:
@@ -157,7 +173,7 @@ class Client:
 
     async def stream_create(
         self, name: str, **kwargs: Unpack[StreamCreateRequest]
-    ) -> StreamCreateResponse:
+    ) -> StreamCreateResponse_StreamInfo:
         # Validate max_msgs
         max_msgs = kwargs.get("max_msgs", -1)
         if max_msgs < -1:
@@ -177,22 +193,22 @@ class Client:
                 "name": name,
                 **kwargs,
             },
-            response_type=StreamCreateResponse,
+            response_type=StreamCreateResponse_StreamInfo,
         )
 
-    async def stream_delete(self, name: str) -> StreamDeleteResponse:
+    async def stream_delete(self, name: str) -> StreamDeleteResponse_Variant1:
         return await self.request_json(
             f"{self._prefix}.STREAM.DELETE.{name}",
-            response_type=StreamDeleteResponse,
+            response_type=StreamDeleteResponse_Variant1,
         )
 
     async def stream_info(
         self, name: str, **request: Unpack[StreamInfoRequest]
-    ) -> StreamInfoResponse:
+    ) -> StreamInfoResponse_StreamInfo:
         return await self.request_json(
             f"{self._prefix}.STREAM.INFO.{name}",
             request if request else None,
-            response_type=StreamInfoResponse,
+            response_type=StreamInfoResponse_StreamInfo,
         )
 
     async def stream_list(
@@ -223,20 +239,20 @@ class Client:
 
     async def stream_msg_delete(
         self, name: str, **request: Unpack[StreamMsgDeleteRequest]
-    ) -> StreamMsgDeleteResponse:
+    ) -> StreamMsgDeleteResponse_Variant1:
         return await self.request_json(
             f"{self._prefix}.STREAM.MSG.DELETE.{name}",
             request if request else None,
-            response_type=StreamMsgDeleteResponse,
+            response_type=StreamMsgDeleteResponse_Variant1,
         )
 
     async def stream_msg_get(
         self, name: str, **request: Unpack[StreamMsgGetRequest]
-    ) -> StreamMsgGetResponse:
+    ) -> StreamMsgGetResponse_Variant1:
         return await self.request_json(
             f"{self._prefix}.STREAM.MSG.GET.{name}",
             request if request else None,
-            response_type=StreamMsgGetResponse,
+            response_type=StreamMsgGetResponse_Variant1,
         )
 
     async def stream_names(
@@ -259,27 +275,27 @@ class Client:
 
     async def stream_purge(
         self, name: str, **request: Unpack[StreamPurgeRequest]
-    ) -> StreamPurgeResponse:
+    ) -> StreamPurgeResponse_Variant1:
         return await self.request_json(
             f"{self._prefix}.STREAM.PURGE.{name}",
             request if request else None,
-            response_type=StreamPurgeResponse,
+            response_type=StreamPurgeResponse_Variant1,
         )
 
     async def stream_update(
         self, name: str, **config: Unpack[StreamUpdateRequest]
-    ) -> StreamUpdateResponse:
+    ) -> StreamUpdateResponse_StreamInfo:
         return await self.request_json(
             f"{self._prefix}.STREAM.UPDATE.{name}",
             {
                 "name": name,
                 **config,
             },
-            response_type=StreamUpdateResponse,
+            response_type=StreamUpdateResponse_StreamInfo,
         )
 
     @overload
-    async def request_json(
+    async def request_json[ResponseT](
         self,
         subject: str,
         payload: Any | None = None,
@@ -290,7 +306,7 @@ class Client:
         ...
 
     @overload
-    async def request_json(
+    async def request_json[ResponseT](
         self,
         subject: str,
         payload: Any | None = None,
@@ -300,7 +316,7 @@ class Client:
     ) -> ResponseT | ErrorResponse:
         ...
 
-    async def request_json(
+    async def request_json[ResponseT](
         self,
         subject: str,
         payload: Any | None = None,
