@@ -44,12 +44,12 @@ class LostStreamData:
     """The number of bytes that were lost."""
 
     @classmethod
-    def from_response(cls, data: api.LostStreamData) -> LostStreamData:
+    def from_response(cls, data: api.LostStreamData, *, strict: bool = True) -> LostStreamData:
         msgs = data.pop("msgs", None)
         bytes_val = data.pop("bytes", None)
 
         # Check for unconsumed fields
-        if data:
+        if strict and data:
             raise ValueError(f"LostStreamData.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
@@ -69,12 +69,12 @@ class ExternalStreamSource:
     """The delivery subject to use for the push consumer."""
 
     @classmethod
-    def from_response(cls, data: api.ExternalStreamSource) -> ExternalStreamSource:
+    def from_response(cls, data: api.ExternalStreamSource, *, strict: bool = True) -> ExternalStreamSource:
         api_prefix = data.pop("api")
         deliver = data.pop("deliver", None)
 
         # Check for unconsumed fields
-        if data:
+        if strict and data:
             raise ValueError(f"ExternalStreamSource.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
@@ -101,12 +101,12 @@ class SubjectTransform:
     """The subject transform destination."""
 
     @classmethod
-    def from_response(cls, data: api.SubjectTransform) -> SubjectTransform:
+    def from_response(cls, data: api.SubjectTransform, *, strict: bool = True) -> SubjectTransform:
         src = data.pop("src")
         dest = data.pop("dest")
 
         # Check for unconsumed fields
-        if data:
+        if strict and data:
             raise ValueError(f"SubjectTransform.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
@@ -143,7 +143,7 @@ class StreamSource:
     """The subject filtering sources and associated destination transforms."""
 
     @classmethod
-    def from_response(cls, data: api.StreamSource) -> StreamSource:
+    def from_response(cls, data: api.StreamSource, *, strict: bool = True) -> StreamSource:
         name = data.pop("name")
         opt_start_seq = data.pop("opt_start_seq", None)
         opt_start_time = data.pop("opt_start_time", None)
@@ -153,10 +153,10 @@ class StreamSource:
         external = None
         external_data = data.pop("external", None)
         if external_data:
-            external = ExternalStreamSource.from_response(external_data)
+            external = ExternalStreamSource.from_response(external_data, strict=strict)
 
         # Check for unconsumed fields
-        if data:
+        if strict and data:
             raise ValueError(f"StreamSource.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
@@ -208,7 +208,7 @@ class StreamSourceInfo:
     """The subject filtering sources and associated destination transforms."""
 
     @classmethod
-    def from_response(cls, data: api.StreamSourceInfo) -> StreamSourceInfo:
+    def from_response(cls, data: api.StreamSourceInfo, *, strict: bool = True) -> StreamSourceInfo:
         name = data.pop("name")
         lag = data.pop("lag")
         active = data.pop("active")
@@ -219,10 +219,10 @@ class StreamSourceInfo:
         external = None
         external_data = data.pop("external", None)
         if external_data:
-            external = ExternalStreamSource.from_response(external_data)
+            external = ExternalStreamSource.from_response(external_data, strict=strict)
 
         # Check for unconsumed fields
-        if data:
+        if strict and data:
             raise ValueError(f"StreamSourceInfo.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
@@ -247,12 +247,12 @@ class Placement:
     """Tags required on servers hosting this stream or leader."""
 
     @classmethod
-    def from_response(cls, data: api.Placement) -> Placement:
+    def from_response(cls, data: api.Placement, *, strict: bool = True) -> Placement:
         cluster = data.pop("cluster", None)
         tags = data.pop("tags", None)
 
         # Check for unconsumed fields
-        if data:
+        if strict and data:
             raise ValueError(f"Placement.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
@@ -284,13 +284,13 @@ class Republish:
     """Only send message headers, no bodies."""
 
     @classmethod
-    def from_response(cls, data: api.Republish) -> Republish:
+    def from_response(cls, data: api.Republish, *, strict: bool = True) -> Republish:
         src = data.pop("src")
         dest = data.pop("dest")
         headers_only = data.pop("headers_only", None)
 
         # Check for unconsumed fields
-        if data:
+        if strict and data:
             raise ValueError(f"Republish.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
@@ -318,12 +318,12 @@ class StreamConsumerLimits:
     """Maximum value for max_ack_pending for consumers of this stream. Acts as a default when consumers do not set this value."""
 
     @classmethod
-    def from_response(cls, data: api.StreamConsumerLimits) -> StreamConsumerLimits:
+    def from_response(cls, data: api.StreamConsumerLimits, *, strict: bool = True) -> StreamConsumerLimits:
         inactive_threshold = data.pop("inactive_threshold", None)
         max_ack_pending = data.pop("max_ack_pending", None)
 
         # Check for unconsumed fields
-        if data:
+        if strict and data:
             raise ValueError(f"StreamConsumerLimits.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
@@ -364,7 +364,7 @@ class PeerInfo:
     """Indicates if the server is running as an observer only."""
 
     @classmethod
-    def from_response(cls, data: api.PeerInfo) -> PeerInfo:
+    def from_response(cls, data: api.PeerInfo, *, strict: bool = True) -> PeerInfo:
         name = data.pop("name")
         current = data.pop("current")
         active = data.pop("active")
@@ -373,7 +373,7 @@ class PeerInfo:
         observer = data.pop("observer", None)
 
         # Check for unconsumed fields
-        if data:
+        if strict and data:
             raise ValueError(f"PeerInfo.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
@@ -403,7 +403,7 @@ class ClusterInfo:
     """In clustered environments the name of the Raft group managing the asset."""
 
     @classmethod
-    def from_response(cls, data: api.ClusterInfo) -> ClusterInfo:
+    def from_response(cls, data: api.ClusterInfo, *, strict: bool = True) -> ClusterInfo:
         name = data.pop("name", None)
         leader = data.pop("leader", None)
         raft_group = data.pop("raft_group", None)
@@ -411,10 +411,10 @@ class ClusterInfo:
         replicas = None
         replicas_data = data.pop("replicas", None)
         if replicas_data:
-            replicas = [PeerInfo.from_response(r) for r in replicas_data]
+            replicas = [PeerInfo.from_response(r, strict=strict) for r in replicas_data]
 
         # Check for unconsumed fields
-        if data:
+        if strict and data:
             raise ValueError(f"ClusterInfo.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
@@ -465,7 +465,7 @@ class StreamState:
     """The number of unique subjects in the Stream."""
 
     @classmethod
-    def from_response(cls, data: api.StreamState) -> StreamState:
+    def from_response(cls, data: api.StreamState, *, strict: bool = True) -> StreamState:
         messages = data.pop("messages")
         bytes_val = data.pop("bytes")
         first_sequence = data.pop("first_seq")
@@ -481,10 +481,10 @@ class StreamState:
         lost = None
         lost_data = data.pop("lost", None)
         if lost_data:
-            lost = LostStreamData.from_response(lost_data)
+            lost = LostStreamData.from_response(lost_data, strict=strict)
 
         # Check for unconsumed fields
-        if data:
+        if strict and data:
             raise ValueError(f"StreamState.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
@@ -650,7 +650,7 @@ class StreamConfig:
         return cls(**kwargs)
 
     @classmethod
-    def from_response(cls, config: api.StreamConfig) -> StreamConfig:
+    def from_response(cls, config: api.StreamConfig, *, strict: bool = True) -> StreamConfig:
         """Create a StreamConfig from an API response"""
         # Pop fields as we consume them to detect unconsumed ones at the end
         # No need to copy - config comes from JSON and won't be reused
@@ -700,35 +700,35 @@ class StreamConfig:
         mirror = None
         mirror_data = config.pop("mirror", None)
         if mirror_data:
-            mirror = StreamSource.from_response(mirror_data)
+            mirror = StreamSource.from_response(mirror_data, strict=strict)
 
         sources = None
         sources_data = config.pop("sources", None)
         if sources_data:
-            sources = [StreamSource.from_response(s) for s in sources_data]
+            sources = [StreamSource.from_response(s, strict=strict) for s in sources_data]
 
         subject_transform = None
         subject_transform_data = config.pop("subject_transform", None)
         if subject_transform_data:
-            subject_transform = SubjectTransform.from_response(subject_transform_data)
+            subject_transform = SubjectTransform.from_response(subject_transform_data, strict=strict)
 
         placement = None
         placement_data = config.pop("placement", None)
         if placement_data:
-            placement = Placement.from_response(placement_data)
+            placement = Placement.from_response(placement_data, strict=strict)
 
         republish = None
         republish_data = config.pop("republish", None)
         if republish_data:
-            republish = Republish.from_response(republish_data)
+            republish = Republish.from_response(republish_data, strict=strict)
 
         consumer_limits = None
         consumer_limits_data = config.pop("consumer_limits", None)
         if consumer_limits_data:
-            consumer_limits = StreamConsumerLimits.from_response(consumer_limits_data)
+            consumer_limits = StreamConsumerLimits.from_response(consumer_limits_data, strict=strict)
 
         # Check for unconsumed fields
-        if config:
+        if strict and config:
             raise ValueError(f"StreamConfig.from_response() has unconsumed fields: {list(config.keys())}")
 
         return cls(
@@ -862,26 +862,26 @@ class StreamInfo:
     """The server time the stream info was created."""
 
     @classmethod
-    def from_response(cls, data: api.StreamInfo) -> StreamInfo:
-        config = StreamConfig.from_response(data.pop("config"))
+    def from_response(cls, data: api.StreamInfo, *, strict: bool = True) -> StreamInfo:
+        config = StreamConfig.from_response(data.pop("config"), strict=strict)
         created = data.pop("created")
-        state = StreamState.from_response(data.pop("state"))
+        state = StreamState.from_response(data.pop("state"), strict=strict)
         ts = data.pop("ts", None)
 
         cluster = None
         cluster_data = data.pop("cluster", None)
         if cluster_data:
-            cluster = ClusterInfo.from_response(cluster_data)
+            cluster = ClusterInfo.from_response(cluster_data, strict=strict)
 
         mirror = None
         mirror_data = data.pop("mirror", None)
         if mirror_data:
-            mirror = StreamSourceInfo.from_response(mirror_data)
+            mirror = StreamSourceInfo.from_response(mirror_data, strict=strict)
 
         sources = None
         sources_data = data.pop("sources", None)
         if sources_data:
-            sources = [StreamSourceInfo.from_response(s) for s in sources_data]
+            sources = [StreamSourceInfo.from_response(s, strict=strict) for s in sources_data]
 
         # Pop response envelope fields that aren't part of StreamInfo
         data.pop("type", None)  # Response type discriminator
@@ -892,7 +892,7 @@ class StreamInfo:
         data.pop("total", None)  # Pagination field from list responses
 
         # Check for unconsumed fields
-        if data:
+        if strict and data:
             raise ValueError(f"StreamInfo.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(

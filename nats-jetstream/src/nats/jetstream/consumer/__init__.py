@@ -131,7 +131,7 @@ class ConsumerConfig:
     """Sets the percentage of acknowledgments that should be sampled for observability."""
 
     @classmethod
-    def from_response(cls, config: api.ConsumerConfig) -> ConsumerConfig:
+    def from_response(cls, config: api.ConsumerConfig, *, strict: bool = True) -> ConsumerConfig:
         """Create a ConsumerConfig from an API response."""
         # Pop fields as we consume them to detect unconsumed ones at the end
         ack_policy = config.pop("ack_policy", "none")
@@ -170,7 +170,7 @@ class ConsumerConfig:
         sample_freq = config.pop("sample_freq", None)
 
         # Check for unconsumed fields
-        if config:
+        if strict and config:
             raise ValueError(f"ConsumerConfig.from_response() has unconsumed fields: {list(config.keys())}")
 
         return cls(
@@ -316,11 +316,11 @@ class ConsumerInfo:
     """The server time the consumer info was created."""
 
     @classmethod
-    def from_response(cls, data: api.ConsumerInfo) -> ConsumerInfo:
+    def from_response(cls, data: api.ConsumerInfo, *, strict: bool = True) -> ConsumerInfo:
         stream_name = data.pop("stream_name")
         name = data.pop("name")
         config_data = data.pop("config")
-        config = ConsumerConfig.from_response(config_data)
+        config = ConsumerConfig.from_response(config_data, strict=strict)
         created = data.pop("created")
         delivered = data.pop("delivered")
         ack_floor = data.pop("ack_floor")
@@ -336,7 +336,7 @@ class ConsumerInfo:
         data.pop("type", None)  # Response type discriminator
 
         # Check for unconsumed fields
-        if data:
+        if strict and data:
             raise ValueError(f"ConsumerInfo.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(

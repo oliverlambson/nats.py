@@ -41,13 +41,13 @@ class APIStats:
     """The API level."""
 
     @classmethod
-    def from_response(cls, data: api.ApiStats) -> APIStats:
+    def from_response(cls, data: api.ApiStats, *, strict: bool = True) -> APIStats:
         total = data.pop("total")
         errors = data.pop("errors")
         level = data.pop("level", None)
 
         # Check for unconsumed fields
-        if data:
+        if strict and data:
             raise ValueError(f"APIStats.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
@@ -71,7 +71,7 @@ class AccountLimits:
     max_bytes_required: bool
 
     @classmethod
-    def from_response(cls, data: api.AccountLimits) -> AccountLimits:
+    def from_response(cls, data: api.AccountLimits, *, strict: bool = True) -> AccountLimits:
         max_memory = data.pop("max_memory")
         max_storage = data.pop("max_storage")
         max_streams = data.pop("max_streams")
@@ -82,7 +82,7 @@ class AccountLimits:
         max_bytes_required = data.pop("max_bytes_required")
 
         # Check for unconsumed fields
-        if data:
+        if strict and data:
             raise ValueError(f"AccountLimits.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
@@ -108,15 +108,15 @@ class Tier:
     limits: AccountLimits
 
     @classmethod
-    def from_response(cls, data: api.Tier) -> Tier:
+    def from_response(cls, data: api.Tier, *, strict: bool = True) -> Tier:
         memory = data.pop("memory")
         storage = data.pop("storage")
         streams = data.pop("streams")
         consumers = data.pop("consumers")
-        limits = AccountLimits.from_response(data.pop("limits"))
+        limits = AccountLimits.from_response(data.pop("limits"), strict=strict)
 
         # Check for unconsumed fields
-        if data:
+        if strict and data:
             raise ValueError(f"Tier.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
@@ -146,19 +146,19 @@ class AccountInfo:
     """Reserved storage for the account."""
 
     @classmethod
-    def from_response(cls, data: api.AccountInfo) -> AccountInfo:
+    def from_response(cls, data: api.AccountInfo, *, strict: bool = True) -> AccountInfo:
         memory = data.pop("memory")
         storage = data.pop("storage")
         streams = data.pop("streams")
         consumers = data.pop("consumers")
-        limits = AccountLimits.from_response(data.pop("limits"))
-        api_stats = APIStats.from_response(data.pop("api"))
+        limits = AccountLimits.from_response(data.pop("limits"), strict=strict)
+        api_stats = APIStats.from_response(data.pop("api"), strict=strict)
         domain = data.pop("domain", None)
 
         tiers = None
         tiers_data = data.pop("tiers", None)
         if tiers_data:
-            tiers = {k: Tier.from_response(v) for k, v in tiers_data.items()}
+            tiers = {k: Tier.from_response(v, strict=strict) for k, v in tiers_data.items()}
 
         reserved_memory = data.pop("reserved_memory", None)
         reserved_storage = data.pop("reserved_storage", None)
@@ -167,7 +167,7 @@ class AccountInfo:
         data.pop("type", None)  # Response type discriminator
 
         # Check for unconsumed fields
-        if data:
+        if strict and data:
             raise ValueError(f"AccountInfo.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
@@ -194,14 +194,14 @@ class PublishAck:
     duplicate: bool = False
 
     @classmethod
-    def from_response(cls, data: api.PublishAck) -> PublishAck:
+    def from_response(cls, data: api.PublishAck, *, strict: bool = True) -> PublishAck:
         stream = data.pop("stream")
         sequence = data.pop("seq", None)
         domain = data.pop("domain", None)
         duplicate = data.pop("duplicate", False)
 
         # Check for unconsumed fields
-        if data:
+        if strict and data:
             raise ValueError(f"PublishAck.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(

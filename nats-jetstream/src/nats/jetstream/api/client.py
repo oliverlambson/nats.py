@@ -56,7 +56,7 @@ class Error(Exception):
         self.description = description
 
     @classmethod
-    def from_response(cls, error: ApiError) -> Error:
+    def from_response(cls, error: ApiError, *, strict: bool = True) -> Error:
         description = error.pop("description", "Unknown error")
         code = error.pop("code", None)
         err_code = error.pop("err_code", None)
@@ -66,7 +66,7 @@ class Error(Exception):
             code = err_code
 
         # Check for unconsumed fields
-        if error:
+        if strict and error:
             raise ValueError(f"Error.from_response() has unconsumed fields: {list(error.keys())}")
 
         return cls(
