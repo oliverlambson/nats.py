@@ -119,18 +119,27 @@ class AccountInfo:
 
     @classmethod
     def from_response(cls, data: api.AccountInfo) -> AccountInfo:
+        memory = data["memory"]
+        storage = data["storage"]
+        streams = data["streams"]
+        consumers = data["consumers"]
+        limits = AccountLimits.from_response(data["limits"])
+        api = APIStats.from_response(data["api"])
+        domain = data.get("domain")
+        tiers = {
+            k: Tier.from_response(v)
+            for k, v in data["tiers"].items()
+        } if "tiers" in data else None
+
         return cls(
-            memory=data["memory"],
-            storage=data["storage"],
-            streams=data["streams"],
-            consumers=data["consumers"],
-            limits=AccountLimits.from_response(data["limits"]),
-            api=APIStats.from_response(data["api"]),
-            domain=data.get("domain"),
-            tiers={
-                k: Tier.from_response(v)
-                for k, v in data["tiers"].items()
-            } if "tiers" in data else None,
+            memory=memory,
+            storage=storage,
+            streams=streams,
+            consumers=consumers,
+            limits=limits,
+            api=api,
+            domain=domain,
+            tiers=tiers,
         )
 
 
@@ -145,11 +154,16 @@ class PublishAck:
 
     @classmethod
     def from_response(cls, data: api.PublishAck) -> PublishAck:
+        stream = data["stream"]
+        sequence = data.get("seq")
+        domain = data.get("domain")
+        duplicate = data.get("duplicate", False)
+
         return cls(
-            stream=data["stream"],
-            sequence=data.get("seq"),
-            domain=data.get("domain"),
-            duplicate=data.get("duplicate", False),
+            stream=stream,
+            sequence=sequence,
+            domain=domain,
+            duplicate=duplicate,
         )
 
 
