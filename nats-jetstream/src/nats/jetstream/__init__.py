@@ -15,10 +15,10 @@ from nats.jetstream.stream import (
     StreamState,
 )
 
-from .api.client import Client as ApiClient
+from .api import client
 
 if TYPE_CHECKING:
-    from nats.client import Client as NatsClient
+    from nats.client import Client
 
     from . import api
 
@@ -172,7 +172,7 @@ class JetStream:
 
     def __init__(
         self,
-        client: NatsClient,
+        client: Client,
         prefix: str = "$JS.API",
         domain: str | None = None
     ) -> None:
@@ -187,10 +187,10 @@ class JetStream:
         if domain:
             prefix = f"$JS.{domain}.API"
         self._prefix = prefix
-        self._api = ApiClient(client, prefix)
+        self._api = api.Client(client, prefix)
 
     @property
-    def client(self) -> NatsClient:
+    def client(self) -> Client:
         """Get the underlying NATS client."""
         return self._client
 
@@ -583,7 +583,7 @@ class JetStream:
 
 
 def new(
-    client: NatsClient,
+    client: Client,
     prefix: str = "$JS.API",
     domain: str | None = None
 ) -> JetStream:
