@@ -10,10 +10,14 @@ from typing import TYPE_CHECKING, AsyncIterator, overload
 from nats.jetstream.consumer import Consumer, ConsumerInfo
 from nats.jetstream.stream import (
     ClusterInfo,
+    CompressionType,
+    DiscardPolicy,
     ExternalStreamSource,
     PeerInfo,
     Placement,
     Republish,
+    RetentionPolicy,
+    StorageType,
     Stream,
     StreamConfig,
     StreamConsumerLimits,

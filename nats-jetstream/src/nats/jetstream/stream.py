@@ -22,6 +22,12 @@ CONSUMER_ACTION_CREATE = "create"
 CONSUMER_ACTION_UPDATE = "update"
 CONSUMER_ACTION_CREATE_OR_UPDATE = ""
 
+# Type aliases for stream configuration enums
+RetentionPolicy = Literal["limits", "interest", "workqueue"]
+StorageType = Literal["file", "memory"]
+DiscardPolicy = Literal["old", "new"]
+CompressionType = Literal["none", "s2"]
+
 if TYPE_CHECKING:
     from . import JetStream, api
 
@@ -338,9 +344,8 @@ class StreamConfig:
 
     # Required fields with defaults
     num_replicas: int = 1  # Number of replicas to keep for each message
-    retention: Literal["limits", "interest",
-                       "workqueue"] = "limits"  # How messages are retained
-    storage: Literal["file", "memory"] = "file"  # Storage backend to use
+    retention: RetentionPolicy = "limits"  # How messages are retained
+    storage: StorageType = "file"  # Storage backend to use
 
     # Optional limit fields (None means unlimited)
     max_age: int | None = None  # Maximum age of any message in nanoseconds (None for unlimited)
@@ -351,11 +356,11 @@ class StreamConfig:
     allow_direct: bool | None = None  # Allow direct access to get messages
     allow_msg_ttl: bool | None = None  # Enable per-message TTL using headers
     allow_rollup_hdrs: bool | None = None  # Allow Nats-Rollup header usage
-    compression: Literal["none", "s2"] | None = None  # Compression algorithm
+    compression: CompressionType | None = None  # Compression algorithm
     deny_delete: bool | None = None  # Restrict message deletion via API
     deny_purge: bool | None = None  # Restrict stream purge via API
     description: str | None = None  # Stream description
-    discard: Literal["old", "new"] | None = None  # Discard policy
+    discard: DiscardPolicy | None = None  # Discard policy
     discard_new_per_subject: bool | None = None  # Apply discard new per subject
     duplicate_window: int | None = None  # Duplicate tracking window in ns
     first_seq: int | None = None  # First message sequence number
