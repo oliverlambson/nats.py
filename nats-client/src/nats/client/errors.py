@@ -6,12 +6,7 @@ from __future__ import annotations
 class StatusError(Exception):
     """Base class for NATS status-related errors."""
 
-    def __init__(
-        self,
-        status: str,
-        description: str,
-        subject: str | None = None
-    ) -> None:
+    def __init__(self, status: str, description: str, subject: str | None = None) -> None:
         """Initialize StatusError.
 
         Args:
@@ -25,13 +20,7 @@ class StatusError(Exception):
         super().__init__(f"{status}: {description}")
 
     @classmethod
-    def from_status(
-        cls,
-        status: str,
-        description: str,
-        *,
-        subject: str | None = None
-    ) -> StatusError:
+    def from_status(cls, status: str, description: str, *, subject: str | None = None) -> StatusError:
         """Create appropriate StatusError subclass based on status.
 
         Args:
@@ -57,12 +46,7 @@ class StatusError(Exception):
 class BadRequestError(StatusError):
     """Error raised for bad request status (400)."""
 
-    def __init__(
-        self,
-        status: str,
-        description: str,
-        subject: str | None = None
-    ) -> None:
+    def __init__(self, status: str, description: str, subject: str | None = None) -> None:
         """Initialize BadRequestError.
 
         Args:
@@ -76,12 +60,7 @@ class BadRequestError(StatusError):
 class NoRespondersError(StatusError):
     """Error raised when no responders are available (503)."""
 
-    def __init__(
-        self,
-        status: str,
-        description: str,
-        subject: str | None = None
-    ) -> None:
+    def __init__(self, status: str, description: str, subject: str | None = None) -> None:
         """Initialize NoRespondersError.
 
         Args:

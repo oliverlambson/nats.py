@@ -31,9 +31,7 @@ def test_status_is_error():
     assert status_bad_request.is_error is True
 
     # 500 is an error
-    status_server_error = Status(
-        code="500", description="Internal Server Error"
-    )
+    status_server_error = Status(code="500", description="Internal Server Error")
     assert status_server_error.is_error is True
 
 

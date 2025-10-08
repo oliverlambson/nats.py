@@ -23,9 +23,7 @@ async def test_subscription_receives_messages(client):
 
 
 @pytest.mark.asyncio
-async def test_subscription_with_queue_receives_subset_of_messages_different_clients(
-    server
-):
+async def test_subscription_with_queue_receives_subset_of_messages_different_clients(server):
     """Test that subscriptions from different clients with queue group receives only a subset of messages."""
     # Create two clients
     client1 = await connect(server.client_url, timeout=1.0)
@@ -59,8 +57,9 @@ async def test_subscription_with_queue_receives_subset_of_messages_different_cli
         total_timeout = 3.0
         start_time = asyncio.get_event_loop().time()
 
-        while (msg_count1 + msg_count2 < message_count and
-               (asyncio.get_event_loop().time() - start_time) < total_timeout):
+        while (
+            msg_count1 + msg_count2 < message_count and (asyncio.get_event_loop().time() - start_time) < total_timeout
+        ):
             try:
                 await asyncio.wait_for(sub1.next(), 0.1)
                 msg_count1 += 1
@@ -85,9 +84,7 @@ async def test_subscription_with_queue_receives_subset_of_messages_different_cli
 
 
 @pytest.mark.asyncio
-async def test_subscription_with_queue_receives_subset_of_messages_same_client(
-    client
-):
+async def test_subscription_with_queue_receives_subset_of_messages_same_client(client):
     """Test that subscriptions from the same client with queue group receives only a subset of messages."""
     test_subject = f"test.queue_same_client.{uuid.uuid4()}"
     queue_group = "test_queue_same_client"
@@ -115,8 +112,7 @@ async def test_subscription_with_queue_receives_subset_of_messages_same_client(
     total_timeout = 3.0
     start_time = asyncio.get_event_loop().time()
 
-    while msg_count1 + msg_count2 < message_count and (
-            asyncio.get_event_loop().time() - start_time) < total_timeout:
+    while msg_count1 + msg_count2 < message_count and (asyncio.get_event_loop().time() - start_time) < total_timeout:
         try:
             await asyncio.wait_for(sub1.next(), 0.1)
             msg_count1 += 1
@@ -138,9 +134,7 @@ async def test_subscription_with_queue_receives_subset_of_messages_same_client(
 
 
 @pytest.mark.asyncio
-async def test_subscription_without_queue_receives_all_messages_different_clients(
-    server
-):
+async def test_subscription_without_queue_receives_all_messages_different_clients(server):
     """Test that multiple subscriptions from different clients without queue groups each receive all messages."""
     # Create two clients
     client1 = await connect(server.client_url, timeout=1.0)
@@ -186,12 +180,8 @@ async def test_subscription_without_queue_receives_all_messages_different_client
             pass
 
         # Both subscriptions should receive all messages
-        assert len(
-            messages1
-        ) == message_count, f"sub1 received {len(messages1)} messages, expected {message_count}"
-        assert len(
-            messages2
-        ) == message_count, f"sub2 received {len(messages2)} messages, expected {message_count}"
+        assert len(messages1) == message_count, f"sub1 received {len(messages1)} messages, expected {message_count}"
+        assert len(messages2) == message_count, f"sub2 received {len(messages2)} messages, expected {message_count}"
 
         # Both should receive the same set of messages (order may vary)
         assert set(messages1) == set(messages2)
@@ -201,9 +191,7 @@ async def test_subscription_without_queue_receives_all_messages_different_client
 
 
 @pytest.mark.asyncio
-async def test_subscription_without_queue_receives_all_messages_same_client(
-    client
-):
+async def test_subscription_without_queue_receives_all_messages_same_client(client):
     """Test that multiple subscriptions from the same client without queue groups each receive all messages."""
     test_subject = f"test.no_queue_same_client.{uuid.uuid4()}"
     message_count = 5
@@ -243,12 +231,8 @@ async def test_subscription_without_queue_receives_all_messages_same_client(
         pass
 
     # Both subscriptions should receive all messages
-    assert len(
-        messages1
-    ) == message_count, f"sub1 received {len(messages1)} messages, expected {message_count}"
-    assert len(
-        messages2
-    ) == message_count, f"sub2 received {len(messages2)} messages, expected {message_count}"
+    assert len(messages1) == message_count, f"sub1 received {len(messages1)} messages, expected {message_count}"
+    assert len(messages2) == message_count, f"sub2 received {len(messages2)} messages, expected {message_count}"
 
     # Both should receive the same set of messages (order may vary)
     assert set(messages1) == set(messages2)
@@ -289,9 +273,7 @@ async def test_subscription_star_wildcard_receives_matching_messages(client):
 
 
 @pytest.mark.asyncio
-async def test_subscription_greater_than_wildcard_receives_all_matching(
-    client
-):
+async def test_subscription_greater_than_wildcard_receives_all_matching(client):
     """Test that subscription with > wildcard receives all matching hierarchical messages."""
     # Create base subject and variants
     base = f"test.wild.{uuid.uuid4()}"
@@ -661,9 +643,7 @@ async def test_subscription_callback_with_initial_callback(client):
         added_callback_count += 1
 
     # Create subscription with initial callback
-    subscription = await client.subscribe(
-        test_subject, callback=initial_callback
-    )
+    subscription = await client.subscribe(test_subject, callback=initial_callback)
     # Add additional callback
     subscription.add_callback(added_callback)
 
@@ -712,11 +692,7 @@ async def test_subscription_callbacks_with_headers(client):
             for key, value_list in msg.headers.items():
                 headers_dict[key] = value_list[0] if value_list else None
 
-        received_messages.append({
-            "data": msg.data,
-            "headers": headers_dict,
-            "subject": msg.subject
-        })
+        received_messages.append({"data": msg.data, "headers": headers_dict, "subject": msg.subject})
 
     # Create subscription with callback
     subscription = await client.subscribe(test_subject)

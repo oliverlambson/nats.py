@@ -23,8 +23,7 @@ from nats.client.message import Message
 T = TypeVar("T")
 
 
-class Subscription(AsyncIterator[Message],
-                   AbstractAsyncContextManager["Subscription"]):
+class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscription"]):
     """A subscription to a NATS subject.
 
     This class represents an active subscription to a NATS subject.
@@ -173,8 +172,7 @@ class Subscription(AsyncIterator[Message],
         return self
 
     async def __aexit__(
-        self, exc_type: type[BaseException] | None,
-        exc_val: BaseException | None, exc_tb: types.TracebackType | None
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: types.TracebackType | None
     ) -> None:
         """Exit the async context manager, closing the subscription."""
         await self.unsubscribe()

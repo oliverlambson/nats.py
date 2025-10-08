@@ -34,10 +34,10 @@ class BenchmarkResults:
             f"  Throughput: {self.throughput:,.0f} msgs/sec, "
             f"{self.mb_per_sec:.2f} MB/sec\n"
             f"  Latency: (min/avg/max/std) = "
-            f"{self.min_latency*1000:.2f}/"
-            f"{self.avg_latency*1000:.2f}/"
-            f"{self.max_latency*1000:.2f}/"
-            f"{self.std_latency*1000:.2f} ms"
+            f"{self.min_latency * 1000:.2f}/"
+            f"{self.avg_latency * 1000:.2f}/"
+            f"{self.max_latency * 1000:.2f}/"
+            f"{self.std_latency * 1000:.2f} ms"
         )
 
 
@@ -82,8 +82,7 @@ async def run_pub_benchmark(
         min_latency = min(latencies)
         max_latency = max(latencies)
         avg_latency = sum(latencies) / len(latencies)
-        variance = sum((latency - avg_latency)**2
-                       for latency in latencies) / len(latencies)
+        variance = sum((latency - avg_latency) ** 2 for latency in latencies) / len(latencies)
         std_latency = variance**0.5
 
         return BenchmarkResults(
@@ -104,10 +103,7 @@ async def run_pub_benchmark(
 
 
 async def run_sub_benchmark(
-    *,
-    url: str = "nats://localhost:4222",
-    msg_count: int = 100_000,
-    sub_subject: str = "test"
+    *, url: str = "nats://localhost:4222", msg_count: int = 100_000, sub_subject: str = "test"
 ) -> BenchmarkResults:
     """Run subscriber benchmark."""
 
@@ -149,8 +145,7 @@ async def run_sub_benchmark(
         min_latency = min(latencies)
         max_latency = max(latencies)
         avg_latency = sum(latencies) / len(latencies)
-        variance = sum((latency - avg_latency)**2
-                       for latency in latencies) / len(latencies)
+        variance = sum((latency - avg_latency) ** 2 for latency in latencies) / len(latencies)
         std_latency = variance**0.5
 
         return BenchmarkResults(
@@ -181,20 +176,14 @@ async def run_pubsub_benchmark(
     """Run combined publisher/subscriber benchmark."""
 
     # Start subscriber first
-    sub_task = asyncio.create_task(
-        run_sub_benchmark(url=url, msg_count=msg_count, sub_subject=subject)
-    )
+    sub_task = asyncio.create_task(run_sub_benchmark(url=url, msg_count=msg_count, sub_subject=subject))
 
     # Small delay to ensure subscriber is ready
     await asyncio.sleep(0.1)
 
     # Run publisher
     pub_results = await run_pub_benchmark(
-        url=url,
-        msg_count=msg_count,
-        msg_size=msg_size,
-        pub_subject=subject,
-        headers=headers
+        url=url, msg_count=msg_count, msg_size=msg_size, pub_subject=subject, headers=headers
     )
 
     # Wait for subscriber to finish
@@ -206,30 +195,13 @@ async def run_pubsub_benchmark(
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description="NATS benchmarking tool")
-    parser.add_argument(
-        "--url", default="nats://localhost:4222", help="NATS server URL"
-    )
-    parser.add_argument(
-        "--msgs",
-        type=int,
-        default=100_000,
-        help="Number of messages to publish"
-    )
-    parser.add_argument(
-        "--size", type=int, default=128, help="Size of the message payload"
-    )
-    parser.add_argument(
-        "--subject", default="test", help="Subject to use for messages"
-    )
-    parser.add_argument(
-        "--pub", action="store_true", help="Run publisher benchmark"
-    )
-    parser.add_argument(
-        "--sub", action="store_true", help="Run subscriber benchmark"
-    )
-    parser.add_argument(
-        "--headers", type=int, help="Number of headers to add to messages"
-    )
+    parser.add_argument("--url", default="nats://localhost:4222", help="NATS server URL")
+    parser.add_argument("--msgs", type=int, default=100_000, help="Number of messages to publish")
+    parser.add_argument("--size", type=int, default=128, help="Size of the message payload")
+    parser.add_argument("--subject", default="test", help="Subject to use for messages")
+    parser.add_argument("--pub", action="store_true", help="Run publisher benchmark")
+    parser.add_argument("--sub", action="store_true", help="Run subscriber benchmark")
+    parser.add_argument("--headers", type=int, help="Number of headers to add to messages")
 
     args = parser.parse_args()
 
@@ -241,46 +213,27 @@ def main():
     # Create headers if requested
     headers = None
     if args.headers:
-        headers = Headers({
-            f"key{i}": f"value{i}"
-            for i in range(args.headers)
-        })
+        headers = Headers({f"key{i}": f"value{i}" for i in range(args.headers)})
 
     async def run():
         if args.pub and args.sub:
-            sys.stdout.write(
-                f"\nStarting pub/sub benchmark [msgs={args.msgs:,}, size={args.size:,} B]\n"
-            )
+            sys.stdout.write(f"\nStarting pub/sub benchmark [msgs={args.msgs:,}, size={args.size:,} B]\n")
             pub_results, sub_results = await run_pubsub_benchmark(
-                url=args.url,
-                msg_count=args.msgs,
-                msg_size=args.size,
-                subject=args.subject,
-                headers=headers
+                url=args.url, msg_count=args.msgs, msg_size=args.size, subject=args.subject, headers=headers
             )
             sys.stdout.write(f"\nPublisher results: {pub_results}\n")
             sys.stdout.write(f"\nSubscriber results: {sub_results}\n")
 
         elif args.pub:
-            sys.stdout.write(
-                f"\nStarting publisher benchmark [msgs={args.msgs:,}, size={args.size:,} B]\n"
-            )
+            sys.stdout.write(f"\nStarting publisher benchmark [msgs={args.msgs:,}, size={args.size:,} B]\n")
             results = await run_pub_benchmark(
-                url=args.url,
-                msg_count=args.msgs,
-                msg_size=args.size,
-                pub_subject=args.subject,
-                headers=headers
+                url=args.url, msg_count=args.msgs, msg_size=args.size, pub_subject=args.subject, headers=headers
             )
             sys.stdout.write(f"\nResults: {results}\n")
 
         elif args.sub:
-            sys.stdout.write(
-                f"\nStarting subscriber benchmark [msgs={args.msgs:,}]\n"
-            )
-            results = await run_sub_benchmark(
-                url=args.url, msg_count=args.msgs, sub_subject=args.subject
-            )
+            sys.stdout.write(f"\nStarting subscriber benchmark [msgs={args.msgs:,}]\n")
+            results = await run_sub_benchmark(url=args.url, msg_count=args.msgs, sub_subject=args.subject)
             sys.stdout.write(f"\nResults: {results}\n")
 
     asyncio.run(run())

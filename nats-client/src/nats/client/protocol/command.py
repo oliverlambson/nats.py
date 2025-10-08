@@ -68,8 +68,7 @@ def encode_hpub(
     """
     # Format headers with version indicator
     header_lines = ["NATS/1.0"] + [
-        f"{key}: {item}" for key, value in headers.items()
-        for item in (value if isinstance(value, list) else [value])
+        f"{key}: {item}" for key, value in headers.items() for item in (value if isinstance(value, list) else [value])
     ]
 
     # IMPORTANT: Headers must end with \r\n\r\n (empty line after headers)
@@ -84,9 +83,7 @@ def encode_hpub(
     return [command.encode(), header_data, payload, b"\r\n"]
 
 
-def encode_sub(
-    subject: str, sid: str, queue_group: str | None = None
-) -> bytes:
+def encode_sub(subject: str, sid: str, queue_group: str | None = None) -> bytes:
     """Encode SUB command.
 
     Args:

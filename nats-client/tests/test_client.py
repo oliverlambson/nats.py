@@ -194,12 +194,7 @@ async def test_disconnection_and_reconnection_callbacks(server):
     reconnect_event = asyncio.Event()
 
     # Connect client with callbacks and reconnection options
-    client = await connect(
-        server.client_url,
-        timeout=1.0,
-        allow_reconnect=True,
-        reconnect_time_wait=0.1
-    )
+    client = await connect(server.client_url, timeout=1.0, allow_reconnect=True, reconnect_time_wait=0.1)
 
     # Register callbacks
     def on_disconnect():
@@ -238,8 +233,7 @@ async def test_disconnection_and_reconnection_callbacks(server):
         # Wait for reconnect callback
         try:
             await asyncio.wait_for(reconnect_event.wait(), timeout=2.0)
-            assert reconnect_event.is_set(
-            ), "Reconnect callback was not invoked"
+            assert reconnect_event.is_set(), "Reconnect callback was not invoked"
         except asyncio.TimeoutError:
             pytest.fail("Reconnect callback was not invoked within timeout")
 
@@ -291,12 +285,7 @@ async def test_reconnect_with_ipv6_address():
 
     # Connect using IPv6 URL
     ipv6_url = f"nats://[::1]:{port}"
-    client = await connect(
-        ipv6_url,
-        timeout=1.0,
-        allow_reconnect=True,
-        reconnect_time_wait=0.1
-    )
+    client = await connect(ipv6_url, timeout=1.0, allow_reconnect=True, reconnect_time_wait=0.1)
 
     # Verify connection works
     test_subject = f"test.ipv6.reconnect.{uuid.uuid4()}"
@@ -355,9 +344,7 @@ async def test_message_status_properties(client):
         await client.request(test_subject, b"test", timeout=1.0)
 
     # Test with return_on_error=True to get the Message object
-    response = await client.request(
-        test_subject, b"test", timeout=1.0, return_on_error=True
-    )
+    response = await client.request(test_subject, b"test", timeout=1.0, return_on_error=True)
 
     # Verify status properties
     assert response.status.code == "503"
@@ -394,12 +381,7 @@ async def test_multiple_disconnect_reconnect_callbacks(server):
     reconnect_event = asyncio.Event()
 
     # Connect client with callbacks and reconnection options
-    client = await connect(
-        server.client_url,
-        timeout=1.0,
-        allow_reconnect=True,
-        reconnect_time_wait=0.1
-    )
+    client = await connect(server.client_url, timeout=1.0, allow_reconnect=True, reconnect_time_wait=0.1)
 
     # Register multiple callbacks
     def on_disconnect1():
@@ -461,9 +443,7 @@ async def test_multiple_disconnect_reconnect_callbacks(server):
             await asyncio.wait_for(reconnect_event.wait(), timeout=5.0)
             assert reconnect_count == 2, f"Expected 2 reconnect callbacks, got {reconnect_count}"
         except asyncio.TimeoutError:
-            pytest.fail(
-                "Not all reconnect callbacks were invoked within timeout"
-            )
+            pytest.fail("Not all reconnect callbacks were invoked within timeout")
 
         # Verify client works after reconnection
         await client.publish(test_subject, b"after reconnect")
@@ -507,7 +487,7 @@ async def test_cluster_reconnect_sequential_shutdown(cluster_size):
             allow_reconnect=True,
             reconnect_max_attempts=60,
             reconnect_time_wait=0.0,
-            no_randomize=True
+            no_randomize=True,
         )
 
         client.add_reconnected_callback(on_reconnect)
@@ -558,7 +538,9 @@ async def test_cluster_reconnect_sequential_shutdown(cluster_size):
 
         # Verify we had the expected number of reconnections (cluster_size - 1)
         expected_reconnects = cluster_size - 1
-        assert reconnect_count == expected_reconnects, f"Expected {expected_reconnects} reconnects, got {reconnect_count}"
+        assert reconnect_count == expected_reconnects, (
+            f"Expected {expected_reconnects} reconnects, got {reconnect_count}"
+        )
 
         await client.close()
 

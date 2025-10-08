@@ -47,6 +47,7 @@ class Reader(Protocol):
         """
         ...
 
+
 # Protocol constants
 CRLF: Final[bytes] = b"\r\n"
 MAX_CONTROL_LINE: Final[int] = 4096  # Max length of control line
@@ -54,14 +55,14 @@ MAX_HEADER_SIZE: Final[int] = 64 * 1024  # Max header size (64KB)
 MAX_PAYLOAD_SIZE: Final[int] = 64 * 1024 * 1024  # Max payload size (64MB)
 MIN_MSG_ARGS: Final[int] = 3  # Minimum arguments for MSG command
 MIN_HMSG_ARGS: Final[int] = 4  # Minimum arguments for HMSG command
-MIN_STATUS_PARTS: Final[int
-                        ] = 2  # Minimum parts for status line (NATS/1.0 CODE)
+MIN_STATUS_PARTS: Final[int] = 2  # Minimum parts for status line (NATS/1.0 CODE)
 MIN_STATUS_PARTS_WITH_DESC: Final[int] = 3  # Parts for status with description
 
 
 # Message type definitions using NamedTuple
 class Msg(NamedTuple):
     """MSG protocol message."""
+
     op: Literal["MSG"]
     subject: str
     sid: str
@@ -71,6 +72,7 @@ class Msg(NamedTuple):
 
 class HMsg(NamedTuple):
     """HMSG protocol message."""
+
     op: Literal["HMSG"]
     subject: str
     sid: str
@@ -83,23 +85,27 @@ class HMsg(NamedTuple):
 
 class Info(NamedTuple):
     """INFO protocol message."""
+
     op: Literal["INFO"]
     info: ServerInfo
 
 
 class Err(NamedTuple):
     """ERR protocol message."""
+
     op: Literal["ERR"]
     error: str
 
 
 class Ping(NamedTuple):
     """PING protocol message."""
+
     op: Literal["PING"]
 
 
 class Pong(NamedTuple):
     """PONG protocol message."""
+
     op: Literal["PONG"]
 
 
@@ -147,12 +153,7 @@ def parse_control_line(line: bytes) -> tuple[str, list[str]]:
         raise ParseError(msg) from e
 
 
-
-
-
-def parse_headers(
-    data: bytes
-) -> tuple[dict[str, list[str]], str | None, str | None]:
+def parse_headers(data: bytes) -> tuple[dict[str, list[str]], str | None, str | None]:
     """Parse header data into multi-value dictionary and status information.
 
     Args:
@@ -353,10 +354,7 @@ async def parse_hmsg(reader: Reader, args: list[bytes]) -> HMsg:
     sid = sid_bytes.decode()
     reply_to = reply_to_bytes.decode() if reply_to_bytes is not None else None
 
-    return HMsg(
-        "HMSG", subject, sid, reply_to, headers, payload, status_code,
-        status_description
-    )
+    return HMsg("HMSG", subject, sid, reply_to, headers, payload, status_code, status_description)
 
 
 async def parse_info(args: list[bytes]) -> Info:

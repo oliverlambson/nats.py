@@ -168,9 +168,7 @@ def test_parse_headers():
 
     # Test headers with status
     header_data_with_status = b"NATS/1.0 503 No Responders\r\nfoo: bar\r\n\r\n"
-    headers, status_code, status_description = parse_headers(
-        header_data_with_status
-    )
+    headers, status_code, status_description = parse_headers(header_data_with_status)
     assert headers == {"foo": ["bar"]}
     assert status_code == "503"
     assert status_description == "No Responders"
@@ -248,9 +246,7 @@ def test_encode_hpub():
     assert command[3] == b"\r\n"
 
     # Test with reply
-    command = encode_hpub(
-        "foo.bar", payload, reply_to="reply.to", headers=headers
-    )
+    command = encode_hpub("foo.bar", payload, reply_to="reply.to", headers=headers)
     assert len(command) == 4
     assert command[0].startswith(b"HPUB foo.bar reply.to")
     assert command[1].startswith(b"NATS/1.0\r\n")

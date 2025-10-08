@@ -71,10 +71,7 @@ class TcpConnection:
     _reader: asyncio.StreamReader | None
     _writer: asyncio.StreamWriter | None
 
-    def __init__(
-        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter,
-        host: str, port: int
-    ):
+    def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, host: str, port: int):
         """Initialize TCP connection.
 
         Args:
@@ -95,9 +92,7 @@ class TcpConnection:
             await self._writer.wait_closed()
             self._writer = None
             self._reader = None
-            logger.debug(
-                "TCP connection closed to %s:%s", self.host, self.port
-            )
+            logger.debug("TCP connection closed to %s:%s", self.host, self.port)
 
     async def read(self, n: int) -> bytes:
         """Read n bytes from TCP connection."""
@@ -151,11 +146,7 @@ class TcpConnection:
         return await self._reader.readexactly(n)
 
 
-async def open_tcp_connection(
-    host: str,
-    port: int,
-    ssl_context: ssl.SSLContext | None = None
-) -> TcpConnection:
+async def open_tcp_connection(host: str, port: int, ssl_context: ssl.SSLContext | None = None) -> TcpConnection:
     """Open a TCP connection to a NATS server.
 
     Args:
@@ -170,9 +161,7 @@ async def open_tcp_connection(
         ConnectionError: If connection fails
     """
     try:
-        reader, writer = await asyncio.open_connection(
-            host, port, ssl=ssl_context
-        )
+        reader, writer = await asyncio.open_connection(host, port, ssl=ssl_context)
         return TcpConnection(reader, writer, host, port)
     except Exception as e:
         msg = f"Failed to connect: {e}"
