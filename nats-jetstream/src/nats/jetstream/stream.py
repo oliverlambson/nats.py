@@ -106,16 +106,29 @@ class StreamState:
 
     @classmethod
     def from_response(cls, data: api.StreamState) -> StreamState:
+        messages = data["messages"]
+        bytes_val = data["bytes"]
+        first_sequence = data["first_seq"]
+        last_sequence = data["last_seq"]
+        consumer_count = data["consumer_count"]
+        deleted = data.get("deleted")
+        num_deleted = data.get("num_deleted")
+        subjects = data.get("subjects")
+
+        lost = None
+        if data.get("lost"):
+            lost = LostStreamData.from_response(data["lost"])
+
         return cls(
-            messages=data["messages"],
-            bytes=data["bytes"],
-            first_sequence=data["first_seq"],
-            last_sequence=data["last_seq"],
-            consumer_count=data["consumer_count"],
-            deleted=data.get("deleted"),
-            num_deleted=data.get("num_deleted"),
-            lost=LostStreamData.from_response(data["lost"]) if data.get("lost") else None,
-            subjects=data.get("subjects"),
+            messages=messages,
+            bytes=bytes_val,
+            first_sequence=first_sequence,
+            last_sequence=last_sequence,
+            consumer_count=consumer_count,
+            deleted=deleted,
+            num_deleted=num_deleted,
+            lost=lost,
+            subjects=subjects,
         )
 
 
