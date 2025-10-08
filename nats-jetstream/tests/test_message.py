@@ -84,8 +84,8 @@ def test_metadata_from_reply_handles_v2_format_with_extra_tokens():
     assert metadata.domain == "domain"
 
 
-def test_metadata_from_reply_returns_none_for_invalid_subjects():
-    """Test parsing invalid reply subjects."""
+def test_metadata_from_reply_raises_error_for_invalid_subjects():
+    """Test parsing invalid reply subjects raises ValueError."""
     invalid_replies = [
         "",
         "invalid",
@@ -97,8 +97,8 @@ def test_metadata_from_reply_returns_none_for_invalid_subjects():
     ]
 
     for reply in invalid_replies:
-        metadata = Metadata.from_reply(reply)
-        assert metadata is None
+        with pytest.raises(ValueError, match="Invalid JetStream ACK reply subject format"):
+            Metadata.from_reply(reply)
 
 
 def test_message_creation_with_basic_data():

@@ -48,13 +48,22 @@ class Metadata:
     """Domain this message was received on (empty string if not set)."""
 
     @classmethod
-    def from_reply(cls, reply_subject: str) -> Metadata | None:
+    def from_reply(cls, reply_subject: str) -> Metadata:
         """Parse metadata from a JetStream reply subject.
 
         The reply subject contains the message metadata in one of three forms:
         - V2 (12 tokens): $JS.ACK.<domain>.<account_hash>.<stream>.<consumer>.<delivered>.<stream_seq>.<consumer_seq>.<timestamp>.<pending>.<random>
         - V1 (9 tokens): $JS.ACK.<stream>.<consumer>.<delivered>.<stream_seq>.<consumer_seq>.<timestamp>.<pending>
         - V1 (8 tokens): $JS.ACK.<stream>.<consumer>.<delivered>.<stream_seq>.<consumer_seq>.<timestamp>
+
+        Args:
+            reply_subject: The JetStream ACK reply subject to parse.
+
+        Returns:
+            Parsed metadata from the reply subject.
+
+        Raises:
+            ValueError: If the reply subject format is invalid or not recognized.
         """
         tokens = reply_subject.split(".")
 
@@ -101,7 +110,7 @@ class Metadata:
                     consumer=consumer,
                 )
             case _:
-                return None
+                raise ValueError(f"Invalid JetStream ACK reply subject format: {reply_subject}")
 
 
 class Message:
@@ -151,9 +160,11 @@ class Message:
 
         # Override with parsed metadata from reply if available
         if reply_to:
-            parsed_metadata = Metadata.from_reply(reply_to)
-            if parsed_metadata:
-                self._metadata = parsed_metadata
+            try:
+                self._metadata = Metadata.from_reply(reply_to)
+            except ValueError:
+                # Invalid reply subject format, keep default metadata
+                pass
 
         # Override with explicitly provided metadata if available
         if metadata is not None:
