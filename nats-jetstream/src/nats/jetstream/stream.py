@@ -40,6 +40,69 @@ class LostStreamData:
 
 
 @dataclass
+class ExternalStreamSource:
+    api: str
+    deliver: str | None = None
+
+    @classmethod
+    def from_response(cls, data: api.ExternalStreamSource) -> ExternalStreamSource:
+        api_prefix = data["api"]
+        deliver = data.get("deliver")
+
+        return cls(
+            api=api_prefix,
+            deliver=deliver,
+        )
+
+
+@dataclass
+class SubjectTransform:
+    src: str
+    dest: str
+
+    @classmethod
+    def from_response(cls, data: api.SubjectTransform) -> SubjectTransform:
+        src = data["src"]
+        dest = data["dest"]
+
+        return cls(
+            src=src,
+            dest=dest,
+        )
+
+
+@dataclass
+class StreamSource:
+    name: str
+    opt_start_seq: int | None = None
+    opt_start_time: int | None = None
+    filter_subject: str | None = None
+    external: ExternalStreamSource | None = None
+    subject_transforms: Any | None = None
+
+    @classmethod
+    def from_response(cls, data: api.StreamSource) -> StreamSource:
+        name = data["name"]
+        opt_start_seq = data.get("opt_start_seq")
+        opt_start_time = data.get("opt_start_time")
+        filter_subject = data.get("filter_subject")
+        subject_transforms = data.get("subject_transforms")
+
+        external = None
+        if data.get("external"):
+            external = ExternalStreamSource.from_response(data["external"])
+
+        return cls(
+            name=name,
+            opt_start_seq=opt_start_seq,
+            opt_start_time=opt_start_time,
+            filter_subject=filter_subject,
+            external=external,
+            subject_transforms=subject_transforms,
+        )
+
+
+@dataclass
 class PeerInfo:
     name: str
     current: bool
@@ -160,16 +223,16 @@ class StreamConfig:
     max_msg_size: int | None = None  # Maximum message size (-1 for unlimited)
     max_msgs_per_subject: int | None = None  # Per-subject message limit
     metadata: dict[str, str] | None = None  # Additional metadata
-    mirror: api.StreamSource | None = None  # Mirror configuration
+    mirror: StreamSource | None = None  # Mirror configuration
     mirror_direct: bool | None = None  # Allow direct access for mirrors
     name: str | None = None  # Stream name
     no_ack: bool | None = None  # Disable message acknowledgment
     placement: api.Placement | None = None  # Replica placement directives
     republish: api.Republish | None = None  # Message republishing config
     sealed: bool | None = None  # Prevent message deletion and updates
-    sources: list[api.StreamSource] | None = None  # Replication sources
+    sources: list[StreamSource] | None = None  # Replication sources
     subject_delete_marker_ttl: int | None = None  # TTL for delete markers
-    subject_transform: api.SubjectTransform | None = None  # Subject transform
+    subject_transform: SubjectTransform | None = None  # Subject transform
     subjects: list[str] | None = None  # Subjects to consume
     template_owner: str | None = None  # Managing template name
     consumer_limits: api.StreamConsumerLimits | None = None  # Consumer limits
@@ -199,17 +262,26 @@ class StreamConfig:
         max_msg_size = config.get("max_msg_size")
         max_msgs_per_subject = config.get("max_msgs_per_subject")
         metadata = config.get("metadata")
-        mirror = config.get("mirror")
         mirror_direct = config.get("mirror_direct")
         name = config.get("name")
         no_ack = config.get("no_ack")
         placement = config.get("placement")
         republish = config.get("republish")
         sealed = config.get("sealed")
-        sources = config.get("sources")
         subjects = config.get("subjects")
-        subject_transform = config.get("subject_transform")
         template_owner = config.get("template_owner")
+
+        mirror = None
+        if config.get("mirror"):
+            mirror = StreamSource.from_response(config["mirror"])
+
+        sources = None
+        if config.get("sources"):
+            sources = [StreamSource.from_response(s) for s in config["sources"]]
+
+        subject_transform = None
+        if config.get("subject_transform"):
+            subject_transform = SubjectTransform.from_response(config["subject_transform"])
 
         return cls(
             max_age=max_age,
