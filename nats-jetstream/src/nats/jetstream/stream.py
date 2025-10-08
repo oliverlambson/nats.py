@@ -40,6 +40,59 @@ class LostStreamData:
 
 
 @dataclass
+class PeerInfo:
+    name: str
+    current: bool
+    active: float
+    lag: int | None = None
+    offline: bool | None = None
+    observer: bool | None = None
+
+    @classmethod
+    def from_response(cls, data: api.PeerInfo) -> PeerInfo:
+        name = data["name"]
+        current = data["current"]
+        active = data["active"]
+        lag = data.get("lag")
+        offline = data.get("offline")
+        observer = data.get("observer")
+
+        return cls(
+            name=name,
+            current=current,
+            active=active,
+            lag=lag,
+            offline=offline,
+            observer=observer,
+        )
+
+
+@dataclass
+class ClusterInfo:
+    name: str | None = None
+    leader: str | None = None
+    replicas: list[PeerInfo] | None = None
+    raft_group: str | None = None
+
+    @classmethod
+    def from_response(cls, data: api.ClusterInfo) -> ClusterInfo:
+        name = data.get("name")
+        leader = data.get("leader")
+        raft_group = data.get("raft_group")
+
+        replicas = None
+        if data.get("replicas"):
+            replicas = [PeerInfo.from_response(r) for r in data["replicas"]]
+
+        return cls(
+            name=name,
+            leader=leader,
+            replicas=replicas,
+            raft_group=raft_group,
+        )
+
+
+@dataclass
 class StreamState:
     messages: int
     bytes: int
@@ -186,7 +239,7 @@ class StreamInfo:
     config: StreamConfig
     created: int
     state: StreamState
-    cluster: dict[str, Any] | None = None
+    cluster: ClusterInfo | None = None
     mirror: dict[str, Any] | None = None
     sources: list[dict[str, Any]] | None = None
 
@@ -195,7 +248,7 @@ class StreamInfo:
         config = StreamConfig.from_response(data["config"])
         created = data["created"]
         state = StreamState.from_response(data["state"])
-        cluster = data.get("cluster")
+        cluster = ClusterInfo.from_response(data["cluster"]) if data.get("cluster") else None
         mirror = data.get("mirror")
         sources = data.get("sources")
 
