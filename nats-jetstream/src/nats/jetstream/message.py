@@ -14,6 +14,7 @@ from .util import new_inbox
 if TYPE_CHECKING:
     from . import JetStream
 
+
 @dataclass
 class SequencePair:
     """Sequence information for a message."""
@@ -68,14 +69,24 @@ class Metadata:
         tokens = reply_subject.split(".")
 
         match tokens:
-            case ["$JS", "ACK", domain, _account_hash, stream, consumer, delivered, stream_seq, consumer_seq, timestamp, pending, *_]:
+            case [
+                "$JS",
+                "ACK",
+                domain,
+                _account_hash,
+                stream,
+                consumer,
+                delivered,
+                stream_seq,
+                consumer_seq,
+                timestamp,
+                pending,
+                *_,
+            ]:
                 # V2 format (12+ tokens) with domain and account hash
                 domain_value = "" if domain == "_" else domain
                 return cls(
-                    sequence=SequencePair(
-                        consumer=int(consumer_seq),
-                        stream=int(stream_seq)
-                    ),
+                    sequence=SequencePair(consumer=int(consumer_seq), stream=int(stream_seq)),
                     num_delivered=int(delivered),
                     num_pending=int(pending),
                     timestamp=datetime.fromtimestamp(int(timestamp) / 1e9, tz=timezone.utc),
@@ -86,10 +97,7 @@ class Metadata:
             case ["$JS", "ACK", stream, consumer, delivered, stream_seq, consumer_seq, timestamp, pending]:
                 # V1 format (9 tokens) with pending count
                 return cls(
-                    sequence=SequencePair(
-                        consumer=int(consumer_seq),
-                        stream=int(stream_seq)
-                    ),
+                    sequence=SequencePair(consumer=int(consumer_seq), stream=int(stream_seq)),
                     num_delivered=int(delivered),
                     num_pending=int(pending),
                     timestamp=datetime.fromtimestamp(int(timestamp) / 1e9, tz=timezone.utc),
@@ -99,10 +107,7 @@ class Metadata:
             case ["$JS", "ACK", stream, consumer, delivered, stream_seq, consumer_seq, timestamp]:
                 # V1 format (8 tokens) without pending count
                 return cls(
-                    sequence=SequencePair(
-                        consumer=int(consumer_seq),
-                        stream=int(stream_seq)
-                    ),
+                    sequence=SequencePair(consumer=int(consumer_seq), stream=int(stream_seq)),
                     num_delivered=int(delivered),
                     num_pending=0,
                     timestamp=datetime.fromtimestamp(int(timestamp) / 1e9, tz=timezone.utc),
@@ -207,9 +212,7 @@ class Message:
         if not self._reply_to:
             raise ValueError("Cannot acknowledge message without reply_to")
         if not self._jetstream:
-            raise ValueError(
-                "Cannot acknowledge message without JetStream reference"
-            )
+            raise ValueError("Cannot acknowledge message without JetStream reference")
 
         await self._jetstream.client.publish(self._reply_to, b"")
 
@@ -229,9 +232,7 @@ class Message:
         if not self._reply_to:
             raise ValueError("Cannot acknowledge message without reply_to")
         if not self._jetstream:
-            raise ValueError(
-                "Cannot acknowledge message without JetStream reference"
-            )
+            raise ValueError("Cannot acknowledge message without JetStream reference")
 
         client = self._jetstream.client
         inbox = new_inbox()
@@ -278,7 +279,7 @@ class Message:
 
         # Convert delay to nanoseconds for NATS
         delay_ns = int(delay * 1_000_000_000)
-        payload = f"-NAK {{\"delay\": {delay_ns}}}".encode()
+        payload = f'-NAK {{"delay": {delay_ns}}}'.encode()
         await self._jetstream.client.publish(self._reply_to, payload)
 
     async def in_progress(self) -> None:
@@ -291,13 +292,9 @@ class Message:
             ValueError: If reply_to or jetstream reference is missing.
         """
         if not self._reply_to:
-            raise ValueError(
-                "Cannot send in-progress for message without reply_to"
-            )
+            raise ValueError("Cannot send in-progress for message without reply_to")
         if not self._jetstream:
-            raise ValueError(
-                "Cannot send in-progress for message without JetStream reference"
-            )
+            raise ValueError("Cannot send in-progress for message without JetStream reference")
 
         await self._jetstream.client.publish(self._reply_to, b"+WPI")
 
@@ -313,9 +310,7 @@ class Message:
         if not self._reply_to:
             raise ValueError("Cannot terminate message without reply_to")
         if not self._jetstream:
-            raise ValueError(
-                "Cannot terminate message without JetStream reference"
-            )
+            raise ValueError("Cannot terminate message without JetStream reference")
 
         await self._jetstream.client.publish(self._reply_to, b"+TERM")
 
@@ -338,12 +333,11 @@ class Message:
         if not self._reply_to:
             raise ValueError("Cannot terminate message without reply_to")
         if not self._jetstream:
-            raise ValueError(
-                "Cannot terminate message without JetStream reference"
-            )
+            raise ValueError("Cannot terminate message without JetStream reference")
 
         payload = f"+TERM {reason}".encode()
         await self._jetstream.client.publish(self._reply_to, payload)
+
 
 __all__ = [
     "Headers",

@@ -20,9 +20,7 @@ def test_metadata_from_reply_parses_valid_subject():
     assert metadata.num_delivered == 1
     assert metadata.sequence.stream == 100
     assert metadata.sequence.consumer == 50
-    assert metadata.timestamp == datetime.fromtimestamp(
-        1234567890 / 1e9, tz=timezone.utc
-    )
+    assert metadata.timestamp == datetime.fromtimestamp(1234567890 / 1e9, tz=timezone.utc)
     assert metadata.num_pending == 10
 
 
@@ -51,9 +49,7 @@ def test_metadata_from_reply_parses_v2_format_with_domain():
     assert metadata.num_delivered == 1
     assert metadata.sequence.stream == 100
     assert metadata.sequence.consumer == 50
-    assert metadata.timestamp == datetime.fromtimestamp(
-        1234567890 / 1e9, tz=timezone.utc
-    )
+    assert metadata.timestamp == datetime.fromtimestamp(1234567890 / 1e9, tz=timezone.utc)
     assert metadata.num_pending == 10
     assert metadata.domain == "hub"
 
@@ -195,9 +191,7 @@ async def test_message_ack_acknowledges_successfully(jetstream: JetStream):
     )
 
     # Create a consumer
-    consumer = await stream.create_consumer(
-        name="test-ack-consumer", ack_policy="explicit"
-    )
+    consumer = await stream.create_consumer(name="test-ack-consumer", ack_policy="explicit")
 
     # Publish a message
     await jetstream.publish("test.ack", b"test message")
@@ -221,9 +215,7 @@ async def test_message_ack_acknowledges_successfully(jetstream: JetStream):
 
 
 @pytest.mark.asyncio
-async def test_message_double_ack_waits_for_server_confirmation(
-    jetstream: JetStream
-):
+async def test_message_double_ack_waits_for_server_confirmation(jetstream: JetStream):
     """Test double acknowledgment with server confirmation."""
     # Create a stream
     stream = await jetstream.create_stream(
@@ -232,9 +224,7 @@ async def test_message_double_ack_waits_for_server_confirmation(
     )
 
     # Create a consumer
-    consumer = await stream.create_consumer(
-        name="test-double-ack-consumer", ack_policy="explicit"
-    )
+    consumer = await stream.create_consumer(name="test-double-ack-consumer", ack_policy="explicit")
 
     # Publish a message
     await jetstream.publish("test.double_ack", b"test message")
@@ -267,9 +257,7 @@ async def test_message_nak_triggers_redelivery(jetstream: JetStream):
     )
 
     # Create a consumer
-    consumer = await stream.create_consumer(
-        name="test-nak-consumer", ack_policy="explicit"
-    )
+    consumer = await stream.create_consumer(name="test-nak-consumer", ack_policy="explicit")
 
     # Publish a message
     await jetstream.publish("test.nak", b"test message")
@@ -300,9 +288,7 @@ async def test_message_nak_triggers_redelivery(jetstream: JetStream):
 
 
 @pytest.mark.asyncio
-async def test_message_nak_with_delay_redelivers_after_delay(
-    jetstream: JetStream
-):
+async def test_message_nak_with_delay_redelivers_after_delay(jetstream: JetStream):
     """Test negative acknowledgment with delay."""
     # Create a stream
     stream = await jetstream.create_stream(
@@ -311,9 +297,7 @@ async def test_message_nak_with_delay_redelivers_after_delay(
     )
 
     # Create a consumer
-    consumer = await stream.create_consumer(
-        name="test-nak-delay-consumer", ack_policy="explicit"
-    )
+    consumer = await stream.create_consumer(name="test-nak-delay-consumer", ack_policy="explicit")
 
     # Publish a message
     await jetstream.publish("test.nak_delay", b"test message")
@@ -426,9 +410,7 @@ async def test_message_term_prevents_redelivery(jetstream: JetStream):
 
 
 @pytest.mark.asyncio
-async def test_message_term_with_reason_includes_reason_in_advisory(
-    jetstream: JetStream
-):
+async def test_message_term_with_reason_includes_reason_in_advisory(jetstream: JetStream):
     """Test message termination with reason."""
     # Create a stream
     stream = await jetstream.create_stream(
@@ -465,9 +447,7 @@ async def test_message_term_with_reason_includes_reason_in_advisory(
 
 
 @pytest.mark.asyncio
-async def test_ack_methods_raise_error_without_jetstream_reference(
-    client: Client
-):
+async def test_ack_methods_raise_error_without_jetstream_reference(client: Client):
     """Test that ack methods raise ValueError when JetStream reference is missing."""
     # Create a message without JetStream reference
     msg = Message(
@@ -479,31 +459,19 @@ async def test_ack_methods_raise_error_without_jetstream_reference(
     )
 
     # These should raise ValueError
-    with pytest.raises(
-            ValueError,
-            match="Cannot acknowledge message without JetStream reference"):
+    with pytest.raises(ValueError, match="Cannot acknowledge message without JetStream reference"):
         await msg.ack()
-    with pytest.raises(
-            ValueError,
-            match="Cannot acknowledge message without JetStream reference"):
+    with pytest.raises(ValueError, match="Cannot acknowledge message without JetStream reference"):
         await msg.double_ack()
-    with pytest.raises(ValueError,
-                       match="Cannot NAK message without JetStream reference"):
+    with pytest.raises(ValueError, match="Cannot NAK message without JetStream reference"):
         await msg.nak()
-    with pytest.raises(ValueError,
-                       match="Cannot NAK message without JetStream reference"):
+    with pytest.raises(ValueError, match="Cannot NAK message without JetStream reference"):
         await msg.nak_with_delay(1.0)
-    with pytest.raises(
-            ValueError, match=
-            "Cannot send in-progress for message without JetStream reference"):
+    with pytest.raises(ValueError, match="Cannot send in-progress for message without JetStream reference"):
         await msg.in_progress()
-    with pytest.raises(
-            ValueError,
-            match="Cannot terminate message without JetStream reference"):
+    with pytest.raises(ValueError, match="Cannot terminate message without JetStream reference"):
         await msg.term()
-    with pytest.raises(
-            ValueError,
-            match="Cannot terminate message without JetStream reference"):
+    with pytest.raises(ValueError, match="Cannot terminate message without JetStream reference"):
         await msg.term_with_reason("test reason")
 
 
@@ -520,27 +488,19 @@ async def test_ack_methods_raise_error_without_reply_to(jetstream: JetStream):
     )
 
     # These should raise ValueError
-    with pytest.raises(ValueError,
-                       match="Cannot acknowledge message without reply_to"):
+    with pytest.raises(ValueError, match="Cannot acknowledge message without reply_to"):
         await msg.ack()
-    with pytest.raises(ValueError,
-                       match="Cannot acknowledge message without reply_to"):
+    with pytest.raises(ValueError, match="Cannot acknowledge message without reply_to"):
         await msg.double_ack()
-    with pytest.raises(ValueError,
-                       match="Cannot NAK message without reply_to"):
+    with pytest.raises(ValueError, match="Cannot NAK message without reply_to"):
         await msg.nak()
-    with pytest.raises(ValueError,
-                       match="Cannot NAK message without reply_to"):
+    with pytest.raises(ValueError, match="Cannot NAK message without reply_to"):
         await msg.nak_with_delay(1.0)
-    with pytest.raises(
-            ValueError,
-            match="Cannot send in-progress for message without reply_to"):
+    with pytest.raises(ValueError, match="Cannot send in-progress for message without reply_to"):
         await msg.in_progress()
-    with pytest.raises(ValueError,
-                       match="Cannot terminate message without reply_to"):
+    with pytest.raises(ValueError, match="Cannot terminate message without reply_to"):
         await msg.term()
-    with pytest.raises(ValueError,
-                       match="Cannot terminate message without reply_to"):
+    with pytest.raises(ValueError, match="Cannot terminate message without reply_to"):
         await msg.term_with_reason("test reason")
 
 
@@ -554,9 +514,7 @@ async def test_fetch_and_acknowledge_multiple_messages(jetstream: JetStream):
     )
 
     # Create a consumer
-    consumer = await stream.create_consumer(
-        name="test-multi-consumer", ack_policy="explicit"
-    )
+    consumer = await stream.create_consumer(name="test-multi-consumer", ack_policy="explicit")
 
     # Publish multiple messages
     for i in range(5):

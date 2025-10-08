@@ -171,9 +171,7 @@ class ConsumerConfig:
 
         # Check for unconsumed fields
         if config:
-            raise ValueError(
-                f"ConsumerConfig.from_response() has unconsumed fields: {list(config.keys())}"
-            )
+            raise ValueError(f"ConsumerConfig.from_response() has unconsumed fields: {list(config.keys())}")
 
         return cls(
             ack_policy=ack_policy,
@@ -339,9 +337,7 @@ class ConsumerInfo:
 
         # Check for unconsumed fields
         if data:
-            raise ValueError(
-                f"ConsumerInfo.from_response() has unconsumed fields: {list(data.keys())}"
-            )
+            raise ValueError(f"ConsumerInfo.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
             stream_name=stream_name,

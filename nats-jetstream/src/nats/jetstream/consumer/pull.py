@@ -54,7 +54,6 @@ class MessageHandler:
 
 
 class PullMessageBatch(MessageBatch):
-
     _subscription: Subscription
     _pending_messages: int
     _jetstream: Any
@@ -62,17 +61,13 @@ class PullMessageBatch(MessageBatch):
     _error: Exception | None
     _deadline: float | None
 
-    def __init__(
-        self, subscription: Subscription, batch_size: int, jetstream,
-        max_wait: float | None
-    ):
+    def __init__(self, subscription: Subscription, batch_size: int, jetstream, max_wait: float | None):
         self._subscription = subscription
         self._pending_messages = batch_size
         self._jetstream = jetstream
         self._terminated = False
         self._error: Exception | None = None
-        self._deadline = time.time(
-        ) + max_wait if max_wait is not None else None
+        self._deadline = time.time() + max_wait if max_wait is not None else None
 
     @property
     def error(self) -> Exception | None:
@@ -98,9 +93,7 @@ class PullMessageBatch(MessageBatch):
                         raise StopAsyncIteration
 
                 try:
-                    raw_msg: ClientMessage = await self._subscription.next(
-                        timeout=timeout
-                    )
+                    raw_msg: ClientMessage = await self._subscription.next(timeout=timeout)
                 except (TimeoutError, asyncio.TimeoutError):
                     # If no more messages after timeout, we're done
                     raise StopAsyncIteration
@@ -117,9 +110,7 @@ class PullMessageBatch(MessageBatch):
                         case "409":  # Message Size Exceeds MaxBytes
                             raise StopAsyncIteration
                         case _:
-                            self._error = Exception(
-                                f"Status {raw_msg.status.code}: {raw_msg.status.description or ''}"
-                            )
+                            self._error = Exception(f"Status {raw_msg.status.code}: {raw_msg.status.description or ''}")
                             raise StopAsyncIteration
 
                 # Convert to JetStream message
@@ -228,9 +219,7 @@ class PullMessageStream(MessageStream):
 
             # Track that we consumed a message
             self._pending_messages = max(0, self._pending_messages - 1)
-            self._pending_bytes = max(
-                0, self._pending_bytes - len(raw_msg.data)
-            )
+            self._pending_bytes = max(0, self._pending_bytes - len(raw_msg.data))
 
             # Convert to JetStream message
             return Message(
@@ -264,9 +253,7 @@ class PullMessageStream(MessageStream):
         subject = f"{api_prefix}.CONSUMER.MSG.NEXT.{self._consumer.stream_name}.{self._consumer.name}"
         payload = json.dumps(request).encode()
 
-        await jetstream.client.publish(
-            subject, payload=payload, reply_to=self._subscription.subject
-        )
+        await jetstream.client.publish(subject, payload=payload, reply_to=self._subscription.subject)
 
         self._pending_messages += self._batch
         if self._max_bytes is not None:
@@ -315,7 +302,6 @@ class PullMessageStream(MessageStream):
 
 
 class PullConsumer(Consumer):
-
     _stream: Stream
     _info: ConsumerInfo
 
@@ -401,8 +387,7 @@ class PullConsumer(Consumer):
         stream = PullMessageStream(
             consumer=self,
             subscription=subscription,
-            batch=max_messages
-            or 100,  # Default to 100 if max_messages is None
+            batch=max_messages or 100,  # Default to 100 if max_messages is None
             max_bytes=max_bytes,
             heartbeat=heartbeat,
             expires=max_wait,
@@ -435,10 +420,7 @@ class PullConsumer(Consumer):
         # Get a message stream (callback-unaware, minimal background processing)
         # Support both max_messages and max_bytes together (like Go's PullMaxMessagesWithBytesLimit)
         message_stream = await self.messages(
-            max_messages=max_messages,
-            max_bytes=max_bytes,
-            heartbeat=heartbeat,
-            max_wait=max_wait
+            max_messages=max_messages, max_bytes=max_bytes, heartbeat=heartbeat, max_wait=max_wait
         )
 
         # Higher-level callback handling: create a task that iterates over the stream
@@ -462,8 +444,7 @@ class PullConsumer(Consumer):
         min_ack_pending: int | None = None,
         min_pending: int | None = None,
         priority_group: str | None = None,
-    ) -> MessageBatch:
-        ...
+    ) -> MessageBatch: ...
 
     @overload
     async def fetch(
@@ -475,8 +456,7 @@ class PullConsumer(Consumer):
         min_ack_pending: int | None = None,
         min_pending: int | None = None,
         priority_group: str | None = None,
-    ) -> MessageBatch:
-        ...
+    ) -> MessageBatch: ...
 
     async def fetch(
         self,
@@ -507,9 +487,7 @@ class PullConsumer(Consumer):
             ValueError: If both max_messages and max_bytes are specified, or neither is specified
         """
         if (max_messages is None) == (max_bytes is None):
-            raise ValueError(
-                "Must specify exactly one of max_messages or max_bytes"
-            )
+            raise ValueError("Must specify exactly one of max_messages or max_bytes")
 
         # Use max_messages as batch size, or 1 if only max_bytes is specified
         batch_size = max_messages if max_messages is not None else 1
@@ -533,8 +511,7 @@ class PullConsumer(Consumer):
         min_ack_pending: int | None = None,
         min_pending: int | None = None,
         priority_group: str | None = None,
-    ) -> MessageBatch:
-        ...
+    ) -> MessageBatch: ...
 
     @overload
     async def fetch_nowait(
@@ -544,8 +521,7 @@ class PullConsumer(Consumer):
         min_ack_pending: int | None = None,
         min_pending: int | None = None,
         priority_group: str | None = None,
-    ) -> MessageBatch:
-        ...
+    ) -> MessageBatch: ...
 
     async def fetch_nowait(
         self,
@@ -572,9 +548,7 @@ class PullConsumer(Consumer):
             ValueError: If both max_messages and max_bytes are specified, or neither is specified
         """
         if (max_messages is None) == (max_bytes is None):
-            raise ValueError(
-                "Must specify exactly one of max_messages or max_bytes"
-            )
+            raise ValueError("Must specify exactly one of max_messages or max_bytes")
 
         # Use max_messages as batch size, or 1 if only max_bytes is specified
         batch_size = max_messages if max_messages is not None else 1
@@ -630,13 +604,6 @@ class PullConsumer(Consumer):
         subject = f"{api_prefix}.CONSUMER.MSG.NEXT.{self.stream_name}.{self.name}"
         payload = json.dumps(request).encode()
 
-        await jetstream.client.publish(
-            subject, payload=payload, reply_to=inbox
-        )
+        await jetstream.client.publish(subject, payload=payload, reply_to=inbox)
 
-        return PullMessageBatch(
-            subscription=subscription,
-            batch_size=batch,
-            jetstream=jetstream,
-            max_wait=max_wait
-        )
+        return PullMessageBatch(subscription=subscription, batch_size=batch, jetstream=jetstream, max_wait=max_wait)

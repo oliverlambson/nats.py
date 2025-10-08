@@ -54,9 +54,7 @@ class APIStats:
 
         # Check for unconsumed fields
         if data:
-            raise ValueError(
-                f"APIStats.from_response() has unconsumed fields: {list(data.keys())}"
-            )
+            raise ValueError(f"APIStats.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
             total=total,
@@ -91,9 +89,7 @@ class AccountLimits:
 
         # Check for unconsumed fields
         if data:
-            raise ValueError(
-                f"AccountLimits.from_response() has unconsumed fields: {list(data.keys())}"
-            )
+            raise ValueError(f"AccountLimits.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
             max_memory=max_memory,
@@ -127,9 +123,7 @@ class Tier:
 
         # Check for unconsumed fields
         if data:
-            raise ValueError(
-                f"Tier.from_response() has unconsumed fields: {list(data.keys())}"
-            )
+            raise ValueError(f"Tier.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
             memory=memory,
@@ -180,9 +174,7 @@ class AccountInfo:
 
         # Check for unconsumed fields
         if data:
-            raise ValueError(
-                f"AccountInfo.from_response() has unconsumed fields: {list(data.keys())}"
-            )
+            raise ValueError(f"AccountInfo.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
             memory=memory,
@@ -216,9 +208,7 @@ class PublishAck:
 
         # Check for unconsumed fields
         if data:
-            raise ValueError(
-                f"PublishAck.from_response() has unconsumed fields: {list(data.keys())}"
-            )
+            raise ValueError(f"PublishAck.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
             stream=stream,
@@ -231,12 +221,7 @@ class PublishAck:
 class JetStream:
     """JetStream context."""
 
-    def __init__(
-        self,
-        client: Client,
-        prefix: str = "$JS.API",
-        domain: str | None = None
-    ) -> None:
+    def __init__(self, client: Client, prefix: str = "$JS.API", domain: str | None = None) -> None:
         """Initialize JetStream client.
 
         Args:
@@ -288,8 +273,7 @@ class JetStream:
 
         return publish_ack
 
-    async def stream_names(self,
-                           subject: str | None = None) -> AsyncIterator[str]:
+    async def stream_names(self, subject: str | None = None) -> AsyncIterator[str]:
         """Get an async iterator over all stream names.
 
         Args:
@@ -301,9 +285,7 @@ class JetStream:
         offset = 0
         total = None
         while True:
-            response = await self._api.stream_names(
-                offset=offset, subject=subject
-            )
+            response = await self._api.stream_names(offset=offset, subject=subject)
             streams = response.get("streams", [])
             if streams is None:
                 streams = []
@@ -322,9 +304,7 @@ class JetStream:
             # Increment offset by the number of streams we received
             offset += len(streams)
 
-    async def list_streams(self,
-                           subject: str | None = None
-                           ) -> AsyncIterator[StreamInfo]:
+    async def list_streams(self, subject: str | None = None) -> AsyncIterator[StreamInfo]:
         """Get an async iterator over all streams.
 
         Args:
@@ -336,9 +316,7 @@ class JetStream:
         offset = 0
         total = None
         while True:
-            response = await self._api.stream_list(
-                offset=offset, subject=subject
-            )
+            response = await self._api.stream_list(offset=offset, subject=subject)
             streams = response.get("streams", [])
             if streams is None:
                 streams = []
@@ -423,13 +401,7 @@ class JetStream:
         info = await self.get_stream_info(name)
         return Stream(self, name, info)
 
-    async def create_consumer(
-        self,
-        stream_name: str,
-        name: str,
-        durable_name: str | None = None,
-        **config
-    ) -> Consumer:
+    async def create_consumer(self, stream_name: str, name: str, durable_name: str | None = None, **config) -> Consumer:
         """Create a consumer for a stream.
 
         Args:
@@ -453,9 +425,7 @@ class JetStream:
         # Create the consumer via the stream (using keyword arguments)
         return await stream.create_consumer(**consumer_config)
 
-    async def get_consumer(
-        self, stream_name: str, consumer_name: str
-    ) -> Consumer:
+    async def get_consumer(self, stream_name: str, consumer_name: str) -> Consumer:
         """Get a consumer by name.
 
         Args:
@@ -468,9 +438,7 @@ class JetStream:
         stream = await self.get_stream(stream_name)
         return await stream.get_consumer(consumer_name)
 
-    async def delete_consumer(
-        self, stream_name: str, consumer_name: str
-    ) -> bool:
+    async def delete_consumer(self, stream_name: str, consumer_name: str) -> bool:
         """Delete a consumer.
 
         Args:
@@ -483,9 +451,7 @@ class JetStream:
         stream = await self.get_stream(stream_name)
         return await stream.delete_consumer(consumer_name)
 
-    async def update_consumer(
-        self, stream_name: str, consumer_name: str, **config
-    ) -> Consumer:
+    async def update_consumer(self, stream_name: str, consumer_name: str, **config) -> Consumer:
         """Update a consumer.
 
         Args:
@@ -512,9 +478,7 @@ class JetStream:
         total = None
 
         while True:
-            response = await self._api.consumer_names(
-                stream_name, offset=offset
-            )
+            response = await self._api.consumer_names(stream_name, offset=offset)
             consumers = response.get("consumers", [])
 
             if consumers is None:
@@ -534,8 +498,7 @@ class JetStream:
             # Increment offset
             offset += len(consumers)
 
-    async def list_consumers(self,
-                             stream_name: str) -> AsyncIterator[ConsumerInfo]:
+    async def list_consumers(self, stream_name: str) -> AsyncIterator[ConsumerInfo]:
         """Get an async iterator over all consumer info objects for a stream.
 
         Args:
@@ -548,9 +511,7 @@ class JetStream:
         total = None
 
         while True:
-            response = await self._api.consumer_list(
-                stream_name, offset=offset
-            )
+            response = await self._api.consumer_list(stream_name, offset=offset)
             consumers = response.get("consumers", [])
 
             if consumers is None:
@@ -570,9 +531,7 @@ class JetStream:
             # Increment offset
             offset += len(consumers)
 
-    async def get_consumer_info(
-        self, stream_name: str, consumer_name: str
-    ) -> ConsumerInfo:
+    async def get_consumer_info(self, stream_name: str, consumer_name: str) -> ConsumerInfo:
         """Get consumer info.
 
         Args:
@@ -623,15 +582,11 @@ class JetStream:
             subject=message["subject"],
             sequence=message["seq"],
             data=data or b"",
-            time=datetime.fromisoformat(
-                message["time"].replace("Z", "+00:00")
-            ),
+            time=datetime.fromisoformat(message["time"].replace("Z", "+00:00")),
             headers=headers,
         )
 
-    async def get_last_message_for_subject(
-        self, stream: str, subject: str
-    ) -> StreamMessage:
+    async def get_last_message_for_subject(self, stream: str, subject: str) -> StreamMessage:
         """Get the last message for a subject directly from a stream.
 
         This is a direct message get that requires the stream to have allow_direct=true.
@@ -664,18 +619,12 @@ class JetStream:
             subject=message["subject"],
             sequence=message["seq"],
             data=data or b"",
-            time=datetime.fromisoformat(
-                message["time"].replace("Z", "+00:00")
-            ),
+            time=datetime.fromisoformat(message["time"].replace("Z", "+00:00")),
             headers=headers,
         )
 
 
-def new(
-    client: Client,
-    prefix: str = "$JS.API",
-    domain: str | None = None
-) -> JetStream:
+def new(client: Client, prefix: str = "$JS.API", domain: str | None = None) -> JetStream:
     """Create a new JetStream instance.
 
     Args:

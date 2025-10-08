@@ -21,10 +21,7 @@ def run_cmd(cmd: list[str], cwd: str | None = None) -> None:
     try:
         subprocess.run(cmd, check=True, cwd=cwd)
     except subprocess.CalledProcessError as e:
-        print(
-            f"Command failed with exit code {e.returncode}: {' '.join(cmd)}",
-            file=sys.stderr
-        )
+        print(f"Command failed with exit code {e.returncode}: {' '.join(cmd)}", file=sys.stderr)
         sys.exit(1)
 
 
@@ -68,10 +65,7 @@ def main():
             shutil.rmtree(jsm_dir)
 
         print("Cloning jsm.go repository...")
-        run_cmd([
-            "git", "clone", "https://github.com/nats-io/jsm.go.git",
-            str(jsm_dir)
-        ])
+        run_cmd(["git", "clone", "https://github.com/nats-io/jsm.go.git", str(jsm_dir)])
 
         # Create schema directory if it doesn't exist
         schema_dir = root_dir / "schemas" / "jetstream" / "api" / "v1"
@@ -80,10 +74,7 @@ def main():
         # Copy and fix JetStream schema files
         source_schema_dir = jsm_dir / "schema_source" / "jetstream" / "api" / "v1"
         if not source_schema_dir.exists():
-            print(
-                f"Schema directory not found: {source_schema_dir}",
-                file=sys.stderr
-            )
+            print(f"Schema directory not found: {source_schema_dir}", file=sys.stderr)
             sys.exit(1)
 
         print(f"Copying and fixing schema files to {schema_dir}...")

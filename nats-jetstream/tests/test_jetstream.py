@@ -132,13 +132,9 @@ async def test_publish_with_empty_payload(jetstream: JetStream):
 
 
 @pytest.mark.asyncio
-async def test_create_stream_with_subjects_and_description(
-    jetstream: JetStream
-):
+async def test_create_stream_with_subjects_and_description(jetstream: JetStream):
     """Test creating a stream with subjects and description."""
-    stream = await jetstream.create_stream(
-        name="test", subjects=["FOO.*"], description="test stream"
-    )
+    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"], description="test stream")
 
     assert stream.name == "test"
     assert stream.info is not None
@@ -150,12 +146,7 @@ async def test_create_stream_with_subjects_and_description(
 async def test_create_stream_with_metadata(jetstream: JetStream):
     """Test creating a stream with metadata."""
     stream = await jetstream.create_stream(
-        name="test_meta",
-        subjects=["BAR.*"],
-        metadata={
-            "foo": "bar",
-            "name": "test"
-        }
+        name="test_meta", subjects=["BAR.*"], metadata={"foo": "bar", "name": "test"}
     )
     assert stream.name == "test_meta"
     assert stream.info is not None
@@ -194,14 +185,10 @@ async def test_create_stream_with_duplicate_name_fails(jetstream: JetStream):
 async def test_update_stream_max_msgs_and_subjects(jetstream: JetStream):
     """Test updating a stream's max messages and subjects."""
     # Create initial stream
-    _stream = await jetstream.create_stream(
-        name="test", subjects=["FOO.*"], max_msgs=100
-    )
+    _stream = await jetstream.create_stream(name="test", subjects=["FOO.*"], max_msgs=100)
 
     # Update stream configuration
-    updated_info = await jetstream.update_stream(
-        name="test", subjects=["FOO.*", "BAR.*"], max_msgs=200
-    )
+    updated_info = await jetstream.update_stream(name="test", subjects=["FOO.*", "BAR.*"], max_msgs=200)
     assert updated_info.config.max_msgs == 200
     assert set(updated_info.config.subjects) == {"FOO.*", "BAR.*"}
 
@@ -292,9 +279,7 @@ async def test_list_streams_with_subject_filter(jetstream: JetStream):
     await jetstream.create_stream(name="test1", subjects=["FOO.*"])
     await jetstream.create_stream(name="test2", subjects=["BAR.*"])
 
-    streams = [
-        stream async for stream in jetstream.list_streams(subject="FOO.*")
-    ]
+    streams = [stream async for stream in jetstream.list_streams(subject="FOO.*")]
     assert len(streams) == 1
     assert streams[0].config.name == "test1"
 
@@ -347,14 +332,10 @@ async def test_create_stream_with_workqueue_retention(jetstream: JetStream):
 async def test_create_mirror_stream(jetstream: JetStream):
     """Test creating a mirror stream."""
     # Create source stream
-    _source = await jetstream.create_stream(
-        name="source", subjects=["SOURCE.*"]
-    )
+    _source = await jetstream.create_stream(name="source", subjects=["SOURCE.*"])
 
     # Create mirror stream
-    mirror = await jetstream.create_stream(
-        name="mirror", mirror={"name": "source"}
-    )
+    mirror = await jetstream.create_stream(name="mirror", mirror={"name": "source"})
 
     # Check mirror configuration
     assert mirror.info.config.mirror.name == "source"
@@ -362,9 +343,7 @@ async def test_create_mirror_stream(jetstream: JetStream):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("stream_count", [0, 1, 2, 4, 8, 16, 32])
-async def test_list_streams_pagination(
-    jetstream: JetStream, stream_count: int
-):
+async def test_list_streams_pagination(jetstream: JetStream, stream_count: int):
     """Test that listing streams handles pagination."""
     # Create streams
     for i in range(stream_count):
@@ -377,9 +356,7 @@ async def test_list_streams_pagination(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("stream_count", [0, 1, 2, 4, 8, 16, 32])
-async def test_stream_names_pagination(
-    jetstream: JetStream, stream_count: int
-):
+async def test_stream_names_pagination(jetstream: JetStream, stream_count: int):
     """Test that listing stream names handles pagination."""
     # Create streams
     for i in range(stream_count):
@@ -401,9 +378,7 @@ async def test_create_consumer_via_jetstream(jetstream: JetStream):
 
     # Create a consumer via JetStream
     consumer = await jetstream.create_consumer(
-        stream_name="test_stream",
-        name="test_consumer",
-        durable_name="test_consumer"
+        stream_name="test_stream", name="test_consumer", durable_name="test_consumer"
     )
 
     assert consumer.name == "test_consumer"
@@ -415,11 +390,7 @@ async def test_get_consumer_info_via_jetstream(jetstream: JetStream):
     """Test getting consumer info directly via JetStream."""
     # Create a stream and consumer
     await jetstream.create_stream(name="test_stream", subjects=["FOO.*"])
-    await jetstream.create_consumer(
-        stream_name="test_stream",
-        name="test_consumer",
-        durable_name="test_consumer"
-    )
+    await jetstream.create_consumer(stream_name="test_stream", name="test_consumer", durable_name="test_consumer")
 
     # Get consumer info via JetStream
     info = await jetstream.get_consumer_info("test_stream", "test_consumer")
@@ -433,11 +404,7 @@ async def test_get_consumer_via_jetstream(jetstream: JetStream):
     """Test getting a consumer directly via JetStream."""
     # Create a stream and consumer
     await jetstream.create_stream(name="test_stream", subjects=["FOO.*"])
-    await jetstream.create_consumer(
-        stream_name="test_stream",
-        name="test_consumer",
-        durable_name="test_consumer"
-    )
+    await jetstream.create_consumer(stream_name="test_stream", name="test_consumer", durable_name="test_consumer")
 
     # Get consumer via JetStream
     consumer = await jetstream.get_consumer("test_stream", "test_consumer")
@@ -452,9 +419,7 @@ async def test_delete_consumer_via_jetstream(jetstream: JetStream):
     # Create a stream and consumer
     await jetstream.create_stream(name="test_stream", subjects=["FOO.*"])
     consumer = await jetstream.create_consumer(
-        stream_name="test_stream",
-        name="test_consumer",
-        durable_name="test_consumer"
+        stream_name="test_stream", name="test_consumer", durable_name="test_consumer"
     )
 
     # Delete consumer via JetStream
@@ -472,12 +437,8 @@ async def test_consumer_names_via_jetstream(jetstream: JetStream):
     """Test listing consumer names directly via JetStream."""
     # Create a stream and multiple consumers
     await jetstream.create_stream(name="test_stream", subjects=["FOO.*"])
-    await jetstream.create_consumer(
-        stream_name="test_stream", name="consumer1", durable_name="consumer1"
-    )
-    await jetstream.create_consumer(
-        stream_name="test_stream", name="consumer2", durable_name="consumer2"
-    )
+    await jetstream.create_consumer(stream_name="test_stream", name="consumer1", durable_name="consumer1")
+    await jetstream.create_consumer(stream_name="test_stream", name="consumer2", durable_name="consumer2")
 
     # Get consumer names via JetStream
     names = [name async for name in jetstream.consumer_names("test_stream")]
@@ -491,12 +452,8 @@ async def test_list_consumers_via_jetstream(jetstream: JetStream):
     """Test getting info for all consumers directly via JetStream."""
     # Create a stream and multiple consumers
     await jetstream.create_stream(name="test_stream", subjects=["FOO.*"])
-    await jetstream.create_consumer(
-        stream_name="test_stream", name="consumer1", durable_name="consumer1"
-    )
-    await jetstream.create_consumer(
-        stream_name="test_stream", name="consumer2", durable_name="consumer2"
-    )
+    await jetstream.create_consumer(stream_name="test_stream", name="consumer1", durable_name="consumer1")
+    await jetstream.create_consumer(stream_name="test_stream", name="consumer2", durable_name="consumer2")
 
     # Get info for all consumers via JetStream
     consumers_info = [c async for c in jetstream.list_consumers("test_stream")]
@@ -510,9 +467,7 @@ async def test_list_consumers_via_jetstream(jetstream: JetStream):
 async def test_create_consumer_with_invalid_stream_fails(jetstream: JetStream):
     """Test that creating a consumer on a non-existent stream fails."""
     with pytest.raises(Exception):  # TODO: Define specific error type
-        await jetstream.create_consumer(
-            stream_name="nonexistent_stream", name="test_consumer"
-        )
+        await jetstream.create_consumer(stream_name="nonexistent_stream", name="test_consumer")
 
 
 @pytest.mark.asyncio
@@ -521,19 +476,13 @@ async def test_create_consumer_with_duplicate_name_fails(jetstream: JetStream):
     # Create a stream and consumer
     await jetstream.create_stream(name="test_stream", subjects=["FOO.*"])
     await jetstream.create_consumer(
-        stream_name="test_stream",
-        name="test_consumer",
-        durable_name="test_consumer",
-        max_deliver=10
+        stream_name="test_stream", name="test_consumer", durable_name="test_consumer", max_deliver=10
     )
 
     # Try to create a consumer with the same name but different config
     with pytest.raises(Error, match="consumer already exists"):
         await jetstream.create_consumer(
-            stream_name="test_stream",
-            name="test_consumer",
-            durable_name="test_consumer",
-            max_deliver=20
+            stream_name="test_stream", name="test_consumer", durable_name="test_consumer", max_deliver=20
         )
 
 
@@ -544,16 +493,11 @@ async def test_update_consumer_via_jetstream(jetstream: JetStream):
     # Create a stream and consumer
     await jetstream.create_stream(name="test_stream", subjects=["FOO.*"])
     await jetstream.create_consumer(
-        stream_name="test_stream",
-        name="test_consumer",
-        durable_name="test_consumer",
-        max_deliver=10
+        stream_name="test_stream", name="test_consumer", durable_name="test_consumer", max_deliver=10
     )
 
     # Update the consumer via JetStream
-    updated_consumer = await jetstream.update_consumer(
-        stream_name="test_stream", name="test_consumer", max_deliver=20
-    )
+    updated_consumer = await jetstream.update_consumer(stream_name="test_stream", name="test_consumer", max_deliver=20)
 
     assert updated_consumer.info.config.max_deliver == 20
 
@@ -566,9 +510,7 @@ async def test_update_nonexistent_consumer_fails(jetstream: JetStream):
 
     # Try to update a non-existent consumer
     with pytest.raises(Error, match="consumer does not exist"):
-        await jetstream.update_consumer(
-            stream_name="test_stream", consumer_name="nonexistent", max_deliver=20
-        )
+        await jetstream.update_consumer(stream_name="test_stream", consumer_name="nonexistent", max_deliver=20)
 
 
 @pytest.mark.asyncio
@@ -583,15 +525,11 @@ async def test_delete_nonexistent_consumer_fails(jetstream: JetStream):
 
 
 @pytest.mark.asyncio
-async def test_get_consumer_info_nonexistent_consumer_fails(
-    jetstream: JetStream
-):
+async def test_get_consumer_info_nonexistent_consumer_fails(jetstream: JetStream):
     """Test that getting info for a non-existent consumer fails."""
     # Create a stream
     await jetstream.create_stream(name="test_stream", subjects=["FOO.*"])
 
     # Try to get info for a non-existent consumer
     with pytest.raises(Exception):  # TODO: Define specific error type
-        await jetstream.get_consumer_info(
-            "test_stream", "nonexistent_consumer"
-        )
+        await jetstream.get_consumer_info("test_stream", "nonexistent_consumer")

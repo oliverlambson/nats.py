@@ -8,9 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-SCHEMA_DIR = Path(
-    __file__
-).parent.parent / "schemas" / "jetstream" / "api" / "v1"
+SCHEMA_DIR = Path(__file__).parent.parent / "schemas" / "jetstream" / "api" / "v1"
 OUTPUT_PATH = Path(__file__).parent.parent / "src/nats/jetstream/api/types.py"
 
 # Types to skip generating (simple type aliases only)
@@ -89,9 +87,7 @@ def resolve_ref(ref: str, definitions: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
-def is_simple_type(
-    schema: dict[str, Any], definitions: dict[str, Any] = None
-) -> bool:
+def is_simple_type(schema: dict[str, Any], definitions: dict[str, Any] = None) -> bool:
     """Check if a schema represents a simple type (just a type definition).
 
     Args:
@@ -121,9 +117,7 @@ def is_simple_type(
     return "type" in schema and set(schema.keys()).issubset(allowed_keys)
 
 
-def resolve_type_recursively(
-    schema: dict[str, Any], definitions: dict[str, Any]
-) -> dict[str, Any]:
+def resolve_type_recursively(schema: dict[str, Any], definitions: dict[str, Any]) -> dict[str, Any]:
     """Recursively resolve a type definition through references.
 
     Args:
@@ -140,8 +134,7 @@ def resolve_type_recursively(
     return schema
 
 
-def merge_schemas(base: dict[str, Any], overlay: dict[str,
-                                                      Any]) -> dict[str, Any]:
+def merge_schemas(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
     """Merge two schemas, combining their properties and required fields.
 
     Args:
@@ -168,8 +161,7 @@ def merge_schemas(base: dict[str, Any], overlay: dict[str,
     return result
 
 
-def get_combined_schema(schema: dict[str, Any],
-                        definitions: dict[str, Any]) -> dict[str, Any]:
+def get_combined_schema(schema: dict[str, Any], definitions: dict[str, Any]) -> dict[str, Any]:
     """Get the combined schema from allOf fields.
 
     Args:
@@ -191,7 +183,7 @@ def get_combined_schema(schema: dict[str, Any],
             ref_schema = resolve_ref(subschema["$ref"], definitions)
             if ref_schema:
                 # Skip merging pure oneOf schemas (validation constraints we can't express in TypedDict)
-                if ref_schema.keys() == {'oneOf'}:
+                if ref_schema.keys() == {"oneOf"}:
                     continue
                 result = merge_schemas(result, ref_schema)
         else:
@@ -222,13 +214,13 @@ def format_annotation_from_schema(schema: dict, name: str = None) -> str:
 
         case {"enum": values}:
             literals = [f'"{v}"' for v in values]
-            return f'Literal[{", ".join(literals)}]'
+            return f"Literal[{', '.join(literals)}]"
 
         case {"oneOf": schemas}:
-            return f'Union[{", ".join(format_annotation_from_schema(s) for s in schemas)}]'
+            return f"Union[{', '.join(format_annotation_from_schema(s) for s in schemas)}]"
 
         case {"anyOf": schemas}:
-            return f'Union[{", ".join(format_annotation_from_schema(s) for s in schemas)}]'
+            return f"Union[{', '.join(format_annotation_from_schema(s) for s in schemas)}]"
 
         case {"type": "object", "patternProperties": pattern_props}:
             pattern = next(iter(pattern_props.keys()))
@@ -240,10 +232,7 @@ def format_annotation_from_schema(schema: dict, name: str = None) -> str:
         case {"type": "object", "properties": _}:
             return name
 
-        case {
-            "type": "object",
-            "additionalProperties": props
-        } if props is not False:
+        case {"type": "object", "additionalProperties": props} if props is not False:
             if isinstance(props, dict):
                 value_type = format_annotation_from_schema(props)
                 return f"dict[str, {value_type}]"
@@ -274,9 +263,7 @@ def format_annotation_from_schema(schema: dict, name: str = None) -> str:
     return "Any"
 
 
-def generate_typed_dict_class_from_schema(
-    name: str, schema: dict[str, Any], definitions: dict[str, Any]
-) -> list[str]:
+def generate_typed_dict_class_from_schema(name: str, schema: dict[str, Any], definitions: dict[str, Any]) -> list[str]:
     """Generate a TypedDict class from a schema.
 
     Args:
@@ -324,8 +311,7 @@ def generate_typed_dict_class_from_schema(
     return lines
 
 
-def generate_literal_alias_from_schema(name: str,
-                                       schema: dict[str, Any]) -> list[str]:
+def generate_literal_alias_from_schema(name: str, schema: dict[str, Any]) -> list[str]:
     """Generate a type alias for a Literal type.
 
     Args:
@@ -343,9 +329,7 @@ def generate_literal_alias_from_schema(name: str,
     return lines
 
 
-def generate_union_alias_from_schema(
-    name: str, schema: dict[str, Any], definitions: dict[str, Any]
-) -> list[str]:
+def generate_union_alias_from_schema(name: str, schema: dict[str, Any], definitions: dict[str, Any]) -> list[str]:
     """Generate a type alias for a Union type.
 
     Args:
@@ -361,9 +345,7 @@ def generate_union_alias_from_schema(
     return lines
 
 
-def generate_type_from_schema(
-    name: str, schema: dict[str, Any], definitions: dict[str, Any]
-) -> list[str]:
+def generate_type_from_schema(name: str, schema: dict[str, Any], definitions: dict[str, Any]) -> list[str]:
     """Generate a Python type from a JSON schema.
 
     Args:
@@ -467,11 +449,7 @@ def generate_type_from_schema(
                         "description": base_schema["description"],
                     }
 
-                    lines.extend(
-                        generate_typed_dict_class_from_schema(
-                            variant_name, combined, definitions
-                        )
-                    )
+                    lines.extend(generate_typed_dict_class_from_schema(variant_name, combined, definitions))
                     variant_types.append(variant_name)
             else:
                 # Handle inline object definitions
@@ -492,19 +470,13 @@ def generate_type_from_schema(
                     "description": base_schema["description"],
                 }
 
-                lines.extend(
-                    generate_typed_dict_class_from_schema(
-                        variant_name, combined, definitions
-                    )
-                )
+                lines.extend(generate_typed_dict_class_from_schema(variant_name, combined, definitions))
                 variant_types.append(variant_name)
 
         # Create the union type
         lines.extend([f"{name} = Union[{', '.join(variant_types)}]", ""])
         return lines
-    elif ("type" in schema
-          and schema["type"] == "object") or ("properties" in schema
-                                              and "required" in schema):
+    elif ("type" in schema and schema["type"] == "object") or ("properties" in schema and "required" in schema):
         return generate_typed_dict_class_from_schema(name, schema, definitions)
     elif "enum" in schema:
         return generate_literal_alias_from_schema(name, schema)
@@ -516,8 +488,7 @@ def generate_type_from_schema(
         return [f"{name} = {annotation}", ""]
 
 
-def get_type_dependencies(schema: dict[str, Any],
-                          definitions: dict[str, Any]) -> set[str]:
+def get_type_dependencies(schema: dict[str, Any], definitions: dict[str, Any]) -> set[str]:
     """Get all type names that this schema depends on.
 
     Args:
@@ -534,8 +505,7 @@ def get_type_dependencies(schema: dict[str, Any],
         deps.add(get_type_name(ref_type))
     elif "allOf" in schema and "oneOf" in schema:
         # Get dependencies from allOf
-        base_schema = get_combined_schema({"allOf": schema["allOf"]},
-                                          definitions)
+        base_schema = get_combined_schema({"allOf": schema["allOf"]}, definitions)
         deps.update(get_type_dependencies(base_schema, definitions))
 
         # Get dependencies from each oneOf variant
@@ -589,8 +559,7 @@ def sort_types_by_dependencies(definitions: dict[str, Any]) -> list[str]:
     """
     deps = {}
     for type_name, schema in definitions.items():
-        deps[get_type_name(type_name)
-             ] = get_type_dependencies(schema, definitions)
+        deps[get_type_name(type_name)] = get_type_dependencies(schema, definitions)
 
     result = []
     visited = set()
@@ -628,8 +597,7 @@ def main():
         schema = load_schema(path)
 
         # Collect schema if it has a title and any of: properties, required, or allOf
-        if "title" in schema and ("properties" in schema or "required"
-                                  in schema or "allOf" in schema):
+        if "title" in schema and ("properties" in schema or "required" in schema or "allOf" in schema):
             schemas.append(schema)
 
         # Add definitions from this schema
@@ -643,9 +611,7 @@ def main():
     lines = []
 
     # Add imports
-    lines.append(
-        "from typing import Any, Literal, NotRequired, TypedDict, Union"
-    )
+    lines.append("from typing import Any, Literal, NotRequired, TypedDict, Union")
     lines.append("")
     lines.append("")
 
@@ -678,11 +644,8 @@ def main():
     # Now process regular schemas
     for schema in schemas:
         # Get type name from title (e.g. "io.nats.jetstream.api.v1.account_info_response")
-        original_name = schema["title"].split(".")[-1
-                                                   ]  # Get last part after dot
-        type_name = get_type_name(
-            original_name
-        )  # Convert to PascalCase if needed
+        original_name = schema["title"].split(".")[-1]  # Get last part after dot
+        type_name = get_type_name(original_name)  # Convert to PascalCase if needed
 
         if type_name in generated_types:
             print(f"⚠️  Skipping duplicate type {original_name}")

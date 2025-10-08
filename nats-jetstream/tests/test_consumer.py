@@ -10,9 +10,7 @@ from nats.jetstream import JetStream
 async def test_consumer_fetch(jetstream: JetStream):
     """Test fetching a batch of messages from a consumer."""
     # Create a stream
-    stream = await jetstream.create_stream(
-        name="test_fetch", subjects=["FETCH.*"]
-    )
+    stream = await jetstream.create_stream(name="test_fetch", subjects=["FETCH.*"])
 
     # Publish some messages
     messages = []
@@ -23,10 +21,7 @@ async def test_consumer_fetch(jetstream: JetStream):
 
     # Create a pull consumer
     consumer = await stream.create_consumer(
-        name="fetch_consumer",
-        durable_name="fetch_consumer",
-        filter_subject="FETCH.*",
-        deliver_policy="all"
+        name="fetch_consumer", durable_name="fetch_consumer", filter_subject="FETCH.*", deliver_policy="all"
     )
 
     # Fetch a batch of messages
@@ -64,16 +59,11 @@ async def test_consumer_fetch(jetstream: JetStream):
 async def test_consumer_fetch_with_max_wait(jetstream: JetStream):
     """Test fetching messages with max_wait timeout working properly."""
     # Create a stream
-    stream = await jetstream.create_stream(
-        name="test_fetch_timeout", subjects=["TIMEOUT.*"]
-    )
+    stream = await jetstream.create_stream(name="test_fetch_timeout", subjects=["TIMEOUT.*"])
 
     # Create a pull consumer
     consumer = await stream.create_consumer(
-        name="timeout_consumer",
-        durable_name="timeout_consumer",
-        filter_subject="TIMEOUT.*",
-        deliver_policy="all"
+        name="timeout_consumer", durable_name="timeout_consumer", filter_subject="TIMEOUT.*", deliver_policy="all"
     )
 
     # Fetch a batch with a very short timeout (no messages in stream)
@@ -95,16 +85,11 @@ async def test_consumer_fetch_nowait(jetstream: JetStream):
     This is equivalent to FetchNoWait in the Go client.
     """
     # Create a stream
-    stream = await jetstream.create_stream(
-        name="test_no_wait", subjects=["NOWAIT.*"]
-    )
+    stream = await jetstream.create_stream(name="test_no_wait", subjects=["NOWAIT.*"])
 
     # Create a pull consumer
     consumer = await stream.create_consumer(
-        name="no_wait_consumer",
-        durable_name="no_wait_consumer",
-        filter_subject="NOWAIT.*",
-        deliver_policy="all"
+        name="no_wait_consumer", durable_name="no_wait_consumer", filter_subject="NOWAIT.*", deliver_policy="all"
     )
 
     # Fetch with nowait when no messages are available
@@ -144,9 +129,7 @@ async def test_consumer_fetch_nowait(jetstream: JetStream):
 async def test_consumer_fetch_with_max_bytes(jetstream: JetStream):
     """Test fetching messages with max_bytes option."""
     # Create a stream
-    stream = await jetstream.create_stream(
-        name="test_max_bytes", subjects=["MAXBYTES.*"]
-    )
+    stream = await jetstream.create_stream(name="test_max_bytes", subjects=["MAXBYTES.*"])
 
     # Publish some messages with different sizes
     small_msg = b"small"  # 5 bytes
@@ -158,10 +141,7 @@ async def test_consumer_fetch_with_max_bytes(jetstream: JetStream):
 
     # Create a pull consumer
     consumer = await stream.create_consumer(
-        name="max_bytes_consumer",
-        durable_name="max_bytes_consumer",
-        filter_subject="MAXBYTES.*",
-        deliver_policy="all"
+        name="max_bytes_consumer", durable_name="max_bytes_consumer", filter_subject="MAXBYTES.*", deliver_policy="all"
     )
 
     # Fetch with max_bytes limiting to approximately 1 large message + 1 small message
@@ -190,16 +170,11 @@ async def test_consumer_fetch_with_max_bytes(jetstream: JetStream):
 async def test_consumer_delete_during_fetch(jetstream: JetStream):
     """Test deleting a consumer while a fetch is in progress."""
     # Create a stream
-    stream = await jetstream.create_stream(
-        name="test_delete", subjects=["DELETE.*"]
-    )
+    stream = await jetstream.create_stream(name="test_delete", subjects=["DELETE.*"])
 
     # Create a pull consumer
     consumer = await stream.create_consumer(
-        name="delete_consumer",
-        durable_name="delete_consumer",
-        filter_subject="DELETE.*",
-        deliver_policy="all"
+        name="delete_consumer", durable_name="delete_consumer", filter_subject="DELETE.*", deliver_policy="all"
     )
 
     # Start a fetch with a long max_wait - since there are no messages, it will wait
@@ -221,9 +196,7 @@ async def test_consumer_delete_during_fetch(jetstream: JetStream):
             await msg.ack()
 
     # Verify the exception is related to consumer deletion
-    assert "consumer" in str(excinfo.value).lower() or "timeout" in str(
-        excinfo.value
-    ).lower()
+    assert "consumer" in str(excinfo.value).lower() or "timeout" in str(excinfo.value).lower()
 
     # Make sure the delete task completes
     await delete_task
@@ -238,9 +211,7 @@ async def test_consumer_delete_during_fetch(jetstream: JetStream):
 async def test_consumer_next(jetstream: JetStream):
     """Test fetching single messages one by one (similar to Next in Go client)."""
     # Create a stream
-    stream = await jetstream.create_stream(
-        name="test_next", subjects=["NEXT.*"]
-    )
+    stream = await jetstream.create_stream(name="test_next", subjects=["NEXT.*"])
 
     # Publish some messages
     messages = []
@@ -251,10 +222,7 @@ async def test_consumer_next(jetstream: JetStream):
 
     # Create a pull consumer
     consumer = await stream.create_consumer(
-        name="next_consumer",
-        durable_name="next_consumer",
-        filter_subject="NEXT.*",
-        deliver_policy="all"
+        name="next_consumer", durable_name="next_consumer", filter_subject="NEXT.*", deliver_policy="all"
     )
 
     # Fetch messages one by one
@@ -279,9 +247,7 @@ async def test_consumer_next(jetstream: JetStream):
 async def test_consumer_delete_during_next(jetstream: JetStream):
     """Test deleting a consumer while waiting for a message with next."""
     # Create a stream
-    stream = await jetstream.create_stream(
-        name="test_delete_next", subjects=["DELNEXT.*"]
-    )
+    stream = await jetstream.create_stream(name="test_delete_next", subjects=["DELNEXT.*"])
 
     # Create a pull consumer
     consumer = await stream.create_consumer(
@@ -305,9 +271,7 @@ async def test_consumer_delete_during_next(jetstream: JetStream):
         await consumer.next(max_wait=2.0)
 
     # Verify the exception is related to consumer deletion
-    assert "consumer" in str(excinfo.value).lower() or "delete" in str(
-        excinfo.value
-    ).lower()
+    assert "consumer" in str(excinfo.value).lower() or "delete" in str(excinfo.value).lower()
 
     # Make sure the delete task completes
     await delete_task
@@ -321,9 +285,7 @@ async def test_consumer_delete_during_next(jetstream: JetStream):
 async def test_fetch_single_messages_one_by_one(jetstream: JetStream):
     """Test fetching single messages one by one using fetch with batch=1."""
     # Create a stream
-    stream = await jetstream.create_stream(
-        name="test_fetch_single", subjects=["SINGLE.*"]
-    )
+    stream = await jetstream.create_stream(name="test_fetch_single", subjects=["SINGLE.*"])
 
     # Publish some messages
     messages = []
@@ -334,10 +296,7 @@ async def test_fetch_single_messages_one_by_one(jetstream: JetStream):
 
     # Create a pull consumer
     consumer = await stream.create_consumer(
-        name="single_consumer",
-        durable_name="single_consumer",
-        filter_subject="SINGLE.*",
-        deliver_policy="all"
+        name="single_consumer", durable_name="single_consumer", filter_subject="SINGLE.*", deliver_policy="all"
     )
 
     # Fetch messages one by one using batch=1
@@ -358,16 +317,11 @@ async def test_fetch_single_messages_one_by_one(jetstream: JetStream):
 async def test_consumer_consume(jetstream: JetStream):
     """Test continuous message consumption."""
     # Create a stream
-    stream = await jetstream.create_stream(
-        name="test_consume", subjects=["CONSUME.*"]
-    )
+    stream = await jetstream.create_stream(name="test_consume", subjects=["CONSUME.*"])
 
     # Create a pull consumer
     consumer = await stream.create_consumer(
-        name="consume_consumer",
-        durable_name="consume_consumer",
-        filter_subject="CONSUME.*",
-        deliver_policy="all"
+        name="consume_consumer", durable_name="consume_consumer", filter_subject="CONSUME.*", deliver_policy="all"
     )
 
     # Store received messages
@@ -433,9 +387,7 @@ async def test_consumer_consume(jetstream: JetStream):
 async def test_consumer_messages_as_iterator(jetstream: JetStream):
     """Test using messages() method to get a message stream for async iteration."""
     # Create a stream
-    stream = await jetstream.create_stream(
-        name="test_consume_iter", subjects=["CONSUMEITER.*"]
-    )
+    stream = await jetstream.create_stream(name="test_consume_iter", subjects=["CONSUMEITER.*"])
 
     # Create a pull consumer
     consumer = await stream.create_consumer(
@@ -498,9 +450,7 @@ async def test_consumer_messages_as_iterator(jetstream: JetStream):
 async def test_consumer_delete_during_consume(jetstream: JetStream):
     """Test deleting a consumer while consuming messages."""
     # Create a stream
-    stream = await jetstream.create_stream(
-        name="test_delete_consume", subjects=["DELCONSUME.*"]
-    )
+    stream = await jetstream.create_stream(name="test_delete_consume", subjects=["DELCONSUME.*"])
 
     # Create a pull consumer
     consumer = await stream.create_consumer(
@@ -526,9 +476,7 @@ async def test_consumer_delete_during_consume(jetstream: JetStream):
             error_occurred.set()
 
     # Start consuming messages
-    message_stream = await consumer.consume(
-        callback=message_handler, max_messages=5, max_wait=2.0
-    )
+    message_stream = await consumer.consume(callback=message_handler, max_messages=5, max_wait=2.0)
 
     # Publish a few messages to get consumption started
     for i in range(3):
@@ -554,9 +502,7 @@ async def test_consumer_delete_during_consume(jetstream: JetStream):
 async def test_consumer_consume_with_max_bytes(jetstream: JetStream):
     """Test message consumption with max_bytes limitation."""
     # Create a stream
-    stream = await jetstream.create_stream(
-        name="test_consume_bytes", subjects=["CONSUMEBYTES.*"]
-    )
+    stream = await jetstream.create_stream(name="test_consume_bytes", subjects=["CONSUMEBYTES.*"])
 
     # Create a pull consumer
     consumer = await stream.create_consumer(
@@ -637,9 +583,7 @@ async def test_consumer_consume_with_max_bytes(jetstream: JetStream):
                 all_received.set()
 
         # Only get remaining messages
-        full_stream = await consumer.consume(
-            callback=collect_remaining, max_messages=10, max_wait=1.0
-        )
+        full_stream = await consumer.consume(callback=collect_remaining, max_messages=10, max_wait=1.0)
 
         try:
             # Wait for all remaining messages
@@ -652,9 +596,7 @@ async def test_consumer_consume_with_max_bytes(jetstream: JetStream):
             all_messages = received + remaining
 
             # We should have all messages, but in case of timing issues, be lenient
-            assert len(
-                all_messages
-            ) >= 2, f"Expected at least 2 messages, got {len(all_messages)}"
+            assert len(all_messages) >= 2, f"Expected at least 2 messages, got {len(all_messages)}"
 
             # Verify we got the right message types
             subjects = [r[0] for r in all_messages]
@@ -678,14 +620,10 @@ async def test_consumer_consume_with_max_bytes(jetstream: JetStream):
 
 
 @pytest.mark.asyncio
-async def test_consumer_consume_with_max_bytes_and_max_messages(
-    jetstream: JetStream
-):
+async def test_consumer_consume_with_max_bytes_and_max_messages(jetstream: JetStream):
     """Test consume with both max_messages and max_bytes specified (like Go's PullMaxMessagesWithBytesLimit)."""
     # Create a stream
-    stream = await jetstream.create_stream(
-        name="test_max_bytes_and_max_messages", subjects=["BOTHLIMITS.*"]
-    )
+    stream = await jetstream.create_stream(name="test_max_bytes_and_max_messages", subjects=["BOTHLIMITS.*"])
 
     # Create a pull consumer
     consumer = await stream.create_consumer(
@@ -712,9 +650,7 @@ async def test_consumer_consume_with_max_bytes_and_max_messages(
     async def message_handler(msg):
         received.append((msg.subject, len(msg.data)))
         await msg.ack()
-        print(
-            f"Received message {len(received)}: {msg.subject}, {len(msg.data)} bytes"
-        )
+        print(f"Received message {len(received)}: {msg.subject}, {len(msg.data)} bytes")
         if len(received) >= 1:  # Signal when we get at least 1 message
             receive_event.set()
 
@@ -735,32 +671,22 @@ async def test_consumer_consume_with_max_bytes_and_max_messages(
         await asyncio.sleep(0.5)
 
         # Should have received some messages limited by byte constraint
-        assert len(
-            received
-        ) >= 1, f"Expected at least 1 message, got {len(received)}"
-        assert len(
-            received
-        ) <= 10, f"Shouldn't exceed max_messages (10), got {len(received)}"
+        assert len(received) >= 1, f"Expected at least 1 message, got {len(received)}"
+        assert len(received) <= 10, f"Shouldn't exceed max_messages (10), got {len(received)}"
 
         # With 600 byte limit and our message sizes, we should get at most 2 messages
         # (1 large at 500 bytes + 1 small at 5 bytes = 505 bytes)
-        assert len(
-            received
-        ) <= 2, f"With 600 byte limit, expected at most 2 messages, got {len(received)}"
+        assert len(received) <= 2, f"With 600 byte limit, expected at most 2 messages, got {len(received)}"
 
     finally:
         await message_stream.stop()
 
 
 @pytest.mark.asyncio
-async def test_consumer_messages_with_max_bytes_and_max_messages(
-    jetstream: JetStream
-):
+async def test_consumer_messages_with_max_bytes_and_max_messages(jetstream: JetStream):
     """Test messages() method with both max_messages and max_bytes specified."""
     # Create a stream
-    stream = await jetstream.create_stream(
-        name="test_messages_both", subjects=["MSGBOTH.*"]
-    )
+    stream = await jetstream.create_stream(name="test_messages_both", subjects=["MSGBOTH.*"])
 
     # Create a pull consumer
     consumer = await stream.create_consumer(
@@ -801,16 +727,11 @@ async def test_consumer_messages_with_max_bytes_and_max_messages(
 async def test_consumer_consume_flow_control(jetstream: JetStream):
     """Test consumer flow control during consumption."""
     # Create a stream
-    stream = await jetstream.create_stream(
-        name="test_flow", subjects=["FLOW.*"]
-    )
+    stream = await jetstream.create_stream(name="test_flow", subjects=["FLOW.*"])
 
     # Create a pull consumer
     consumer = await stream.create_consumer(
-        name="flow_consumer",
-        durable_name="flow_consumer",
-        filter_subject="FLOW.*",
-        deliver_policy="all"
+        name="flow_consumer", durable_name="flow_consumer", filter_subject="FLOW.*", deliver_policy="all"
     )
 
     # Publish a large number of messages

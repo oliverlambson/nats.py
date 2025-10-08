@@ -1,4 +1,5 @@
 """Tests for StreamConfig None semantics for unlimited values."""
+
 import pytest
 
 from nats.jetstream.stream import StreamConfig
@@ -61,10 +62,10 @@ def test_stream_config_from_response_converts_unlimited_to_none():
     api_response = {
         "name": "test",
         "subjects": ["TEST.*"],
-        "max_msgs": -1,      # API unlimited
-        "max_bytes": -1,     # API unlimited
-        "max_consumers": -1, # API unlimited
-        "max_age": 0,        # API unlimited
+        "max_msgs": -1,  # API unlimited
+        "max_bytes": -1,  # API unlimited
+        "max_consumers": -1,  # API unlimited
+        "max_age": 0,  # API unlimited
         "num_replicas": 1,
         "retention": "limits",
         "storage": "file",
@@ -179,10 +180,10 @@ def test_stream_config_mixed_limits():
     config = StreamConfig(
         name="test",
         subjects=["TEST.*"],
-        max_msgs=1000,        # Limited
-        max_bytes=None,       # Unlimited
-        max_consumers=5,      # Limited
-        max_age=None,         # Unlimited
+        max_msgs=1000,  # Limited
+        max_bytes=None,  # Unlimited
+        max_consumers=5,  # Limited
+        max_age=None,  # Unlimited
     )
 
     request = config.to_request()
@@ -201,8 +202,8 @@ async def test_create_stream_with_none_limits(jetstream):
     config = StreamConfig(
         name="test_unlimited",
         subjects=["TEST.*"],
-        max_msgs=None,       # Unlimited
-        max_bytes=None,      # Unlimited
+        max_msgs=None,  # Unlimited
+        max_bytes=None,  # Unlimited
     )
 
     stream = await jetstream.create_stream(config)

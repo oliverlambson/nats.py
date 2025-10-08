@@ -50,9 +50,7 @@ class LostStreamData:
 
         # Check for unconsumed fields
         if data:
-            raise ValueError(
-                f"LostStreamData.from_response() has unconsumed fields: {list(data.keys())}"
-            )
+            raise ValueError(f"LostStreamData.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
             msgs=msgs,
@@ -77,9 +75,7 @@ class ExternalStreamSource:
 
         # Check for unconsumed fields
         if data:
-            raise ValueError(
-                f"ExternalStreamSource.from_response() has unconsumed fields: {list(data.keys())}"
-            )
+            raise ValueError(f"ExternalStreamSource.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
             api=api_prefix,
@@ -111,9 +107,7 @@ class SubjectTransform:
 
         # Check for unconsumed fields
         if data:
-            raise ValueError(
-                f"SubjectTransform.from_response() has unconsumed fields: {list(data.keys())}"
-            )
+            raise ValueError(f"SubjectTransform.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
             src=src,
@@ -163,9 +157,7 @@ class StreamSource:
 
         # Check for unconsumed fields
         if data:
-            raise ValueError(
-                f"StreamSource.from_response() has unconsumed fields: {list(data.keys())}"
-            )
+            raise ValueError(f"StreamSource.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
             name=name,
@@ -231,9 +223,7 @@ class StreamSourceInfo:
 
         # Check for unconsumed fields
         if data:
-            raise ValueError(
-                f"StreamSourceInfo.from_response() has unconsumed fields: {list(data.keys())}"
-            )
+            raise ValueError(f"StreamSourceInfo.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
             name=name,
@@ -263,9 +253,7 @@ class Placement:
 
         # Check for unconsumed fields
         if data:
-            raise ValueError(
-                f"Placement.from_response() has unconsumed fields: {list(data.keys())}"
-            )
+            raise ValueError(f"Placement.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
             cluster=cluster,
@@ -303,9 +291,7 @@ class Republish:
 
         # Check for unconsumed fields
         if data:
-            raise ValueError(
-                f"Republish.from_response() has unconsumed fields: {list(data.keys())}"
-            )
+            raise ValueError(f"Republish.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
             src=src,
@@ -338,9 +324,7 @@ class StreamConsumerLimits:
 
         # Check for unconsumed fields
         if data:
-            raise ValueError(
-                f"StreamConsumerLimits.from_response() has unconsumed fields: {list(data.keys())}"
-            )
+            raise ValueError(f"StreamConsumerLimits.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
             inactive_threshold=inactive_threshold,
@@ -390,9 +374,7 @@ class PeerInfo:
 
         # Check for unconsumed fields
         if data:
-            raise ValueError(
-                f"PeerInfo.from_response() has unconsumed fields: {list(data.keys())}"
-            )
+            raise ValueError(f"PeerInfo.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
             name=name,
@@ -433,9 +415,7 @@ class ClusterInfo:
 
         # Check for unconsumed fields
         if data:
-            raise ValueError(
-                f"ClusterInfo.from_response() has unconsumed fields: {list(data.keys())}"
-            )
+            raise ValueError(f"ClusterInfo.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
             name=name,
@@ -505,9 +485,7 @@ class StreamState:
 
         # Check for unconsumed fields
         if data:
-            raise ValueError(
-                f"StreamState.from_response() has unconsumed fields: {list(data.keys())}"
-            )
+            raise ValueError(f"StreamState.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
             messages=messages,
@@ -751,9 +729,7 @@ class StreamConfig:
 
         # Check for unconsumed fields
         if config:
-            raise ValueError(
-                f"StreamConfig.from_response() has unconsumed fields: {list(config.keys())}"
-            )
+            raise ValueError(f"StreamConfig.from_response() has unconsumed fields: {list(config.keys())}")
 
         return cls(
             max_age=max_age,
@@ -917,9 +893,7 @@ class StreamInfo:
 
         # Check for unconsumed fields
         if data:
-            raise ValueError(
-                f"StreamInfo.from_response() has unconsumed fields: {list(data.keys())}"
-            )
+            raise ValueError(f"StreamInfo.from_response() has unconsumed fields: {list(data.keys())}")
 
         return cls(
             config=config,
@@ -944,9 +918,7 @@ class StreamManager(Protocol):
         """
         ...
 
-    async def list_streams(self,
-                           subject: str | None = None
-                           ) -> AsyncIterator[StreamInfo]:
+    async def list_streams(self, subject: str | None = None) -> AsyncIterator[StreamInfo]:
         """Get an async iterator over all streams.
 
         Args:
@@ -1005,12 +977,7 @@ class StreamMessage:
 class Stream:
     """A JetStream stream."""
 
-    def __init__(
-        self,
-        jetstream: JetStream,
-        name: str,
-        info: StreamInfo | None = None
-    ) -> None:
+    def __init__(self, jetstream: JetStream, name: str, info: StreamInfo | None = None) -> None:
         self._jetstream = jetstream
         self._name = name
         self._info = info
@@ -1073,12 +1040,7 @@ class Stream:
         # Send purge request
         await api.stream_purge(self._name, **request)
 
-    async def _get_message(
-        self,
-        *,
-        sequence: int | None = None,
-        last_by_subject: str | None = None
-    ) -> StreamMessage:
+    async def _get_message(self, *, sequence: int | None = None, last_by_subject: str | None = None) -> StreamMessage:
         """Internal helper to get a message either by sequence or last by subject.
 
         Args:
@@ -1101,15 +1063,11 @@ class Stream:
             if sequence is not None:
                 response = await api._client.request(
                     f"$JS.API.DIRECT.GET.{self._name}",
-                    json.dumps({
-                        "seq": sequence
-                    }).encode(),
+                    json.dumps({"seq": sequence}).encode(),
                 )
             else:
                 # Must be last by subject
-                response = await api._client.request(
-                    f"$JS.API.DIRECT.GET.{self._name}.{last_by_subject}", b""
-                )
+                response = await api._client.request(f"$JS.API.DIRECT.GET.{self._name}.{last_by_subject}", b"")
 
             # Direct get returns raw message with headers
             if not hasattr(response, "headers") or not response.headers:
@@ -1125,27 +1083,19 @@ class Stream:
             # Parse required headers
             stream = response.headers.get("Nats-Stream")
             if not stream:
-                raise RuntimeError(
-                    "Direct get response missing Nats-Stream header"
-                )
+                raise RuntimeError("Direct get response missing Nats-Stream header")
 
             subject = response.headers.get("Nats-Subject")
             if not subject:
-                raise RuntimeError(
-                    "Direct get response missing Nats-Subject header"
-                )
+                raise RuntimeError("Direct get response missing Nats-Subject header")
 
             sequence = response.headers.get("Nats-Sequence")
             if not sequence:
-                raise RuntimeError(
-                    "Direct get response missing Nats-Sequence header"
-                )
+                raise RuntimeError("Direct get response missing Nats-Sequence header")
 
             timestamp = response.headers.get("Nats-Time-Stamp")
             if not timestamp:
-                raise RuntimeError(
-                    "Direct get response missing Nats-Time-Stamp header"
-                )
+                raise RuntimeError("Direct get response missing Nats-Time-Stamp header")
 
             # Convert list values to single values for all headers
             headers = {}
@@ -1157,10 +1107,10 @@ class Stream:
 
             # Remove metadata headers
             for key in [
-                    "Nats-Stream",
-                    "Nats-Subject",
-                    "Nats-Sequence",
-                    "Nats-Time-Stamp",
+                "Nats-Stream",
+                "Nats-Subject",
+                "Nats-Sequence",
+                "Nats-Time-Stamp",
             ]:
                 headers.pop(key, None)
 
@@ -1170,13 +1120,9 @@ class Stream:
 
             return StreamMessage(
                 subject=subject[0] if isinstance(subject, list) else subject,
-                sequence=int(
-                    sequence[0] if isinstance(sequence, list) else sequence
-                ),
+                sequence=int(sequence[0] if isinstance(sequence, list) else sequence),
                 data=response.data,
-                time=datetime.fromisoformat(
-                    timestamp[0] if isinstance(timestamp, list) else timestamp
-                ),
+                time=datetime.fromisoformat(timestamp[0] if isinstance(timestamp, list) else timestamp),
                 headers=headers,
             )
         else:
@@ -1193,9 +1139,7 @@ class Stream:
             #   },
             #   "type": "io.nats.jetstream.api.v1.stream_msg_get_response"
             # }
-            response = await api.stream_msg_get(
-                self._name, seq=sequence, last_by_subj=last_by_subject
-            )
+            response = await api.stream_msg_get(self._name, seq=sequence, last_by_subj=last_by_subject)
             message = response["message"]
 
         # Decode base64 data if present
@@ -1231,9 +1175,7 @@ class Stream:
             subject=message["subject"],
             sequence=message["seq"],
             data=data,
-            time=datetime.fromisoformat(
-                message["time"].replace("Z", "+00:00")
-            ),
+            time=datetime.fromisoformat(message["time"].replace("Z", "+00:00")),
             headers=headers,
         )
 
@@ -1251,9 +1193,7 @@ class Stream:
         """
         return await self._get_message(sequence=sequence)
 
-    async def get_last_message_for_subject(
-        self, subject: str
-    ) -> StreamMessage:
+    async def get_last_message_for_subject(self, subject: str) -> StreamMessage:
         """Get the last message for a subject.
 
         If the stream has allow_direct=true configured, this will use direct message access.
@@ -1297,11 +1237,7 @@ class Stream:
 
         await api.stream_msg_delete(self._name, seq=sequence, no_erase=False)
 
-    async def _upsert_consumer(
-        self,
-        action: str = CONSUMER_ACTION_CREATE_OR_UPDATE,
-        **config
-    ) -> Consumer:
+    async def _upsert_consumer(self, action: str = CONSUMER_ACTION_CREATE_OR_UPDATE, **config) -> Consumer:
         """Upsert a consumer for this stream, mirroring Go's upsertConsumer logic.
 
         Args:
@@ -1382,9 +1318,7 @@ class Stream:
         config_dict = config.to_request()
 
         # Delegate to _upsert_consumer with "create" action
-        return await self._upsert_consumer(
-            action=CONSUMER_ACTION_CREATE, **config_dict
-        )
+        return await self._upsert_consumer(action=CONSUMER_ACTION_CREATE, **config_dict)
 
     async def get_consumer_info(self, consumer_name: str) -> ConsumerInfo:
         """Get consumer info."""
@@ -1430,6 +1364,4 @@ class Stream:
         Returns:
             The updated consumer
         """
-        return await self._upsert_consumer(
-            action=CONSUMER_ACTION_UPDATE, name=consumer_name, **config
-        )
+        return await self._upsert_consumer(action=CONSUMER_ACTION_UPDATE, name=consumer_name, **config)

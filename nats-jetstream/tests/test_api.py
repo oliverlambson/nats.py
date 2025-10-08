@@ -8,18 +8,21 @@ from nats.jetstream.api.client import check_response
 
 class RequiredFieldsOnly(TypedDict):
     """TypedDict with only required fields."""
+
     name: str
     value: int
 
 
 class MixedFields(TypedDict):
     """TypedDict with both required and optional fields."""
+
     required_field: Required[str]
     optional_field: NotRequired[int]
 
 
 class AllOptionalFields(TypedDict, total=False):
     """TypedDict with all optional fields."""
+
     optional_name: str
     optional_value: int
 

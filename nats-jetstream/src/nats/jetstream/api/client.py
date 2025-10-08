@@ -50,13 +50,7 @@ logger = logging.getLogger("nats.jetstream.api")
 
 
 class Error(Exception):
-
-    def __init__(
-        self,
-        message: str,
-        code: int | None = None,
-        description: str | None = None
-    ):
+    def __init__(self, message: str, code: int | None = None, description: str | None = None):
         super().__init__(message)
         self.code = code
         self.description = description
@@ -73,9 +67,7 @@ class Error(Exception):
 
         # Check for unconsumed fields
         if error:
-            raise ValueError(
-                f"Error.from_response() has unconsumed fields: {list(error.keys())}"
-            )
+            raise ValueError(f"Error.from_response() has unconsumed fields: {list(error.keys())}")
 
         return cls(
             message=description,
@@ -104,7 +96,7 @@ def check_response[ResponseT](
 
     # Filter out optional keys from missing_keys
     # TypedDict stores required/optional info in __required_keys__ (Python 3.9+)
-    if hasattr(expected_type, '__required_keys__'):
+    if hasattr(expected_type, "__required_keys__"):
         required_keys = expected_type.__required_keys__
         missing_keys = missing_keys & required_keys
 
@@ -114,7 +106,6 @@ def check_response[ResponseT](
 
 
 class Client:
-
     def __init__(self, client: NatsClient, prefix: str = "$JS.API") -> None:
         self._client = client
         self._prefix = prefix
@@ -125,9 +116,7 @@ class Client:
             response_type=AccountInfoResponse,
         )
 
-    async def consumer_create(
-        self, **request: Unpack[ConsumerCreateRequest]
-    ) -> ConsumerCreateResponse:
+    async def consumer_create(self, **request: Unpack[ConsumerCreateRequest]) -> ConsumerCreateResponse:
         stream_name = request.get("stream_name")
         if not stream_name:
             raise ValueError("stream_name is required")
@@ -146,17 +135,13 @@ class Client:
             response_type=ConsumerCreateResponse,
         )
 
-    async def consumer_delete(
-        self, stream_name: str, consumer_name: str
-    ) -> ConsumerDeleteResponse:
+    async def consumer_delete(self, stream_name: str, consumer_name: str) -> ConsumerDeleteResponse:
         return await self.request_json(
             f"{self._prefix}.CONSUMER.DELETE.{stream_name}.{consumer_name}",
             response_type=ConsumerDeleteResponse,
         )
 
-    async def consumer_info(
-        self, stream_name: str, consumer_name: str
-    ) -> ConsumerInfoResponse:
+    async def consumer_info(self, stream_name: str, consumer_name: str) -> ConsumerInfoResponse:
         return await self.request_json(
             f"{self._prefix}.CONSUMER.INFO.{stream_name}.{consumer_name}",
             response_type=ConsumerInfoResponse,
@@ -185,15 +170,11 @@ class Client:
             response_type=ConsumerNamesResponse,
         )
 
-    async def stream_create(
-        self, name: str, **kwargs: Unpack[StreamCreateRequest]
-    ) -> StreamCreateResponse:
+    async def stream_create(self, name: str, **kwargs: Unpack[StreamCreateRequest]) -> StreamCreateResponse:
         # Validate max_msgs
         max_msgs = kwargs.get("max_msgs", -1)
         if max_msgs < -1:
-            raise ValueError(
-                "max_msgs must be -1 (unlimited) or a positive number"
-            )
+            raise ValueError("max_msgs must be -1 (unlimited) or a positive number")
 
         # Validate mirror configuration
         mirror = kwargs.get("mirror")
@@ -216,20 +197,14 @@ class Client:
             response_type=StreamDeleteResponse,
         )
 
-    async def stream_info(
-        self, name: str, **request: Unpack[StreamInfoRequest]
-    ) -> StreamInfoResponse:
+    async def stream_info(self, name: str, **request: Unpack[StreamInfoRequest]) -> StreamInfoResponse:
         return await self.request_json(
             f"{self._prefix}.STREAM.INFO.{name}",
             request if request else None,
             response_type=StreamInfoResponse,
         )
 
-    async def stream_list(
-        self,
-        offset: int | None = None,
-        subject: str | None = None
-    ) -> StreamListResponse:
+    async def stream_list(self, offset: int | None = None, subject: str | None = None) -> StreamListResponse:
         """Get information about all streams.
 
         Args:
@@ -251,27 +226,21 @@ class Client:
             response_type=StreamListResponse,
         )
 
-    async def stream_msg_delete(
-        self, name: str, **request: Unpack[StreamMsgDeleteRequest]
-    ) -> StreamMsgDeleteResponse:
+    async def stream_msg_delete(self, name: str, **request: Unpack[StreamMsgDeleteRequest]) -> StreamMsgDeleteResponse:
         return await self.request_json(
             f"{self._prefix}.STREAM.MSG.DELETE.{name}",
             request if request else None,
             response_type=StreamMsgDeleteResponse,
         )
 
-    async def stream_msg_get(
-        self, name: str, **request: Unpack[StreamMsgGetRequest]
-    ) -> StreamMsgGetResponse:
+    async def stream_msg_get(self, name: str, **request: Unpack[StreamMsgGetRequest]) -> StreamMsgGetResponse:
         return await self.request_json(
             f"{self._prefix}.STREAM.MSG.GET.{name}",
             request if request else None,
             response_type=StreamMsgGetResponse,
         )
 
-    async def stream_names(
-        self, **kwargs: Unpack[StreamNamesRequest]
-    ) -> StreamNamesResponse:
+    async def stream_names(self, **kwargs: Unpack[StreamNamesRequest]) -> StreamNamesResponse:
         """Get a list of all stream names.
 
         Args:
@@ -287,18 +256,14 @@ class Client:
             response_type=StreamNamesResponse,
         )
 
-    async def stream_purge(
-        self, name: str, **request: Unpack[StreamPurgeRequest]
-    ) -> StreamPurgeResponse:
+    async def stream_purge(self, name: str, **request: Unpack[StreamPurgeRequest]) -> StreamPurgeResponse:
         return await self.request_json(
             f"{self._prefix}.STREAM.PURGE.{name}",
             request if request else None,
             response_type=StreamPurgeResponse,
         )
 
-    async def stream_update(
-        self, name: str, **config: Unpack[StreamUpdateRequest]
-    ) -> StreamUpdateResponse:
+    async def stream_update(self, name: str, **config: Unpack[StreamUpdateRequest]) -> StreamUpdateResponse:
         return await self.request_json(
             f"{self._prefix}.STREAM.UPDATE.{name}",
             {
@@ -316,8 +281,7 @@ class Client:
         *,
         response_type: type[ResponseT],
         raise_on_error: Literal[True] = True,
-    ) -> ResponseT:
-        ...
+    ) -> ResponseT: ...
 
     @overload
     async def request_json[ResponseT](
@@ -327,8 +291,7 @@ class Client:
         *,
         response_type: type[ResponseT],
         raise_on_error: Literal[False],
-    ) -> ResponseT | ErrorResponse:
-        ...
+    ) -> ResponseT | ErrorResponse: ...
 
     async def request_json[ResponseT](
         self,
@@ -340,14 +303,9 @@ class Client:
         timeout: float = 5.0,
     ) -> ResponseT | ErrorResponse:
         request_id = str(uuid.uuid4())[:8]
-        encoded_payload = json.dumps(payload
-                                     ).encode() if payload is not None else b""
-        logger.debug(
-            "[%s] request: %s %r", request_id, subject, encoded_payload
-        )
-        response = await self._client.request(
-            subject, encoded_payload, timeout=timeout
-        )
+        encoded_payload = json.dumps(payload).encode() if payload is not None else b""
+        logger.debug("[%s] request: %s %r", request_id, subject, encoded_payload)
+        response = await self._client.request(subject, encoded_payload, timeout=timeout)
 
         try:
             data = json.loads(response.data.decode())
@@ -356,26 +314,14 @@ class Client:
             if raise_on_error and is_error_response(data):
                 raise Error.from_response(data["error"])
 
-            is_valid, unknown_keys, missing_keys = check_response(
-                data, response_type
-            )
+            is_valid, unknown_keys, missing_keys = check_response(data, response_type)
             if not is_valid:
                 if missing_keys:
-                    logger.warning(
-                        "[%s] Missing keys in response: %s", request_id,
-                        missing_keys
-                    )
+                    logger.warning("[%s] Missing keys in response: %s", request_id, missing_keys)
                 if unknown_keys:
-                    logger.warning(
-                        "[%s] Unknown keys in response: %s", request_id,
-                        unknown_keys
-                    )
+                    logger.warning("[%s] Unknown keys in response: %s", request_id, unknown_keys)
                 if not missing_keys and not unknown_keys:
-                    logger.warning(
-                        "[%s] Expected %s, got %s", request_id,
-                        response_type.__name__,
-                        type(data).__name__
-                    )
+                    logger.warning("[%s] Expected %s, got %s", request_id, response_type.__name__, type(data).__name__)
 
             return cast(ResponseT, data)
         except json.JSONDecodeError as e:

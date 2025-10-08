@@ -42,8 +42,7 @@ async def server(store_dir: str) -> AsyncGenerator[Server, None]:
     Returns:
         The NATS server instance.
     """
-    async with await run(port=0, jetstream=True,
-                         store_dir=store_dir) as server:
+    async with await run(port=0, jetstream=True, store_dir=store_dir) as server:
         yield server
 
 
