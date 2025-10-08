@@ -34,21 +34,33 @@ class ConsumerInfo:
     num_pending: int
     cluster: dict[str, Any] | None = None
     push_bound: bool | None = None
+    ts: int | None = None
+    """The server time the consumer info was created."""
 
     @classmethod
     def from_response(cls, data: api.ConsumerInfo) -> ConsumerInfo:
-        stream_name = data["stream_name"]
-        name = data["name"]
-        config = data["config"]
-        created = data["created"]
-        delivered = data["delivered"]
-        ack_floor = data["ack_floor"]
-        num_ack_pending = data["num_ack_pending"]
-        num_redelivered = data["num_redelivered"]
-        num_waiting = data["num_waiting"]
-        num_pending = data["num_pending"]
-        cluster = data.get("cluster")
-        push_bound = data.get("push_bound")
+        stream_name = data.pop("stream_name")
+        name = data.pop("name")
+        config = data.pop("config")
+        created = data.pop("created")
+        delivered = data.pop("delivered")
+        ack_floor = data.pop("ack_floor")
+        num_ack_pending = data.pop("num_ack_pending")
+        num_redelivered = data.pop("num_redelivered")
+        num_waiting = data.pop("num_waiting")
+        num_pending = data.pop("num_pending")
+        cluster = data.pop("cluster", None)
+        push_bound = data.pop("push_bound", None)
+        ts = data.pop("ts", None)
+
+        # Pop response envelope fields that aren't part of ConsumerInfo
+        data.pop("type", None)  # Response type discriminator
+
+        # Check for unconsumed fields
+        if data:
+            raise ValueError(
+                f"ConsumerInfo.from_response() has unconsumed fields: {list(data.keys())}"
+            )
 
         return cls(
             stream_name=stream_name,
@@ -63,6 +75,7 @@ class ConsumerInfo:
             num_pending=num_pending,
             cluster=cluster,
             push_bound=push_bound,
+            ts=ts,
         )
 
 

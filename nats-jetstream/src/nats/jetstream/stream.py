@@ -44,9 +44,18 @@ class LostStreamData:
 
     @classmethod
     def from_response(cls, data: api.LostStreamData) -> LostStreamData:
+        msgs = data.pop("msgs", None)
+        bytes_val = data.pop("bytes", None)
+
+        # Check for unconsumed fields
+        if data:
+            raise ValueError(
+                f"LostStreamData.from_response() has unconsumed fields: {list(data.keys())}"
+            )
+
         return cls(
-            msgs=data.get("msgs"),
-            bytes=data.get("bytes"),
+            msgs=msgs,
+            bytes=bytes_val,
         )
 
 
@@ -62,8 +71,14 @@ class ExternalStreamSource:
 
     @classmethod
     def from_response(cls, data: api.ExternalStreamSource) -> ExternalStreamSource:
-        api_prefix = data["api"]
-        deliver = data.get("deliver")
+        api_prefix = data.pop("api")
+        deliver = data.pop("deliver", None)
+
+        # Check for unconsumed fields
+        if data:
+            raise ValueError(
+                f"ExternalStreamSource.from_response() has unconsumed fields: {list(data.keys())}"
+            )
 
         return cls(
             api=api_prefix,
@@ -90,8 +105,14 @@ class SubjectTransform:
 
     @classmethod
     def from_response(cls, data: api.SubjectTransform) -> SubjectTransform:
-        src = data["src"]
-        dest = data["dest"]
+        src = data.pop("src")
+        dest = data.pop("dest")
+
+        # Check for unconsumed fields
+        if data:
+            raise ValueError(
+                f"SubjectTransform.from_response() has unconsumed fields: {list(data.keys())}"
+            )
 
         return cls(
             src=src,
@@ -128,15 +149,22 @@ class StreamSource:
 
     @classmethod
     def from_response(cls, data: api.StreamSource) -> StreamSource:
-        name = data["name"]
-        opt_start_seq = data.get("opt_start_seq")
-        opt_start_time = data.get("opt_start_time")
-        filter_subject = data.get("filter_subject")
-        subject_transforms = data.get("subject_transforms")
+        name = data.pop("name")
+        opt_start_seq = data.pop("opt_start_seq", None)
+        opt_start_time = data.pop("opt_start_time", None)
+        filter_subject = data.pop("filter_subject", None)
+        subject_transforms = data.pop("subject_transforms", None)
 
         external = None
-        if data.get("external"):
-            external = ExternalStreamSource.from_response(data["external"])
+        external_data = data.pop("external", None)
+        if external_data:
+            external = ExternalStreamSource.from_response(external_data)
+
+        # Check for unconsumed fields
+        if data:
+            raise ValueError(
+                f"StreamSource.from_response() has unconsumed fields: {list(data.keys())}"
+            )
 
         return cls(
             name=name,
@@ -188,16 +216,23 @@ class StreamSourceInfo:
 
     @classmethod
     def from_response(cls, data: api.StreamSourceInfo) -> StreamSourceInfo:
-        name = data["name"]
-        lag = data["lag"]
-        active = data["active"]
-        filter_subject = data.get("filter_subject")
-        subject_transforms = data.get("subject_transforms")
-        error = data.get("error")
+        name = data.pop("name")
+        lag = data.pop("lag")
+        active = data.pop("active")
+        filter_subject = data.pop("filter_subject", None)
+        subject_transforms = data.pop("subject_transforms", None)
+        error = data.pop("error", None)
 
         external = None
-        if data.get("external"):
-            external = ExternalStreamSource.from_response(data["external"])
+        external_data = data.pop("external", None)
+        if external_data:
+            external = ExternalStreamSource.from_response(external_data)
+
+        # Check for unconsumed fields
+        if data:
+            raise ValueError(
+                f"StreamSourceInfo.from_response() has unconsumed fields: {list(data.keys())}"
+            )
 
         return cls(
             name=name,
@@ -222,8 +257,14 @@ class Placement:
 
     @classmethod
     def from_response(cls, data: api.Placement) -> Placement:
-        cluster = data.get("cluster")
-        tags = data.get("tags")
+        cluster = data.pop("cluster", None)
+        tags = data.pop("tags", None)
+
+        # Check for unconsumed fields
+        if data:
+            raise ValueError(
+                f"Placement.from_response() has unconsumed fields: {list(data.keys())}"
+            )
 
         return cls(
             cluster=cluster,
@@ -255,9 +296,15 @@ class Republish:
 
     @classmethod
     def from_response(cls, data: api.Republish) -> Republish:
-        src = data["src"]
-        dest = data["dest"]
-        headers_only = data.get("headers_only")
+        src = data.pop("src")
+        dest = data.pop("dest")
+        headers_only = data.pop("headers_only", None)
+
+        # Check for unconsumed fields
+        if data:
+            raise ValueError(
+                f"Republish.from_response() has unconsumed fields: {list(data.keys())}"
+            )
 
         return cls(
             src=src,
@@ -285,8 +332,14 @@ class StreamConsumerLimits:
 
     @classmethod
     def from_response(cls, data: api.StreamConsumerLimits) -> StreamConsumerLimits:
-        inactive_threshold = data.get("inactive_threshold")
-        max_ack_pending = data.get("max_ack_pending")
+        inactive_threshold = data.pop("inactive_threshold", None)
+        max_ack_pending = data.pop("max_ack_pending", None)
+
+        # Check for unconsumed fields
+        if data:
+            raise ValueError(
+                f"StreamConsumerLimits.from_response() has unconsumed fields: {list(data.keys())}"
+            )
 
         return cls(
             inactive_threshold=inactive_threshold,
@@ -327,12 +380,18 @@ class PeerInfo:
 
     @classmethod
     def from_response(cls, data: api.PeerInfo) -> PeerInfo:
-        name = data["name"]
-        current = data["current"]
-        active = data["active"]
-        lag = data.get("lag")
-        offline = data.get("offline")
-        observer = data.get("observer")
+        name = data.pop("name")
+        current = data.pop("current")
+        active = data.pop("active")
+        lag = data.pop("lag", None)
+        offline = data.pop("offline", None)
+        observer = data.pop("observer", None)
+
+        # Check for unconsumed fields
+        if data:
+            raise ValueError(
+                f"PeerInfo.from_response() has unconsumed fields: {list(data.keys())}"
+            )
 
         return cls(
             name=name,
@@ -362,13 +421,20 @@ class ClusterInfo:
 
     @classmethod
     def from_response(cls, data: api.ClusterInfo) -> ClusterInfo:
-        name = data.get("name")
-        leader = data.get("leader")
-        raft_group = data.get("raft_group")
+        name = data.pop("name", None)
+        leader = data.pop("leader", None)
+        raft_group = data.pop("raft_group", None)
 
         replicas = None
-        if data.get("replicas"):
-            replicas = [PeerInfo.from_response(r) for r in data["replicas"]]
+        replicas_data = data.pop("replicas", None)
+        if replicas_data:
+            replicas = [PeerInfo.from_response(r) for r in replicas_data]
+
+        # Check for unconsumed fields
+        if data:
+            raise ValueError(
+                f"ClusterInfo.from_response() has unconsumed fields: {list(data.keys())}"
+            )
 
         return cls(
             name=name,
@@ -397,6 +463,12 @@ class StreamState:
     consumer_count: int
     """Number of Consumers attached to the Stream."""
 
+    first_ts: str | None = None
+    """The timestamp of the first message in the Stream."""
+
+    last_ts: str | None = None
+    """The timestamp of the last message in the Stream."""
+
     deleted: list[int] | None = None
     """IDs of messages that were deleted using the Message Delete API or Interest based streams removing messages out of order."""
 
@@ -408,20 +480,33 @@ class StreamState:
     subjects: dict[str, int] | None = None
     """Subjects and their message counts when a subjects_filter was set."""
 
+    num_subjects: int | None = None
+    """The number of unique subjects in the Stream."""
+
     @classmethod
     def from_response(cls, data: api.StreamState) -> StreamState:
-        messages = data["messages"]
-        bytes_val = data["bytes"]
-        first_sequence = data["first_seq"]
-        last_sequence = data["last_seq"]
-        consumer_count = data["consumer_count"]
-        deleted = data.get("deleted")
-        num_deleted = data.get("num_deleted")
-        subjects = data.get("subjects")
+        messages = data.pop("messages")
+        bytes_val = data.pop("bytes")
+        first_sequence = data.pop("first_seq")
+        last_sequence = data.pop("last_seq")
+        consumer_count = data.pop("consumer_count")
+        first_ts = data.pop("first_ts", None)
+        last_ts = data.pop("last_ts", None)
+        deleted = data.pop("deleted", None)
+        num_deleted = data.pop("num_deleted", None)
+        subjects = data.pop("subjects", None)
+        num_subjects = data.pop("num_subjects", None)
 
         lost = None
-        if data.get("lost"):
-            lost = LostStreamData.from_response(data["lost"])
+        lost_data = data.pop("lost", None)
+        if lost_data:
+            lost = LostStreamData.from_response(lost_data)
+
+        # Check for unconsumed fields
+        if data:
+            raise ValueError(
+                f"StreamState.from_response() has unconsumed fields: {list(data.keys())}"
+            )
 
         return cls(
             messages=messages,
@@ -429,10 +514,13 @@ class StreamState:
             first_sequence=first_sequence,
             last_sequence=last_sequence,
             consumer_count=consumer_count,
+            first_ts=first_ts,
+            last_ts=last_ts,
             deleted=deleted,
             num_deleted=num_deleted,
             lost=lost,
             subjects=subjects,
+            num_subjects=num_subjects,
         )
 
 
@@ -585,67 +673,86 @@ class StreamConfig:
     @classmethod
     def from_response(cls, config: api.StreamConfig) -> StreamConfig:
         """Create a StreamConfig from an API response"""
+        # Pop fields as we consume them to detect unconsumed ones at the end
+        # No need to copy - config comes from JSON and won't be reused
+
         # Convert API values to None for unlimited (-1 or 0)
-        max_age = config.get("max_age", 0)
+        max_age = config.pop("max_age", 0)
         max_age = None if max_age == 0 else max_age
 
-        max_bytes = config.get("max_bytes", -1)
+        max_bytes = config.pop("max_bytes", -1)
         max_bytes = None if max_bytes == -1 else max_bytes
 
-        max_consumers = config.get("max_consumers", -1)
+        max_consumers = config.pop("max_consumers", -1)
         max_consumers = None if max_consumers == -1 else max_consumers
 
-        max_msgs = config.get("max_msgs", -1)
+        max_msgs = config.pop("max_msgs", -1)
         max_msgs = None if max_msgs == -1 else max_msgs
 
-        num_replicas = config.get("num_replicas", 1)
-        retention = config.get("retention", "limits")
-        storage = config.get("storage", "file")
+        num_replicas = config.pop("num_replicas", 1)
+        retention = config.pop("retention", "limits")
+        storage = config.pop("storage", "file")
 
-        allow_direct = config.get("allow_direct")
-        allow_msg_ttl = config.get("allow_msg_ttl")
-        allow_rollup_hdrs = config.get("allow_rollup_hdrs")
-        compression = config.get("compression")
-        deny_delete = config.get("deny_delete")
-        deny_purge = config.get("deny_purge")
-        description = config.get("description")
-        discard = config.get("discard")
-        discard_new_per_subject = config.get("discard_new_per_subject")
-        duplicate_window = config.get("duplicate_window")
-        first_seq = config.get("first_seq")
-        max_msg_size = config.get("max_msg_size")
-        max_msgs_per_subject = config.get("max_msgs_per_subject")
-        metadata = config.get("metadata")
-        mirror_direct = config.get("mirror_direct")
-        name = config.get("name")
-        no_ack = config.get("no_ack")
-        sealed = config.get("sealed")
-        subjects = config.get("subjects")
-        template_owner = config.get("template_owner")
+        allow_direct = config.pop("allow_direct", None)
+        allow_msg_ttl = config.pop("allow_msg_ttl", None)
+        allow_rollup_hdrs = config.pop("allow_rollup_hdrs", None)
+        compression = config.pop("compression", None)
+        deny_delete = config.pop("deny_delete", None)
+        deny_purge = config.pop("deny_purge", None)
+        description = config.pop("description", None)
+        discard = config.pop("discard", None)
+        discard_new_per_subject = config.pop("discard_new_per_subject", None)
+        duplicate_window = config.pop("duplicate_window", None)
+        first_seq = config.pop("first_seq", None)
+
+        max_msg_size = config.pop("max_msg_size", -1)
+        max_msg_size = None if max_msg_size == -1 else max_msg_size
+
+        max_msgs_per_subject = config.pop("max_msgs_per_subject", None)
+        metadata = config.pop("metadata", None)
+        mirror_direct = config.pop("mirror_direct", None)
+        name = config.pop("name", None)
+        no_ack = config.pop("no_ack", None)
+        sealed = config.pop("sealed", None)
+        subjects = config.pop("subjects", None)
+        subject_delete_marker_ttl = config.pop("subject_delete_marker_ttl", None)
+        template_owner = config.pop("template_owner", None)
 
         mirror = None
-        if config.get("mirror"):
-            mirror = StreamSource.from_response(config["mirror"])
+        mirror_data = config.pop("mirror", None)
+        if mirror_data:
+            mirror = StreamSource.from_response(mirror_data)
 
         sources = None
-        if config.get("sources"):
-            sources = [StreamSource.from_response(s) for s in config["sources"]]
+        sources_data = config.pop("sources", None)
+        if sources_data:
+            sources = [StreamSource.from_response(s) for s in sources_data]
 
         subject_transform = None
-        if config.get("subject_transform"):
-            subject_transform = SubjectTransform.from_response(config["subject_transform"])
+        subject_transform_data = config.pop("subject_transform", None)
+        if subject_transform_data:
+            subject_transform = SubjectTransform.from_response(subject_transform_data)
 
         placement = None
-        if config.get("placement"):
-            placement = Placement.from_response(config["placement"])
+        placement_data = config.pop("placement", None)
+        if placement_data:
+            placement = Placement.from_response(placement_data)
 
         republish = None
-        if config.get("republish"):
-            republish = Republish.from_response(config["republish"])
+        republish_data = config.pop("republish", None)
+        if republish_data:
+            republish = Republish.from_response(republish_data)
 
         consumer_limits = None
-        if config.get("consumer_limits"):
-            consumer_limits = StreamConsumerLimits.from_response(config["consumer_limits"])
+        consumer_limits_data = config.pop("consumer_limits", None)
+        if consumer_limits_data:
+            consumer_limits = StreamConsumerLimits.from_response(consumer_limits_data)
+
+        # Check for unconsumed fields
+        if config:
+            raise ValueError(
+                f"StreamConfig.from_response() has unconsumed fields: {list(config.keys())}"
+            )
 
         return cls(
             max_age=max_age,
@@ -678,6 +785,7 @@ class StreamConfig:
             sealed=sealed,
             sources=sources,
             subjects=subjects,
+            subject_delete_marker_ttl=subject_delete_marker_ttl,
             subject_transform=subject_transform,
             template_owner=template_owner,
             consumer_limits=consumer_limits,
@@ -690,6 +798,7 @@ class StreamConfig:
             "max_bytes": self.max_bytes if self.max_bytes is not None else -1,
             "max_consumers": self.max_consumers if self.max_consumers is not None else -1,
             "max_msgs": self.max_msgs if self.max_msgs is not None else -1,
+            "max_msg_size": self.max_msg_size if self.max_msg_size is not None else -1,
             "num_replicas": self.num_replicas,
             "retention": self.retention,
             "storage": self.storage,
@@ -718,8 +827,6 @@ class StreamConfig:
             result["duplicate_window"] = self.duplicate_window
         if self.first_seq is not None:
             result["first_seq"] = self.first_seq
-        if self.max_msg_size is not None:
-            result["max_msg_size"] = self.max_msg_size
         if self.max_msgs_per_subject is not None:
             result["max_msgs_per_subject"] = self.max_msgs_per_subject
         if self.metadata is not None:
@@ -774,25 +881,50 @@ class StreamInfo:
     sources: list[StreamSourceInfo] | None = None
     """Streams being sourced into this Stream."""
 
+    ts: int | None = None
+    """The server time the stream info was created."""
+
     @classmethod
     def from_response(cls, data: api.StreamInfo) -> StreamInfo:
-        config = StreamConfig.from_response(data["config"])
-        created = data["created"]
-        state = StreamState.from_response(data["state"])
-        cluster = ClusterInfo.from_response(data["cluster"]) if data.get("cluster") else None
+        config = StreamConfig.from_response(data.pop("config"))
+        created = data.pop("created")
+        state = StreamState.from_response(data.pop("state"))
+        ts = data.pop("ts", None)
+
+        cluster = None
+        cluster_data = data.pop("cluster", None)
+        if cluster_data:
+            cluster = ClusterInfo.from_response(cluster_data)
 
         mirror = None
-        if data.get("mirror"):
-            mirror = StreamSourceInfo.from_response(data["mirror"])
+        mirror_data = data.pop("mirror", None)
+        if mirror_data:
+            mirror = StreamSourceInfo.from_response(mirror_data)
 
         sources = None
-        if data.get("sources"):
-            sources = [StreamSourceInfo.from_response(s) for s in data["sources"]]
+        sources_data = data.pop("sources", None)
+        if sources_data:
+            sources = [StreamSourceInfo.from_response(s) for s in sources_data]
+
+        # Pop response envelope fields that aren't part of StreamInfo
+        data.pop("type", None)  # Response type discriminator
+        data.pop("did_create", None)  # Create response specific field
+        data.pop("alternates", None)  # TODO: Add this field to dataclass
+        data.pop("limit", None)  # Pagination field from list responses
+        data.pop("offset", None)  # Pagination field from list responses
+        data.pop("total", None)  # Pagination field from list responses
+
+        # Check for unconsumed fields
+        if data:
+            raise ValueError(
+                f"StreamInfo.from_response() has unconsumed fields: {list(data.keys())}"
+            )
 
         return cls(
             config=config,
             created=created,
             state=state,
+            ts=ts,
             cluster=cluster,
             mirror=mirror,
             sources=sources,
