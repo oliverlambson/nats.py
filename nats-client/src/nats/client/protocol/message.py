@@ -213,9 +213,6 @@ def parse_headers(data: bytes) -> tuple[dict[str, list[str]], str | None, str | 
     return headers, status_code, status_description
 
 
-
-
-
 async def parse_msg(reader: Reader, args: list[bytes]) -> Msg:
     """Parse MSG message.
 
