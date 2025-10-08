@@ -56,15 +56,24 @@ class AccountLimits:
 
     @classmethod
     def from_response(cls, data: api.AccountLimits) -> AccountLimits:
+        max_memory = data["max_memory"]
+        max_storage = data["max_storage"]
+        max_streams = data["max_streams"]
+        max_consumers = data["max_consumers"]
+        max_ack_pending = data["max_ack_pending"]
+        memory_max_stream_bytes = data["memory_max_stream_bytes"]
+        storage_max_stream_bytes = data["storage_max_stream_bytes"]
+        max_bytes_required = data["max_bytes_required"]
+
         return cls(
-            max_memory=data["max_memory"],
-            max_storage=data["max_storage"],
-            max_streams=data["max_streams"],
-            max_consumers=data["max_consumers"],
-            max_ack_pending=data["max_ack_pending"],
-            memory_max_stream_bytes=data["memory_max_stream_bytes"],
-            storage_max_stream_bytes=data["storage_max_stream_bytes"],
-            max_bytes_required=data["max_bytes_required"],
+            max_memory=max_memory,
+            max_storage=max_storage,
+            max_streams=max_streams,
+            max_consumers=max_consumers,
+            max_ack_pending=max_ack_pending,
+            memory_max_stream_bytes=memory_max_stream_bytes,
+            storage_max_stream_bytes=storage_max_stream_bytes,
+            max_bytes_required=max_bytes_required,
         )
 
 
