@@ -192,13 +192,20 @@ class StreamInfo:
 
     @classmethod
     def from_response(cls, data: api.StreamInfo) -> StreamInfo:
+        config = StreamConfig.from_response(data["config"])
+        created = data["created"]
+        state = StreamState.from_response(data["state"])
+        cluster = data.get("cluster")
+        mirror = data.get("mirror")
+        sources = data.get("sources")
+
         return cls(
-            config=StreamConfig.from_response(data["config"]),
-            created=data["created"],
-            state=StreamState.from_response(data["state"]),
-            cluster=data.get("cluster"),
-            mirror=data.get("mirror"),
-            sources=data.get("sources"),
+            config=config,
+            created=created,
+            state=state,
+            cluster=cluster,
+            mirror=mirror,
+            sources=sources,
         )
 
 
