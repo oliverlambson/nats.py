@@ -137,6 +137,22 @@ class StreamSourceInfo:
 
 
 @dataclass
+class Placement:
+    cluster: str | None = None
+    tags: list[str] | None = None
+
+    @classmethod
+    def from_response(cls, data: api.Placement) -> Placement:
+        cluster = data.get("cluster")
+        tags = data.get("tags")
+
+        return cls(
+            cluster=cluster,
+            tags=tags,
+        )
+
+
+@dataclass
 class PeerInfo:
     name: str
     current: bool
@@ -261,7 +277,7 @@ class StreamConfig:
     mirror_direct: bool | None = None  # Allow direct access for mirrors
     name: str | None = None  # Stream name
     no_ack: bool | None = None  # Disable message acknowledgment
-    placement: api.Placement | None = None  # Replica placement directives
+    placement: Placement | None = None  # Replica placement directives
     republish: api.Republish | None = None  # Message republishing config
     sealed: bool | None = None  # Prevent message deletion and updates
     sources: list[StreamSource] | None = None  # Replication sources
@@ -299,7 +315,6 @@ class StreamConfig:
         mirror_direct = config.get("mirror_direct")
         name = config.get("name")
         no_ack = config.get("no_ack")
-        placement = config.get("placement")
         republish = config.get("republish")
         sealed = config.get("sealed")
         subjects = config.get("subjects")
@@ -316,6 +331,10 @@ class StreamConfig:
         subject_transform = None
         if config.get("subject_transform"):
             subject_transform = SubjectTransform.from_response(config["subject_transform"])
+
+        placement = None
+        if config.get("placement"):
+            placement = Placement.from_response(config["placement"])
 
         return cls(
             max_age=max_age,
