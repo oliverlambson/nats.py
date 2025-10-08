@@ -40,6 +40,50 @@ def test_metadata_from_reply_handles_missing_pending_count():
     assert metadata.num_pending == 0
 
 
+def test_metadata_from_reply_parses_v2_format_with_domain():
+    """Test parsing V2 format with domain and account hash."""
+    reply = "$JS.ACK.hub.ACCOUNT123.test-stream.test-consumer.1.100.50.1234567890.10.random-token"
+    metadata = Metadata.from_reply(reply)
+
+    assert metadata is not None
+    assert metadata.stream == "test-stream"
+    assert metadata.consumer == "test-consumer"
+    assert metadata.num_delivered == 1
+    assert metadata.sequence.stream == 100
+    assert metadata.sequence.consumer == 50
+    assert metadata.timestamp == datetime.fromtimestamp(
+        1234567890 / 1e9, tz=timezone.utc
+    )
+    assert metadata.num_pending == 10
+    assert metadata.domain == "hub"
+
+
+def test_metadata_from_reply_handles_v2_format_with_underscore_domain():
+    """Test parsing V2 format with underscore domain (should convert to empty string)."""
+    reply = "$JS.ACK._.ACCOUNT123.stream.consumer.2.200.100.9876543210.5.random"
+    metadata = Metadata.from_reply(reply)
+
+    assert metadata is not None
+    assert metadata.stream == "stream"
+    assert metadata.consumer == "consumer"
+    assert metadata.num_delivered == 2
+    assert metadata.sequence.stream == 200
+    assert metadata.sequence.consumer == 100
+    assert metadata.num_pending == 5
+    assert metadata.domain == ""
+
+
+def test_metadata_from_reply_handles_v2_format_with_extra_tokens():
+    """Test parsing V2 format with more than 12 tokens."""
+    reply = "$JS.ACK.domain.ACCT.stream.consumer.1.50.25.1111111111.3.token1.token2.token3"
+    metadata = Metadata.from_reply(reply)
+
+    assert metadata is not None
+    assert metadata.stream == "stream"
+    assert metadata.consumer == "consumer"
+    assert metadata.domain == "domain"
+
+
 def test_metadata_from_reply_returns_none_for_invalid_subjects():
     """Test parsing invalid reply subjects."""
     invalid_replies = [

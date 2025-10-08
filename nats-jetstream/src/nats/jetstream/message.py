@@ -51,32 +51,57 @@ class Metadata:
     def from_reply(cls, reply_subject: str) -> Metadata | None:
         """Parse metadata from a JetStream reply subject.
 
-        The reply subject contains the message metadata in the form:
-        $JS.ACK.<stream>.<consumer>.<delivered>.<stream sequence>.<consumer sequence>.<timestamp>.<pending>
+        The reply subject contains the message metadata in one of three forms:
+        - V2 (12 tokens): $JS.ACK.<domain>.<account_hash>.<stream>.<consumer>.<delivered>.<stream_seq>.<consumer_seq>.<timestamp>.<pending>.<random>
+        - V1 (9 tokens): $JS.ACK.<stream>.<consumer>.<delivered>.<stream_seq>.<consumer_seq>.<timestamp>.<pending>
+        - V1 (8 tokens): $JS.ACK.<stream>.<consumer>.<delivered>.<stream_seq>.<consumer_seq>.<timestamp>
         """
-        metadata = reply_subject.split(".")
-        if len(metadata
-               ) >= 8 and metadata[0] == "$JS" and metadata[1] == "ACK":
-            stream = metadata[2]
-            consumer = metadata[3]
-            delivered = int(metadata[4])
-            stream_seq = int(metadata[5])
-            consumer_seq = int(metadata[6])
+        tokens = reply_subject.split(".")
 
-            return cls(
-                sequence=SequencePair(
-                    consumer=consumer_seq, stream=stream_seq
-                ),
-                num_delivered=delivered,
-                num_pending=int(metadata[8]) if len(metadata) > 8 else 0,
-                timestamp=datetime.fromtimestamp(
-                    int(metadata[7]) / 1e9, tz=timezone.utc
-                ),
-                stream=stream,
-                consumer=consumer,
-            )
-
-        return None
+        match tokens:
+            case ["$JS", "ACK", domain, _account_hash, stream, consumer, delivered, stream_seq, consumer_seq, timestamp, pending, *_]:
+                # V2 format (12+ tokens) with domain and account hash
+                domain_value = "" if domain == "_" else domain
+                return cls(
+                    sequence=SequencePair(
+                        consumer=int(consumer_seq),
+                        stream=int(stream_seq)
+                    ),
+                    num_delivered=int(delivered),
+                    num_pending=int(pending),
+                    timestamp=datetime.fromtimestamp(int(timestamp) / 1e9, tz=timezone.utc),
+                    stream=stream,
+                    consumer=consumer,
+                    domain=domain_value,
+                )
+            case ["$JS", "ACK", stream, consumer, delivered, stream_seq, consumer_seq, timestamp, pending]:
+                # V1 format (9 tokens) with pending count
+                return cls(
+                    sequence=SequencePair(
+                        consumer=int(consumer_seq),
+                        stream=int(stream_seq)
+                    ),
+                    num_delivered=int(delivered),
+                    num_pending=int(pending),
+                    timestamp=datetime.fromtimestamp(int(timestamp) / 1e9, tz=timezone.utc),
+                    stream=stream,
+                    consumer=consumer,
+                )
+            case ["$JS", "ACK", stream, consumer, delivered, stream_seq, consumer_seq, timestamp]:
+                # V1 format (8 tokens) without pending count
+                return cls(
+                    sequence=SequencePair(
+                        consumer=int(consumer_seq),
+                        stream=int(stream_seq)
+                    ),
+                    num_delivered=int(delivered),
+                    num_pending=0,
+                    timestamp=datetime.fromtimestamp(int(timestamp) / 1e9, tz=timezone.utc),
+                    stream=stream,
+                    consumer=consumer,
+                )
+            case _:
+                return None
 
 
 class Message:
