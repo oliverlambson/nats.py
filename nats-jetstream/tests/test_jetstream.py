@@ -517,21 +517,23 @@ async def test_create_consumer_with_invalid_stream_fails(jetstream: JetStream):
 
 @pytest.mark.asyncio
 async def test_create_consumer_with_duplicate_name_fails(jetstream: JetStream):
-    """Test that creating a consumer with a duplicate name fails."""
+    """Test that creating a consumer with a duplicate name but different config fails."""
     # Create a stream and consumer
     await jetstream.create_stream(name="test_stream", subjects=["FOO.*"])
     await jetstream.create_consumer(
         stream_name="test_stream",
         name="test_consumer",
-        durable_name="test_consumer"
+        durable_name="test_consumer",
+        max_deliver=10
     )
 
-    # Try to create a consumer with the same name
-    with pytest.raises(ValueError, match="Consumer 'test_consumer' already exists"):
+    # Try to create a consumer with the same name but different config
+    with pytest.raises(Error, match="consumer already exists"):
         await jetstream.create_consumer(
             stream_name="test_stream",
             name="test_consumer",
-            durable_name="test_consumer"
+            durable_name="test_consumer",
+            max_deliver=20
         )
 
 
