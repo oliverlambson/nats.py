@@ -89,12 +89,18 @@ class Tier:
 
     @classmethod
     def from_response(cls, data: api.Tier) -> Tier:
+        memory = data["memory"]
+        storage = data["storage"]
+        streams = data["streams"]
+        consumers = data["consumers"]
+        limits = AccountLimits.from_response(data["limits"])
+
         return cls(
-            memory=data["memory"],
-            storage=data["storage"],
-            streams=data["streams"],
-            consumers=data["consumers"],
-            limits=AccountLimits.from_response(data["limits"]),
+            memory=memory,
+            storage=storage,
+            streams=streams,
+            consumers=consumers,
+            limits=limits,
         )
 
 
