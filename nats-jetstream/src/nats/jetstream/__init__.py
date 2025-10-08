@@ -220,7 +220,7 @@ class JetStream:
             subject,
             payload,
             headers=headers,
-            timeout=5.0,  # Use a longer timeout for publish operations
+            timeout=5.0,
         )
 
         publish_ack = PublishAck.from_response(json.loads(response.data))
