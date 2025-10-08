@@ -1,16 +1,4 @@
-from __future__ import annotations
-
 from typing import Any, Literal, NotRequired, TypedDict, Union
-
-
-class ExternalStreamSource(TypedDict):
-    """Configuration referencing a stream source in another account or JetStream domain"""
-
-    api: str
-    """The subject prefix that imports the other account/domain $JS.API.CONSUMER.> subjects"""
-
-    deliver: NotRequired[str]
-    """The delivery subject to use for the push consumer"""
 
 
 class SubjectTransform(TypedDict):
@@ -21,6 +9,16 @@ class SubjectTransform(TypedDict):
 
     src: str
     """The subject transform source"""
+
+
+class ExternalStreamSource(TypedDict):
+    """Configuration referencing a stream source in another account or JetStream domain"""
+
+    api: str
+    """The subject prefix that imports the other account/domain $JS.API.CONSUMER.> subjects"""
+
+    deliver: NotRequired[str]
+    """The delivery subject to use for the push consumer"""
 
 
 class StreamSource(TypedDict):
@@ -266,8 +264,65 @@ class ErrorResponse(TypedDict):
     error: Error
 
 
-PriorityPolicy = Literal["none", "overflow", "pinned_client"]
+PriorityPolicy = Literal['none', 'overflow', 'pinned_client']
 
+class StartSequenceDeliverPolicy(TypedDict):
+    deliver_policy: Literal["by_start_sequence"]
+
+    opt_start_seq: int
+
+
+class AllDeliverPolicy(TypedDict):
+    deliver_policy: Literal["all"]
+
+
+class NewDeliverPolicy(TypedDict):
+    deliver_policy: Literal["new"]
+
+
+class LastDeliverPolicy(TypedDict):
+    deliver_policy: Literal["last"]
+
+
+class StartTimeDeliverPolicy(TypedDict):
+    deliver_policy: Literal["by_start_time"]
+
+    opt_start_time: int
+
+
+class LastPerSubjectDeliverPolicy(TypedDict):
+    deliver_policy: Literal["last_per_subject"]
+
+
+class DeliverPolicy_AllDeliverPolicy(TypedDict):
+    deliver_policy: Literal["all"]
+
+
+class DeliverPolicy_LastDeliverPolicy(TypedDict):
+    deliver_policy: Literal["last"]
+
+
+class DeliverPolicy_NewDeliverPolicy(TypedDict):
+    deliver_policy: Literal["new"]
+
+
+class DeliverPolicy_StartSequenceDeliverPolicy(TypedDict):
+    deliver_policy: Literal["by_start_sequence"]
+
+    opt_start_seq: int
+
+
+class DeliverPolicy_StartTimeDeliverPolicy(TypedDict):
+    deliver_policy: Literal["by_start_time"]
+
+    opt_start_time: int
+
+
+class DeliverPolicy_LastPerSubjectDeliverPolicy(TypedDict):
+    deliver_policy: Literal["last_per_subject"]
+
+
+DeliverPolicy = Union[DeliverPolicy_AllDeliverPolicy, DeliverPolicy_LastDeliverPolicy, DeliverPolicy_NewDeliverPolicy, DeliverPolicy_StartSequenceDeliverPolicy, DeliverPolicy_StartTimeDeliverPolicy, DeliverPolicy_LastPerSubjectDeliverPolicy]
 
 class StreamConsumerLimits(TypedDict):
     inactive_threshold: NotRequired[int]
@@ -296,7 +351,108 @@ class SequencePair(TypedDict):
     """The sequence number of the Stream"""
 
 
-ConsumerConfig = Any
+class ConsumerConfig(TypedDict):
+    ack_policy: NotRequired[Literal["none", "all", "explicit"]]
+    """The requirement of client acknowledgments"""
+
+    ack_wait: NotRequired[int]
+    """How long (in nanoseconds) to allow messages to remain un-acknowledged before attempting redelivery"""
+
+    backoff: NotRequired[list[int]]
+    """List of durations in Go format that represents a retry time scale for NaK'd messages"""
+
+    deliver_group: NotRequired[str]
+    """The queue group name used to distribute messages among subscribers"""
+
+    deliver_policy: NotRequired[Literal["all", "last", "new", "by_start_sequence", "by_start_time", "last_per_subject"]]
+    """The point in the stream from which to receive messages"""
+
+    deliver_subject: NotRequired[str]
+    """The subject push consumers delivery messages to"""
+
+    description: NotRequired[str]
+    """A short description of the purpose of this consumer"""
+
+    direct: NotRequired[bool]
+    """Creates a special consumer that does not touch the Raft layers, not for general use by clients, internal use only"""
+
+    durable_name: NotRequired[str]
+    """A unique name for a durable consumer"""
+
+    filter_subject: NotRequired[str]
+    """Filter the stream by a single subjects"""
+
+    filter_subjects: NotRequired[list[str]]
+    """Filter the stream by multiple subjects"""
+
+    flow_control: NotRequired[bool]
+    """For push consumers this will regularly send an empty mess with Status header 100 and a reply subject, consumers must reply to these messages to control the rate of message delivery"""
+
+    headers_only: NotRequired[bool]
+    """Delivers only the headers of messages in the stream and not the bodies. Additionally adds Nats-Msg-Size header to indicate the size of the removed payload"""
+
+    idle_heartbeat: NotRequired[int]
+    """If the Consumer is idle for more than this many nano seconds a empty message with Status header 100 will be sent indicating the consumer is still alive"""
+
+    inactive_threshold: NotRequired[int]
+    """Duration that instructs the server to cleanup ephemeral consumers that are inactive for that long"""
+
+    max_ack_pending: NotRequired[int]
+    """The maximum number of messages without acknowledgement that can be outstanding, once this limit is reached message delivery will be suspended"""
+
+    max_batch: NotRequired[int]
+    """The largest batch property that may be specified when doing a pull on a Pull Consumer"""
+
+    max_bytes: NotRequired[int]
+    """The maximum bytes value that maybe set when dong a pull on a Pull Consumer"""
+
+    max_deliver: NotRequired[int]
+    """The number of times a message will be delivered to consumers if not acknowledged in time"""
+
+    max_expires: NotRequired[int]
+    """The maximum expires value that may be set when doing a pull on a Pull Consumer"""
+
+    max_waiting: NotRequired[int]
+    """The number of pulls that can be outstanding on a pull consumer, pulls received after this is reached are ignored"""
+
+    mem_storage: NotRequired[bool]
+    """Force the consumer state to be kept in memory rather than inherit the setting from the stream"""
+
+    metadata: NotRequired[dict[str, str]]
+    """Additional metadata for the Consumer"""
+
+    name: NotRequired[str]
+    """A unique name for a consumer"""
+
+    num_replicas: NotRequired[int]
+    """When set do not inherit the replica count from the stream but specifically set it to this amount"""
+
+    opt_start_seq: NotRequired[int]
+    """Start sequence used with the DeliverByStartSequence deliver policy."""
+
+    opt_start_time: NotRequired[int]
+    """Start time used with the DeliverByStartSequence deliver policy"""
+
+    pause_until: NotRequired[int]
+    """When creating a consumer supplying a time in the future will act as a deadline for when the consumer will be paused till"""
+
+    priority_groups: NotRequired[list[str]]
+    """List of priority groups this consumer supports"""
+
+    priority_policy: NotRequired[PriorityPolicy]
+    """The priority policy the consumer is set to"""
+
+    priority_timeout: NotRequired[Any]
+    """For pinned_client priority policy how long before the client times out"""
+
+    rate_limit_bps: NotRequired[int]
+    """The rate at which messages will be delivered to clients, expressed in bit per second"""
+
+    replay_policy: NotRequired[Literal["instant", "original"]]
+    """The rate at which messages will be pushed to a client"""
+
+    sample_freq: NotRequired[str]
+    """Sets the percentage of acknowledgments that should be sampled for observability"""
 
 
 class ConsumerInfo(TypedDict):
@@ -345,6 +501,19 @@ class ConsumerInfo(TypedDict):
 
     ts: NotRequired[int]
     """The server time the consumer info was created"""
+
+
+class Republish(TypedDict):
+    """Rules for republishing messages from a stream with subject mapping onto new subjects for partitioning and more"""
+
+    dest: str
+    """The destination to publish to"""
+
+    headers_only: NotRequired[bool]
+    """Only send message headers, no bodies"""
+
+    src: str
+    """The source subject to republish"""
 
 
 class StreamAlternate(TypedDict):
@@ -419,19 +588,6 @@ class StreamState(TypedDict):
 
     subjects: NotRequired[dict[str, int]]
     """Subjects and their message counts when a subjects_filter was set"""
-
-
-class Republish(TypedDict):
-    """Rules for republishing messages from a stream with subject mapping onto new subjects for partitioning and more"""
-
-    dest: str
-    """The destination to publish to"""
-
-    headers_only: NotRequired[bool]
-    """Only send message headers, no bodies"""
-
-    src: str
-    """The source subject to republish"""
 
 
 class StreamConfig(TypedDict):
@@ -555,7 +711,7 @@ class StreamTemplateInfo(TypedDict):
     """List of Streams managed by this Template"""
 
 
-class ConsumerInfoResponse_ConsumerInfo(TypedDict):
+class ConsumerInfoResponse(TypedDict):
     """A response from the JetStream $JS.API.CONSUMER.INFO API"""
 
     ack_floor: SequenceInfo
@@ -607,27 +763,7 @@ class ConsumerInfoResponse_ConsumerInfo(TypedDict):
     type: Literal["io.nats.jetstream.api.v1.consumer_info_response"]
 
 
-class ConsumerInfoResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.CONSUMER.INFO API"""
-
-    error: Error
-
-    type: Literal["io.nats.jetstream.api.v1.consumer_info_response"]
-
-
-ConsumerInfoResponse = Union[ConsumerInfoResponse_ConsumerInfo,
-                             ConsumerInfoResponse_ErrorResponse]
-
-
-class StreamPurgeResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.STREAM.PURGE API"""
-
-    error: Error
-
-    type: Literal["io.nats.jetstream.api.v1.stream_purge_response"]
-
-
-class StreamPurgeResponse_Variant1(TypedDict):
+class StreamPurgeResponse(TypedDict):
     """A response from the JetStream $JS.API.STREAM.PURGE API"""
 
     purged: int
@@ -638,10 +774,6 @@ class StreamPurgeResponse_Variant1(TypedDict):
     type: Literal["io.nats.jetstream.api.v1.stream_purge_response"]
 
 
-StreamPurgeResponse = Union[StreamPurgeResponse_ErrorResponse,
-                            StreamPurgeResponse_Variant1]
-
-
 class ConsumerUnpinRequest(TypedDict):
     """A request to the JetStream $JS.API.CONSUMER.UNPIN API"""
 
@@ -649,24 +781,12 @@ class ConsumerUnpinRequest(TypedDict):
     """The group to unpin"""
 
 
-class ConsumerDeleteResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.CONSUMER.DELETE API"""
-
-    error: Error
-
-    type: Literal["io.nats.jetstream.api.v1.consumer_delete_response"]
-
-
-class ConsumerDeleteResponse_Variant1(TypedDict):
+class ConsumerDeleteResponse(TypedDict):
     """A response from the JetStream $JS.API.CONSUMER.DELETE API"""
 
     success: bool
 
     type: Literal["io.nats.jetstream.api.v1.consumer_delete_response"]
-
-
-ConsumerDeleteResponse = Union[ConsumerDeleteResponse_ErrorResponse,
-                               ConsumerDeleteResponse_Variant1]
 
 
 class ConsumerGetnextRequest(TypedDict):
@@ -689,6 +809,8 @@ class ConsumerGetnextRequest(TypedDict):
 
 
 class StreamCreateRequest(TypedDict):
+    """A request to the JetStream $JS.API.STREAM.CREATE API"""
+
     allow_direct: NotRequired[bool]
     """Allow higher performance, direct access to get individual messages"""
 
@@ -795,14 +917,20 @@ class StreamCreateRequest(TypedDict):
 
 
 class ConsumerNamesResponse(TypedDict):
+    """A response from the JetStream $JS.API.CONSUMER.NAMES API"""
+
+    consumers: list[str]
+
     limit: int
 
     offset: int
 
     total: int
 
+    type: Literal["io.nats.jetstream.api.v1.consumer_names_response"]
 
-class StreamCreateResponse_StreamInfo(TypedDict):
+
+class StreamCreateResponse(TypedDict):
     """A response from the JetStream $JS.API.STREAM.CREATE API"""
 
     alternates: NotRequired[list[StreamAlternate]]
@@ -830,23 +958,13 @@ class StreamCreateResponse_StreamInfo(TypedDict):
     type: Literal["io.nats.jetstream.api.v1.stream_create_response"]
 
 
-class StreamCreateResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.STREAM.CREATE API"""
-
-    error: Error
-
-    type: Literal["io.nats.jetstream.api.v1.stream_create_response"]
-
-
-StreamCreateResponse = Union[StreamCreateResponse_StreamInfo,
-                             StreamCreateResponse_ErrorResponse]
-
-
 class ConsumerListRequest(TypedDict):
+    """A request to the JetStream $JS.API.CONSUMER.LIST API"""
+
     offset: int
 
 
-class StreamTemplateCreateResponse_StreamTemplateInfo(TypedDict):
+class StreamTemplateCreateResponse(TypedDict):
     """A response from the JetStream $JS.API.STREAM.TEMPLATE.CREATE API"""
 
     config: StreamTemplateConfig
@@ -857,40 +975,13 @@ class StreamTemplateCreateResponse_StreamTemplateInfo(TypedDict):
     type: Literal["io.nats.jetstream.api.v1.stream_template_create_response"]
 
 
-class StreamTemplateCreateResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.STREAM.TEMPLATE.CREATE API"""
-
-    error: Error
-
-    type: Literal["io.nats.jetstream.api.v1.stream_template_create_response"]
-
-
-StreamTemplateCreateResponse = Union[
-    StreamTemplateCreateResponse_StreamTemplateInfo,
-    StreamTemplateCreateResponse_ErrorResponse]
-
-
-class MetaLeaderStepdownResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.META.LEADER.STEPDOWN API"""
-
-    error: Error
-
-    type: NotRequired[
-        Literal["io.nats.jetstream.api.v1.meta_leader_stepdown_response"]]
-
-
-class MetaLeaderStepdownResponse_Variant1(TypedDict):
+class MetaLeaderStepdownResponse(TypedDict):
     """A response from the JetStream $JS.API.META.LEADER.STEPDOWN API"""
 
     success: bool
     """If the leader successfully stood down"""
 
-    type: NotRequired[
-        Literal["io.nats.jetstream.api.v1.meta_leader_stepdown_response"]]
-
-
-MetaLeaderStepdownResponse = Union[MetaLeaderStepdownResponse_ErrorResponse,
-                                   MetaLeaderStepdownResponse_Variant1]
+    type: NotRequired[Literal["io.nats.jetstream.api.v1.meta_leader_stepdown_response"]]
 
 
 class MetaServerRemoveRequest(TypedDict):
@@ -917,6 +1008,8 @@ class StreamPurgeRequest(TypedDict):
 
 
 class StreamUpdateRequest(TypedDict):
+    """A request to the JetStream $JS.API.STREAM.UPDATE API"""
+
     allow_direct: NotRequired[bool]
     """Allow higher performance, direct access to get individual messages"""
 
@@ -1019,62 +1112,26 @@ class StreamUpdateRequest(TypedDict):
     """When the Stream is managed by a Stream Template this identifies the template that manages the Stream."""
 
 
-class StreamSnapshotResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.STREAM.SNAPSHOT API"""
-
-    error: Error
-
-    type: NotRequired[
-        Literal["io.nats.jetstream.api.v1.stream_snapshot_response"]]
-
-
-class StreamSnapshotResponse_Variant1(TypedDict):
+class StreamSnapshotResponse(TypedDict):
     """A response from the JetStream $JS.API.STREAM.SNAPSHOT API"""
 
     config: StreamConfig
 
     state: StreamState
 
-    type: NotRequired[
-        Literal["io.nats.jetstream.api.v1.stream_snapshot_response"]]
+    type: NotRequired[Literal["io.nats.jetstream.api.v1.stream_snapshot_response"]]
 
 
-StreamSnapshotResponse = Union[StreamSnapshotResponse_ErrorResponse,
-                               StreamSnapshotResponse_Variant1]
-
-
-class StreamRemovePeerResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.STREAM.PEER.REMOVE API"""
-
-    error: Error
-
-    type: NotRequired[
-        Literal["io.nats.jetstream.api.v1.stream_remove_peer_response"]]
-
-
-class StreamRemovePeerResponse_Variant1(TypedDict):
+class StreamRemovePeerResponse(TypedDict):
     """A response from the JetStream $JS.API.STREAM.PEER.REMOVE API"""
 
     success: bool
     """If the peer was successfully removed"""
 
-    type: NotRequired[
-        Literal["io.nats.jetstream.api.v1.stream_remove_peer_response"]]
+    type: NotRequired[Literal["io.nats.jetstream.api.v1.stream_remove_peer_response"]]
 
 
-StreamRemovePeerResponse = Union[StreamRemovePeerResponse_ErrorResponse,
-                                 StreamRemovePeerResponse_Variant1]
-
-
-class StreamMsgDeleteResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.STREAM.MSG.DELETE API"""
-
-    error: Error
-
-    type: Literal["io.nats.jetstream.api.v1.stream_msg_delete_response"]
-
-
-class StreamMsgDeleteResponse_Variant1(TypedDict):
+class StreamMsgDeleteResponse(TypedDict):
     """A response from the JetStream $JS.API.STREAM.MSG.DELETE API"""
 
     success: bool
@@ -1082,29 +1139,12 @@ class StreamMsgDeleteResponse_Variant1(TypedDict):
     type: Literal["io.nats.jetstream.api.v1.stream_msg_delete_response"]
 
 
-StreamMsgDeleteResponse = Union[StreamMsgDeleteResponse_ErrorResponse,
-                                StreamMsgDeleteResponse_Variant1]
-
-
-class StreamTemplateDeleteResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.STREAM.TEMPLATE.DELETE API"""
-
-    error: Error
-
-    type: Literal["io.nats.jetstream.api.v1.stream_template_delete_response"]
-
-
-class StreamTemplateDeleteResponse_Variant1(TypedDict):
+class StreamTemplateDeleteResponse(TypedDict):
     """A response from the JetStream $JS.API.STREAM.TEMPLATE.DELETE API"""
 
     success: bool
 
     type: Literal["io.nats.jetstream.api.v1.stream_template_delete_response"]
-
-
-StreamTemplateDeleteResponse = Union[
-    StreamTemplateDeleteResponse_ErrorResponse,
-    StreamTemplateDeleteResponse_Variant1]
 
 
 class StreamMsgDeleteRequest(TypedDict):
@@ -1117,15 +1157,7 @@ class StreamMsgDeleteRequest(TypedDict):
     """Stream sequence number of the message to delete"""
 
 
-class StreamDeleteResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.STREAM.DELETE API"""
-
-    error: Error
-
-    type: Literal["io.nats.jetstream.api.v1.stream_delete_response"]
-
-
-class StreamDeleteResponse_Variant1(TypedDict):
+class StreamDeleteResponse(TypedDict):
     """A response from the JetStream $JS.API.STREAM.DELETE API"""
 
     success: bool
@@ -1133,20 +1165,7 @@ class StreamDeleteResponse_Variant1(TypedDict):
     type: Literal["io.nats.jetstream.api.v1.stream_delete_response"]
 
 
-StreamDeleteResponse = Union[StreamDeleteResponse_ErrorResponse,
-                             StreamDeleteResponse_Variant1]
-
-
-class ConsumerPauseResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.CONSUMER.PAUSE API"""
-
-    error: Error
-
-    type: NotRequired[
-        Literal["io.nats.jetstream.api.v1.consumer_pause_response"]]
-
-
-class ConsumerPauseResponse_Variant1(TypedDict):
+class ConsumerPauseResponse(TypedDict):
     """A response from the JetStream $JS.API.CONSUMER.PAUSE API"""
 
     pause_remaining: NotRequired[int]
@@ -1158,23 +1177,24 @@ class ConsumerPauseResponse_Variant1(TypedDict):
     paused: NotRequired[bool]
     """Indicates if after parsing the pause_until property if the consumer was paused"""
 
-    type: NotRequired[
-        Literal["io.nats.jetstream.api.v1.consumer_pause_response"]]
-
-
-ConsumerPauseResponse = Union[ConsumerPauseResponse_ErrorResponse,
-                              ConsumerPauseResponse_Variant1]
+    type: NotRequired[Literal["io.nats.jetstream.api.v1.consumer_pause_response"]]
 
 
 class StreamTemplateNamesResponse(TypedDict):
+    """A response from the JetStream $JS.API.STREAM.TEMPLATE.NAMES API"""
+
+    consumers: NotRequired[list[str]]
+
     limit: int
 
     offset: int
 
     total: int
 
+    type: Literal["io.nats.jetstream.api.v1.stream_template_names_response"]
 
-class StreamTemplateInfoResponse_StreamTemplateInfo(TypedDict):
+
+class StreamTemplateInfoResponse(TypedDict):
     """A response from the JetStream $JS.API.STREAM.TEMPLATE.INFO API"""
 
     config: StreamTemplateConfig
@@ -1185,19 +1205,6 @@ class StreamTemplateInfoResponse_StreamTemplateInfo(TypedDict):
     type: Literal["io.nats.jetstream.api.v1.stream_template_info_response"]
 
 
-class StreamTemplateInfoResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.STREAM.TEMPLATE.INFO API"""
-
-    error: Error
-
-    type: Literal["io.nats.jetstream.api.v1.stream_template_info_response"]
-
-
-StreamTemplateInfoResponse = Union[
-    StreamTemplateInfoResponse_StreamTemplateInfo,
-    StreamTemplateInfoResponse_ErrorResponse]
-
-
 class StreamLeaderStepdownRequest(TypedDict):
     """A request for the JetStream $JS.API.STREAM.LEADER.STEPDOWN API"""
 
@@ -1205,7 +1212,7 @@ class StreamLeaderStepdownRequest(TypedDict):
     """Placement directives to consider when placing the leader"""
 
 
-class StreamInfoResponse_StreamInfo(TypedDict):
+class StreamInfoResponse(TypedDict):
     """A response from the JetStream $JS.API.STREAM.INFO API"""
 
     alternates: NotRequired[list[StreamAlternate]]
@@ -1239,25 +1246,7 @@ class StreamInfoResponse_StreamInfo(TypedDict):
     type: Literal["io.nats.jetstream.api.v1.stream_info_response"]
 
 
-class StreamInfoResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.STREAM.INFO API"""
-
-    error: Error
-
-    limit: NotRequired[int]
-
-    offset: NotRequired[int]
-
-    total: NotRequired[int]
-
-    type: Literal["io.nats.jetstream.api.v1.stream_info_response"]
-
-
-StreamInfoResponse = Union[StreamInfoResponse_StreamInfo,
-                           StreamInfoResponse_ErrorResponse]
-
-
-class ConsumerCreateResponse_ConsumerInfo(TypedDict):
+class ConsumerCreateResponse(TypedDict):
     """A response from the JetStream $JS.API.CONSUMER.CREATE API"""
 
     ack_floor: SequenceInfo
@@ -1309,18 +1298,6 @@ class ConsumerCreateResponse_ConsumerInfo(TypedDict):
     type: Literal["io.nats.jetstream.api.v1.consumer_create_response"]
 
 
-class ConsumerCreateResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.CONSUMER.CREATE API"""
-
-    error: Error
-
-    type: Literal["io.nats.jetstream.api.v1.consumer_create_response"]
-
-
-ConsumerCreateResponse = Union[ConsumerCreateResponse_ConsumerInfo,
-                               ConsumerCreateResponse_ErrorResponse]
-
-
 class StreamRemovePeerRequest(TypedDict):
     """A request to the JetStream $JS.API.STREAM.PEER.REMOVE API"""
 
@@ -1345,11 +1322,21 @@ class StreamSnapshotRequest(TypedDict):
 
 
 class StreamListResponse(TypedDict):
+    """A response from the JetStream $JS.API.STREAM.LIST API"""
+
     limit: int
+
+    missing: NotRequired[list[str]]
+    """In clustered environments gathering Stream info might time out, this list would be a list of Streams for which information was not obtainable"""
 
     offset: int
 
+    streams: list[StreamInfo]
+    """Full Stream information for each known Stream"""
+
     total: int
+
+    type: Literal["io.nats.jetstream.api.v1.stream_list_response"]
 
 
 class ConsumerCreateRequest(TypedDict):
@@ -1382,30 +1369,21 @@ class StreamInfoRequest(TypedDict):
 
 
 class ConsumerNamesRequest(TypedDict):
+    """A request to the JetStream $JS.API.CONSUMER.NAMES API"""
+
     offset: int
 
-
-class StreamRestoreResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.STREAM.RESTORE API"""
-
-    error: Error
-
-    type: NotRequired[
-        Literal["io.nats.jetstream.api.v1.stream_restore_response"]]
+    subject: NotRequired[str]
+    """Filter the names to those consuming messages matching this subject or wildcard"""
 
 
-class StreamRestoreResponse_Variant1(TypedDict):
+class StreamRestoreResponse(TypedDict):
     """A response from the JetStream $JS.API.STREAM.RESTORE API"""
 
     deliver_subject: str
     """The Subject to send restore chunks to"""
 
-    type: NotRequired[
-        Literal["io.nats.jetstream.api.v1.stream_restore_response"]]
-
-
-StreamRestoreResponse = Union[StreamRestoreResponse_ErrorResponse,
-                              StreamRestoreResponse_Variant1]
+    type: NotRequired[Literal["io.nats.jetstream.api.v1.stream_restore_response"]]
 
 
 class StreamListRequest(TypedDict):
@@ -1417,30 +1395,16 @@ class StreamListRequest(TypedDict):
     """Limit the list to streams matching this subject filter"""
 
 
-class MetaServerRemoveResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.SERVER.REMOVE API"""
-
-    error: Error
-
-    type: NotRequired[
-        Literal["io.nats.jetstream.api.v1.meta_server_remove_response"]]
-
-
-class MetaServerRemoveResponse_Variant1(TypedDict):
+class MetaServerRemoveResponse(TypedDict):
     """A response from the JetStream $JS.API.SERVER.REMOVE API"""
 
     success: bool
     """If the peer was successfully removed"""
 
-    type: NotRequired[
-        Literal["io.nats.jetstream.api.v1.meta_server_remove_response"]]
+    type: NotRequired[Literal["io.nats.jetstream.api.v1.meta_server_remove_response"]]
 
 
-MetaServerRemoveResponse = Union[MetaServerRemoveResponse_ErrorResponse,
-                                 MetaServerRemoveResponse_Variant1]
-
-
-class AccountInfoResponse_AccountInfo(TypedDict):
+class AccountInfoResponse(TypedDict):
     """A response from the JetStream $JS.API.INFO API"""
 
     api: ApiStats
@@ -1467,18 +1431,6 @@ class AccountInfoResponse_AccountInfo(TypedDict):
     type: Literal["io.nats.jetstream.api.v1.account_info_response"]
 
 
-class AccountInfoResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.INFO API"""
-
-    error: Error
-
-    type: Literal["io.nats.jetstream.api.v1.account_info_response"]
-
-
-AccountInfoResponse = Union[AccountInfoResponse_AccountInfo,
-                            AccountInfoResponse_ErrorResponse]
-
-
 class PublishAck(TypedDict):
     """A response received when publishing a message"""
 
@@ -1497,38 +1449,30 @@ class PublishAck(TypedDict):
     """The name of the stream that received the message"""
 
 
-class AccountPurgeResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.ACCOUNT.PURGE API"""
-
-    error: Error
-
-    type: NotRequired[
-        Literal["io.nats.jetstream.api.v1.account_purge_response"]]
-
-
-class AccountPurgeResponse_Variant1(TypedDict):
+class AccountPurgeResponse(TypedDict):
     """A response from the JetStream $JS.API.ACCOUNT.PURGE API"""
 
     initiated: NotRequired[bool]
     """If the purge operation was successfully started"""
 
-    type: NotRequired[
-        Literal["io.nats.jetstream.api.v1.account_purge_response"]]
-
-
-AccountPurgeResponse = Union[AccountPurgeResponse_ErrorResponse,
-                             AccountPurgeResponse_Variant1]
+    type: NotRequired[Literal["io.nats.jetstream.api.v1.account_purge_response"]]
 
 
 class StreamNamesResponse(TypedDict):
+    """A response from the JetStream $JS.API.STREAM.NAMES API"""
+
+    consumers: NotRequired[list[str]]
+
     limit: int
 
     offset: int
 
     total: int
 
+    type: Literal["io.nats.jetstream.api.v1.stream_names_response"]
 
-class StreamUpdateResponse_StreamInfo(TypedDict):
+
+class StreamUpdateResponse(TypedDict):
     """A response from the JetStream $JS.API.STREAM.UPDATE API"""
 
     alternates: NotRequired[list[StreamAlternate]]
@@ -1556,40 +1500,13 @@ class StreamUpdateResponse_StreamInfo(TypedDict):
     type: Literal["io.nats.jetstream.api.v1.stream_update_response"]
 
 
-class StreamUpdateResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.STREAM.UPDATE API"""
-
-    error: Error
-
-    type: Literal["io.nats.jetstream.api.v1.stream_update_response"]
-
-
-StreamUpdateResponse = Union[StreamUpdateResponse_StreamInfo,
-                             StreamUpdateResponse_ErrorResponse]
-
-
-class ConsumerLeaderStepdownResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.CONSUMER.LEADER.STEPDOWN API"""
-
-    error: Error
-
-    type: NotRequired[
-        Literal["io.nats.jetstream.api.v1.consumer_leader_stepdown_response"]]
-
-
-class ConsumerLeaderStepdownResponse_Variant1(TypedDict):
+class ConsumerLeaderStepdownResponse(TypedDict):
     """A response from the JetStream $JS.API.CONSUMER.LEADER.STEPDOWN API"""
 
     success: bool
     """If the leader successfully stood down"""
 
-    type: NotRequired[
-        Literal["io.nats.jetstream.api.v1.consumer_leader_stepdown_response"]]
-
-
-ConsumerLeaderStepdownResponse = Union[
-    ConsumerLeaderStepdownResponse_ErrorResponse,
-    ConsumerLeaderStepdownResponse_Variant1]
+    type: NotRequired[Literal["io.nats.jetstream.api.v1.consumer_leader_stepdown_response"]]
 
 
 class StreamNamesRequest(TypedDict):
@@ -1630,28 +1547,13 @@ class StreamRestoreRequest(TypedDict):
     state: StreamState
 
 
-class StreamLeaderStepdownResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.STREAM.LEADER.STEPDOWN API"""
-
-    error: Error
-
-    type: NotRequired[
-        Literal["io.nats.jetstream.api.v1.stream_leader_stepdown_response"]]
-
-
-class StreamLeaderStepdownResponse_Variant1(TypedDict):
+class StreamLeaderStepdownResponse(TypedDict):
     """A response from the JetStream $JS.API.STREAM.LEADER.STEPDOWN API"""
 
     success: bool
     """If the leader successfully stood down"""
 
-    type: NotRequired[
-        Literal["io.nats.jetstream.api.v1.stream_leader_stepdown_response"]]
-
-
-StreamLeaderStepdownResponse = Union[
-    StreamLeaderStepdownResponse_ErrorResponse,
-    StreamLeaderStepdownResponse_Variant1]
+    type: NotRequired[Literal["io.nats.jetstream.api.v1.stream_leader_stepdown_response"]]
 
 
 class StreamMsgGetRequest(TypedDict):
@@ -1686,22 +1588,21 @@ class StreamMsgGetRequest(TypedDict):
 
 
 class ConsumerListResponse(TypedDict):
+    """A response from the JetStream $JS.API.CONSUMER.LIST API"""
+
+    consumers: list[ConsumerInfo]
+    """Full Consumer information for each known Consumer"""
+
     limit: int
 
     offset: int
 
     total: int
 
-
-class StreamMsgGetResponse_ErrorResponse(TypedDict):
-    """A response from the JetStream $JS.API.STREAM.MSG.GET API"""
-
-    error: Error
-
-    type: Literal["io.nats.jetstream.api.v1.stream_msg_get_response"]
+    type: Literal["io.nats.jetstream.api.v1.consumer_list_response"]
 
 
-class StreamMsgGetResponse_Variant1(TypedDict):
+class StreamMsgGetResponse(TypedDict):
     """A response from the JetStream $JS.API.STREAM.MSG.GET API"""
 
     message: StoredMessage
@@ -1709,11 +1610,9 @@ class StreamMsgGetResponse_Variant1(TypedDict):
     type: Literal["io.nats.jetstream.api.v1.stream_msg_get_response"]
 
 
-StreamMsgGetResponse = Union[StreamMsgGetResponse_ErrorResponse,
-                             StreamMsgGetResponse_Variant1]
-
-
 class StreamTemplateCreateRequest(TypedDict):
+    """A request to the JetStream $JS.API.STREAM.TEMPLATE.CREATE API"""
+
     config: StreamConfig
     """The template configuration to create Streams with"""
 
@@ -1732,4 +1631,7 @@ class ConsumerLeaderStepdownRequest(TypedDict):
 
 
 class StreamTemplateNamesRequest(TypedDict):
+    """A request to the JetStream $JS.API.CONSUMER.LIST API"""
+
     offset: int
+

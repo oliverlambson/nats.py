@@ -16,31 +16,31 @@ from typing import (
 )
 
 from .types import (
-    AccountInfoResponse_AccountInfo,
+    AccountInfoResponse,
     ConsumerCreateRequest,
-    ConsumerCreateResponse_ConsumerInfo,
-    ConsumerDeleteResponse_Variant1,
-    ConsumerInfoResponse_ConsumerInfo,
+    ConsumerCreateResponse,
+    ConsumerDeleteResponse,
+    ConsumerInfoResponse,
     ConsumerListResponse,
     ConsumerNamesResponse,
     Error as ApiError,
     ErrorResponse,
     StreamCreateRequest,
-    StreamCreateResponse_StreamInfo,
-    StreamDeleteResponse_Variant1,
+    StreamCreateResponse,
+    StreamDeleteResponse,
     StreamInfoRequest,
-    StreamInfoResponse_StreamInfo,
+    StreamInfoResponse,
     StreamListResponse,
     StreamMsgDeleteRequest,
-    StreamMsgDeleteResponse_Variant1,
+    StreamMsgDeleteResponse,
     StreamMsgGetRequest,
-    StreamMsgGetResponse_Variant1,
+    StreamMsgGetResponse,
     StreamNamesRequest,
     StreamNamesResponse,
     StreamPurgeRequest,
-    StreamPurgeResponse_Variant1,
+    StreamPurgeResponse,
     StreamUpdateRequest,
-    StreamUpdateResponse_StreamInfo,
+    StreamUpdateResponse,
 )
 
 if TYPE_CHECKING:
@@ -63,10 +63,24 @@ class Error(Exception):
 
     @classmethod
     def from_response(cls, error: ApiError) -> Error:
+        description = error.pop("description", "Unknown error")
+        code = error.pop("code", None)
+        err_code = error.pop("err_code", None)
+
+        # Use err_code if code is not set
+        if code is None and err_code is not None:
+            code = err_code
+
+        # Check for unconsumed fields
+        if error:
+            raise ValueError(
+                f"Error.from_response() has unconsumed fields: {list(error.keys())}"
+            )
+
         return cls(
-            message=error.get("description", "Unknown error"),
-            code=error.get("code"),
-            description=error.get("description"),
+            message=description,
+            code=code,
+            description=description,
         )
 
 
@@ -105,15 +119,15 @@ class Client:
         self._client = client
         self._prefix = prefix
 
-    async def account_info(self) -> AccountInfoResponse_AccountInfo:
+    async def account_info(self) -> AccountInfoResponse:
         return await self.request_json(
             f"{self._prefix}.INFO",
-            response_type=AccountInfoResponse_AccountInfo,
+            response_type=AccountInfoResponse,
         )
 
     async def consumer_create(
         self, **request: Unpack[ConsumerCreateRequest]
-    ) -> ConsumerCreateResponse_ConsumerInfo:
+    ) -> ConsumerCreateResponse:
         stream_name = request.get("stream_name")
         if not stream_name:
             raise ValueError("stream_name is required")
@@ -129,23 +143,23 @@ class Client:
         return await self.request_json(
             f"{self._prefix}.CONSUMER.CREATE.{stream_name}.{consumer_name}",
             request,
-            response_type=ConsumerCreateResponse_ConsumerInfo,
+            response_type=ConsumerCreateResponse,
         )
 
     async def consumer_delete(
         self, stream_name: str, consumer_name: str
-    ) -> ConsumerDeleteResponse_Variant1:
+    ) -> ConsumerDeleteResponse:
         return await self.request_json(
             f"{self._prefix}.CONSUMER.DELETE.{stream_name}.{consumer_name}",
-            response_type=ConsumerDeleteResponse_Variant1,
+            response_type=ConsumerDeleteResponse,
         )
 
     async def consumer_info(
         self, stream_name: str, consumer_name: str
-    ) -> ConsumerInfoResponse_ConsumerInfo:
+    ) -> ConsumerInfoResponse:
         return await self.request_json(
             f"{self._prefix}.CONSUMER.INFO.{stream_name}.{consumer_name}",
-            response_type=ConsumerInfoResponse_ConsumerInfo,
+            response_type=ConsumerInfoResponse,
         )
 
     async def consumer_list(self, stream_name: str, offset: int | None = None) -> ConsumerListResponse:
@@ -173,7 +187,7 @@ class Client:
 
     async def stream_create(
         self, name: str, **kwargs: Unpack[StreamCreateRequest]
-    ) -> StreamCreateResponse_StreamInfo:
+    ) -> StreamCreateResponse:
         # Validate max_msgs
         max_msgs = kwargs.get("max_msgs", -1)
         if max_msgs < -1:
@@ -193,22 +207,22 @@ class Client:
                 "name": name,
                 **kwargs,
             },
-            response_type=StreamCreateResponse_StreamInfo,
+            response_type=StreamCreateResponse,
         )
 
-    async def stream_delete(self, name: str) -> StreamDeleteResponse_Variant1:
+    async def stream_delete(self, name: str) -> StreamDeleteResponse:
         return await self.request_json(
             f"{self._prefix}.STREAM.DELETE.{name}",
-            response_type=StreamDeleteResponse_Variant1,
+            response_type=StreamDeleteResponse,
         )
 
     async def stream_info(
         self, name: str, **request: Unpack[StreamInfoRequest]
-    ) -> StreamInfoResponse_StreamInfo:
+    ) -> StreamInfoResponse:
         return await self.request_json(
             f"{self._prefix}.STREAM.INFO.{name}",
             request if request else None,
-            response_type=StreamInfoResponse_StreamInfo,
+            response_type=StreamInfoResponse,
         )
 
     async def stream_list(
@@ -239,20 +253,20 @@ class Client:
 
     async def stream_msg_delete(
         self, name: str, **request: Unpack[StreamMsgDeleteRequest]
-    ) -> StreamMsgDeleteResponse_Variant1:
+    ) -> StreamMsgDeleteResponse:
         return await self.request_json(
             f"{self._prefix}.STREAM.MSG.DELETE.{name}",
             request if request else None,
-            response_type=StreamMsgDeleteResponse_Variant1,
+            response_type=StreamMsgDeleteResponse,
         )
 
     async def stream_msg_get(
         self, name: str, **request: Unpack[StreamMsgGetRequest]
-    ) -> StreamMsgGetResponse_Variant1:
+    ) -> StreamMsgGetResponse:
         return await self.request_json(
             f"{self._prefix}.STREAM.MSG.GET.{name}",
             request if request else None,
-            response_type=StreamMsgGetResponse_Variant1,
+            response_type=StreamMsgGetResponse,
         )
 
     async def stream_names(
@@ -275,23 +289,23 @@ class Client:
 
     async def stream_purge(
         self, name: str, **request: Unpack[StreamPurgeRequest]
-    ) -> StreamPurgeResponse_Variant1:
+    ) -> StreamPurgeResponse:
         return await self.request_json(
             f"{self._prefix}.STREAM.PURGE.{name}",
             request if request else None,
-            response_type=StreamPurgeResponse_Variant1,
+            response_type=StreamPurgeResponse,
         )
 
     async def stream_update(
         self, name: str, **config: Unpack[StreamUpdateRequest]
-    ) -> StreamUpdateResponse_StreamInfo:
+    ) -> StreamUpdateResponse:
         return await self.request_json(
             f"{self._prefix}.STREAM.UPDATE.{name}",
             {
                 "name": name,
                 **config,
             },
-            response_type=StreamUpdateResponse_StreamInfo,
+            response_type=StreamUpdateResponse,
         )
 
     @overload

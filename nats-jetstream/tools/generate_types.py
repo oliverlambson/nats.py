@@ -13,7 +13,7 @@ SCHEMA_DIR = Path(
 ).parent.parent / "schemas" / "jetstream" / "api" / "v1"
 OUTPUT_PATH = Path(__file__).parent.parent / "src/nats/jetstream/api/types.py"
 
-# Types to skip generating (complex unions, etc)
+# Types to skip generating (simple type aliases only)
 SKIP_TYPES = [
     "golang_duration_nanos",
     "golang_int",
@@ -22,13 +22,6 @@ SKIP_TYPES = [
     "golang_int64",
     "golang_time",
     "basic_name",
-    "deliver_policy",
-    "all_deliver_policy",
-    "last_deliver_policy",
-    "new_deliver_policy",
-    "start_sequence_deliver_policy",
-    "start_time_deliver_policy",
-    "last_per_subject_deliver_policy",
 ]
 
 # Map schema type names to desired Python type names
@@ -184,17 +177,22 @@ def get_combined_schema(schema: dict[str, Any],
         definitions: Dictionary of all available definitions
 
     Returns:
-        Combined schema from allOf fields
+        Combined schema from allOf fields merged with base schema
     """
     if "allOf" not in schema:
         return schema
 
-    result: dict[str, Any] = {}
+    # Start with the base schema (excluding allOf)
+    result: dict[str, Any] = {k: v for k, v in schema.items() if k != "allOf"}
 
+    # Merge in each allOf item
     for subschema in schema["allOf"]:
         if "$ref" in subschema:
             ref_schema = resolve_ref(subschema["$ref"], definitions)
             if ref_schema:
+                # Skip merging pure oneOf schemas (validation constraints we can't express in TypedDict)
+                if ref_schema.keys() == {'oneOf'}:
+                    continue
                 result = merge_schemas(result, ref_schema)
         else:
             result = merge_schemas(result, subschema)
@@ -379,6 +377,58 @@ def generate_type_from_schema(
     # First, handle allOf by combining schemas
     if "allOf" in schema:
         schema = get_combined_schema(schema, definitions)
+
+    if "oneOf" in schema:
+        # Check if this is an error response union (oneOf with error_response variant)
+        # In these cases, the client code handles errors separately, so we only generate the success type
+        has_error_variant = False
+        non_error_variants = []
+
+        for variant in schema["oneOf"]:
+            if "$ref" in variant:
+                ref_name = variant["$ref"].split("/")[-1]
+                if ref_name == "error_response":
+                    has_error_variant = True
+                else:
+                    non_error_variants.append(variant)
+            else:
+                non_error_variants.append(variant)
+
+        # If this is an error response union with exactly one non-error variant,
+        # generate only the success variant as a TypedDict
+        if has_error_variant and len(non_error_variants) == 1:
+            variant = non_error_variants[0]
+
+            # Merge base properties with the variant
+            base_props = schema.get("properties", {})
+            base_required = schema.get("required", [])
+
+            if "$ref" in variant:
+                ref_schema = resolve_ref(variant["$ref"], definitions)
+                if ref_schema:
+                    variant_props = ref_schema.get("properties", {})
+                    variant_required = ref_schema.get("required", [])
+                else:
+                    variant_props = {}
+                    variant_required = []
+            else:
+                variant_props = variant.get("properties", {})
+                variant_required = variant.get("required", [])
+
+            combined_props = base_props.copy()
+            combined_props.update(variant_props)
+
+            combined_required = list(base_required)
+            combined_required.extend(variant_required)
+
+            success_schema = {
+                "type": "object",
+                "properties": combined_props,
+                "required": combined_required,
+                "description": schema.get("description", ""),
+            }
+
+            return generate_typed_dict_class_from_schema(name, success_schema, definitions)
 
     if "oneOf" in schema:
         # Get common fields from properties
