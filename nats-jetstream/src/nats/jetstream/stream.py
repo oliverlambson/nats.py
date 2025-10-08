@@ -172,6 +172,22 @@ class Republish:
 
 
 @dataclass
+class StreamConsumerLimits:
+    inactive_threshold: int | None = None
+    max_ack_pending: int | None = None
+
+    @classmethod
+    def from_response(cls, data: api.StreamConsumerLimits) -> StreamConsumerLimits:
+        inactive_threshold = data.get("inactive_threshold")
+        max_ack_pending = data.get("max_ack_pending")
+
+        return cls(
+            inactive_threshold=inactive_threshold,
+            max_ack_pending=max_ack_pending,
+        )
+
+
+@dataclass
 class PeerInfo:
     name: str
     current: bool
@@ -304,7 +320,7 @@ class StreamConfig:
     subject_transform: SubjectTransform | None = None  # Subject transform
     subjects: list[str] | None = None  # Subjects to consume
     template_owner: str | None = None  # Managing template name
-    consumer_limits: api.StreamConsumerLimits | None = None  # Consumer limits
+    consumer_limits: StreamConsumerLimits | None = None  # Consumer limits
 
     @classmethod
     def from_response(cls, config: api.StreamConfig) -> StreamConfig:
@@ -358,6 +374,10 @@ class StreamConfig:
         if config.get("republish"):
             republish = Republish.from_response(config["republish"])
 
+        consumer_limits = None
+        if config.get("consumer_limits"):
+            consumer_limits = StreamConsumerLimits.from_response(config["consumer_limits"])
+
         return cls(
             max_age=max_age,
             max_bytes=max_bytes,
@@ -391,6 +411,7 @@ class StreamConfig:
             subjects=subjects,
             subject_transform=subject_transform,
             template_owner=template_owner,
+            consumer_limits=consumer_limits,
         )
 
 
