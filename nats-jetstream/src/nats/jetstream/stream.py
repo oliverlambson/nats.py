@@ -54,6 +54,13 @@ class ExternalStreamSource:
             deliver=deliver,
         )
 
+    def to_request(self) -> api.ExternalStreamSource:
+        """Convert to API request format."""
+        result: api.ExternalStreamSource = {"api": self.api}
+        if self.deliver is not None:
+            result["deliver"] = self.deliver
+        return result
+
 
 @dataclass
 class SubjectTransform:
@@ -69,6 +76,11 @@ class SubjectTransform:
             src=src,
             dest=dest,
         )
+
+    def to_request(self) -> api.SubjectTransform:
+        """Convert to API request format."""
+        result: api.SubjectTransform = {"src": self.src, "dest": self.dest}
+        return result
 
 
 @dataclass
@@ -100,6 +112,21 @@ class StreamSource:
             external=external,
             subject_transforms=subject_transforms,
         )
+
+    def to_request(self) -> api.StreamSource:
+        """Convert to API request format."""
+        result: api.StreamSource = {"name": self.name}
+        if self.opt_start_seq is not None:
+            result["opt_start_seq"] = self.opt_start_seq
+        if self.opt_start_time is not None:
+            result["opt_start_time"] = self.opt_start_time
+        if self.filter_subject is not None:
+            result["filter_subject"] = self.filter_subject
+        if self.external is not None:
+            result["external"] = self.external.to_request()
+        if self.subject_transforms is not None:
+            result["subject_transforms"] = self.subject_transforms
+        return result
 
 
 @dataclass
@@ -151,6 +178,15 @@ class Placement:
             tags=tags,
         )
 
+    def to_request(self) -> api.Placement:
+        """Convert to API request format."""
+        result: api.Placement = {}
+        if self.cluster is not None:
+            result["cluster"] = self.cluster
+        if self.tags is not None:
+            result["tags"] = self.tags
+        return result
+
 
 @dataclass
 class Republish:
@@ -170,6 +206,13 @@ class Republish:
             headers_only=headers_only,
         )
 
+    def to_request(self) -> api.Republish:
+        """Convert to API request format."""
+        result: api.Republish = {"src": self.src, "dest": self.dest}
+        if self.headers_only is not None:
+            result["headers_only"] = self.headers_only
+        return result
+
 
 @dataclass
 class StreamConsumerLimits:
@@ -185,6 +228,15 @@ class StreamConsumerLimits:
             inactive_threshold=inactive_threshold,
             max_ack_pending=max_ack_pending,
         )
+
+    def to_request(self) -> api.StreamConsumerLimits:
+        """Convert to API request format."""
+        result: api.StreamConsumerLimits = {}
+        if self.inactive_threshold is not None:
+            result["inactive_threshold"] = self.inactive_threshold
+        if self.max_ack_pending is not None:
+            result["max_ack_pending"] = self.max_ack_pending
+        return result
 
 
 @dataclass
@@ -323,6 +375,47 @@ class StreamConfig:
     consumer_limits: StreamConsumerLimits | None = None  # Consumer limits
 
     @classmethod
+    def from_kwargs(cls, **kwargs) -> StreamConfig:
+        """Create a StreamConfig from keyword arguments, converting dicts to dataclasses."""
+        # Convert mirror dict to StreamSource (with nested conversion)
+        if "mirror" in kwargs and isinstance(kwargs["mirror"], dict):
+            mirror_dict = kwargs["mirror"].copy()
+            if "external" in mirror_dict and isinstance(mirror_dict["external"], dict):
+                mirror_dict["external"] = ExternalStreamSource(**mirror_dict["external"])
+            kwargs["mirror"] = StreamSource(**mirror_dict)
+
+        # Convert placement dict to Placement
+        if "placement" in kwargs and isinstance(kwargs["placement"], dict):
+            kwargs["placement"] = Placement(**kwargs["placement"])
+
+        # Convert republish dict to Republish
+        if "republish" in kwargs and isinstance(kwargs["republish"], dict):
+            kwargs["republish"] = Republish(**kwargs["republish"])
+
+        # Convert subject_transform dict to SubjectTransform
+        if "subject_transform" in kwargs and isinstance(kwargs["subject_transform"], dict):
+            kwargs["subject_transform"] = SubjectTransform(**kwargs["subject_transform"])
+
+        # Convert consumer_limits dict to StreamConsumerLimits
+        if "consumer_limits" in kwargs and isinstance(kwargs["consumer_limits"], dict):
+            kwargs["consumer_limits"] = StreamConsumerLimits(**kwargs["consumer_limits"])
+
+        # Convert sources list of dicts to list of StreamSource
+        if "sources" in kwargs and kwargs["sources"] is not None:
+            converted_sources = []
+            for source in kwargs["sources"]:
+                if isinstance(source, dict):
+                    source_dict = source.copy()
+                    if "external" in source_dict and isinstance(source_dict["external"], dict):
+                        source_dict["external"] = ExternalStreamSource(**source_dict["external"])
+                    converted_sources.append(StreamSource(**source_dict))
+                else:
+                    converted_sources.append(source)
+            kwargs["sources"] = converted_sources
+
+        return cls(**kwargs)
+
+    @classmethod
     def from_response(cls, config: api.StreamConfig) -> StreamConfig:
         """Create a StreamConfig from an API response"""
         max_age = config.get("max_age", 0)
@@ -413,6 +506,76 @@ class StreamConfig:
             template_owner=template_owner,
             consumer_limits=consumer_limits,
         )
+
+    def to_request(self) -> api.StreamConfig:
+        """Convert StreamConfig to an API request dictionary."""
+        result: api.StreamConfig = {
+            "max_age": self.max_age,
+            "max_bytes": self.max_bytes,
+            "max_consumers": self.max_consumers,
+            "max_msgs": self.max_msgs,
+            "num_replicas": self.num_replicas,
+            "retention": self.retention,
+            "storage": self.storage,
+        }
+
+        # Add optional fields only if not None
+        if self.allow_direct is not None:
+            result["allow_direct"] = self.allow_direct
+        if self.allow_msg_ttl is not None:
+            result["allow_msg_ttl"] = self.allow_msg_ttl
+        if self.allow_rollup_hdrs is not None:
+            result["allow_rollup_hdrs"] = self.allow_rollup_hdrs
+        if self.compression is not None:
+            result["compression"] = self.compression
+        if self.deny_delete is not None:
+            result["deny_delete"] = self.deny_delete
+        if self.deny_purge is not None:
+            result["deny_purge"] = self.deny_purge
+        if self.description is not None:
+            result["description"] = self.description
+        if self.discard is not None:
+            result["discard"] = self.discard
+        if self.discard_new_per_subject is not None:
+            result["discard_new_per_subject"] = self.discard_new_per_subject
+        if self.duplicate_window is not None:
+            result["duplicate_window"] = self.duplicate_window
+        if self.first_seq is not None:
+            result["first_seq"] = self.first_seq
+        if self.max_msg_size is not None:
+            result["max_msg_size"] = self.max_msg_size
+        if self.max_msgs_per_subject is not None:
+            result["max_msgs_per_subject"] = self.max_msgs_per_subject
+        if self.metadata is not None:
+            result["metadata"] = self.metadata
+        if self.mirror is not None:
+            result["mirror"] = self.mirror.to_request()
+        if self.mirror_direct is not None:
+            result["mirror_direct"] = self.mirror_direct
+        if self.name is not None:
+            result["name"] = self.name
+        if self.no_ack is not None:
+            result["no_ack"] = self.no_ack
+        if self.placement is not None:
+            result["placement"] = self.placement.to_request()
+        if self.republish is not None:
+            result["republish"] = self.republish.to_request()
+        if self.sealed is not None:
+            result["sealed"] = self.sealed
+        if self.sources is not None:
+            result["sources"] = [s.to_request() for s in self.sources]
+        if self.subject_delete_marker_ttl is not None:
+            result["subject_delete_marker_ttl"] = self.subject_delete_marker_ttl
+        if self.subject_transform is not None:
+            result["subject_transform"] = self.subject_transform.to_request()
+        if self.subjects is not None:
+            result["subjects"] = self.subjects
+        if self.template_owner is not None:
+            result["template_owner"] = self.template_owner
+        if self.consumer_limits is not None:
+            result["consumer_limits"] = self.consumer_limits.to_request()
+
+        return result
 
 
 @dataclass

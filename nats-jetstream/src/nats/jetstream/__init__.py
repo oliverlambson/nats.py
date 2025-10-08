@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, AsyncIterator
+from typing import TYPE_CHECKING, AsyncIterator, overload
 
 from nats.jetstream.consumer import Consumer, ConsumerInfo
 from nats.jetstream.stream import (
@@ -306,11 +306,39 @@ class JetStream:
             # Increment offset by the number of streams we received
             offset += len(streams)
 
-    async def create_stream(self, **config) -> Stream:
-        """Create a new stream."""
-        response = await self._api.stream_create(**config)
+    @overload
+    async def create_stream(self, config: StreamConfig, /) -> Stream:
+        """Create a new stream from a StreamConfig object."""
+        ...
+
+    @overload
+    async def create_stream(self, *, name: str, **config) -> Stream:
+        """Create a new stream with keyword arguments."""
+        ...
+
+    async def create_stream(self, config: StreamConfig | None = None, /, **kwargs) -> Stream:
+        """Create a new stream.
+
+        Args:
+            config: A StreamConfig object to create the stream from (positional-only)
+            **kwargs: Stream configuration parameters as keyword arguments
+
+        Returns:
+            The created Stream object
+        """
+        if config is None:
+            # Create StreamConfig from kwargs with dict-to-dataclass conversion
+            config = StreamConfig.from_kwargs(**kwargs)
+
+        # Validate stream name
+        if config.name is None:
+            raise ValueError("StreamConfig must have a name")
+
+        # Convert StreamConfig to API request format and create stream
+        config_dict = config.to_request()
+        response = await self._api.stream_create(**config_dict)
         info = StreamInfo.from_response(response)
-        return Stream(self, config["name"], info)
+        return Stream(self, config.name, info)
 
     async def update_stream(self, **config) -> StreamInfo:
         """Update an existing stream."""
