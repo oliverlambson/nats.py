@@ -10,9 +10,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, suppress
-from typing import TYPE_CHECKING, TypeVar
-
-from typing import Self
+from typing import TYPE_CHECKING, Self, TypeVar
 
 if TYPE_CHECKING:
     import types

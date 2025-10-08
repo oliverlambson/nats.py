@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Final, Literal, NamedTuple, Protocol, runtime_
 from nats.client.protocol.types import ServerInfo
 
 if TYPE_CHECKING:
-    import asyncio
+    pass
 
 
 @runtime_checkable

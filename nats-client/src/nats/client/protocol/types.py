@@ -7,9 +7,7 @@ the NATS protocol specification.
 
 from __future__ import annotations
 
-from typing import TypedDict
-
-from typing import NotRequired, Required
+from typing import NotRequired, Required, TypedDict
 
 
 class ConnectInfo(TypedDict):

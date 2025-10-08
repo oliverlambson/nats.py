@@ -31,7 +31,7 @@ import uuid
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 from urllib.parse import urlparse
 
 from nats.client.connection import Connection, open_tcp_connection
@@ -49,10 +49,11 @@ from nats.client.protocol.command import (
 from nats.client.protocol.message import ParseError, parse
 from nats.client.protocol.types import (
     ConnectInfo,
+)
+from nats.client.protocol.types import (
     ServerInfo as ProtocolServerInfo,
 )
 from nats.client.subscription import Subscription
-from typing import Self
 
 if TYPE_CHECKING:
     import types
