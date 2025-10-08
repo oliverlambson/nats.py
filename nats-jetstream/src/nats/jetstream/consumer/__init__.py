@@ -37,19 +37,32 @@ class ConsumerInfo:
 
     @classmethod
     def from_response(cls, data: api.ConsumerInfo) -> ConsumerInfo:
+        stream_name = data["stream_name"]
+        name = data["name"]
+        config = data["config"]
+        created = data["created"]
+        delivered = data["delivered"]
+        ack_floor = data["ack_floor"]
+        num_ack_pending = data["num_ack_pending"]
+        num_redelivered = data["num_redelivered"]
+        num_waiting = data["num_waiting"]
+        num_pending = data["num_pending"]
+        cluster = data.get("cluster")
+        push_bound = data.get("push_bound")
+
         return cls(
-            stream_name=data["stream_name"],
-            name=data["name"],
-            config=data["config"],
-            created=data["created"],
-            delivered=data["delivered"],
-            ack_floor=data["ack_floor"],
-            num_ack_pending=data["num_ack_pending"],
-            num_redelivered=data["num_redelivered"],
-            num_waiting=data["num_waiting"],
-            num_pending=data["num_pending"],
-            cluster=data.get("cluster"),
-            push_bound=data.get("push_bound"),
+            stream_name=stream_name,
+            name=name,
+            config=config,
+            created=created,
+            delivered=delivered,
+            ack_floor=ack_floor,
+            num_ack_pending=num_ack_pending,
+            num_redelivered=num_redelivered,
+            num_waiting=num_waiting,
+            num_pending=num_pending,
+            cluster=cluster,
+            push_bound=push_bound,
         )
 
 
