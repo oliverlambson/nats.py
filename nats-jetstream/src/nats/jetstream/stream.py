@@ -336,15 +336,17 @@ class StreamState:
 class StreamConfig:
     """Configuration for a JetStream stream"""
 
-    # All fields are optional with defaults
-    max_age: int = 0  # Maximum age of any message in nanoseconds (0 for unlimited)
-    max_bytes: int = -1  # Maximum size in bytes (-1 for unlimited)
-    max_consumers: int = -1  # Maximum number of consumers (-1 for unlimited)
-    max_msgs: int = -1  # Maximum number of messages (-1 for unlimited)
+    # Required fields with defaults
     num_replicas: int = 1  # Number of replicas to keep for each message
     retention: Literal["limits", "interest",
                        "workqueue"] = "limits"  # How messages are retained
     storage: Literal["file", "memory"] = "file"  # Storage backend to use
+
+    # Optional limit fields (None means unlimited)
+    max_age: int | None = None  # Maximum age of any message in nanoseconds (None for unlimited)
+    max_bytes: int | None = None  # Maximum size in bytes (None for unlimited)
+    max_consumers: int | None = None  # Maximum number of consumers (None for unlimited)
+    max_msgs: int | None = None  # Maximum number of messages (None for unlimited)
 
     allow_direct: bool | None = None  # Allow direct access to get messages
     allow_msg_ttl: bool | None = None  # Enable per-message TTL using headers
@@ -418,10 +420,19 @@ class StreamConfig:
     @classmethod
     def from_response(cls, config: api.StreamConfig) -> StreamConfig:
         """Create a StreamConfig from an API response"""
+        # Convert API values to None for unlimited (-1 or 0)
         max_age = config.get("max_age", 0)
+        max_age = None if max_age == 0 else max_age
+
         max_bytes = config.get("max_bytes", -1)
+        max_bytes = None if max_bytes == -1 else max_bytes
+
         max_consumers = config.get("max_consumers", -1)
+        max_consumers = None if max_consumers == -1 else max_consumers
+
         max_msgs = config.get("max_msgs", -1)
+        max_msgs = None if max_msgs == -1 else max_msgs
+
         num_replicas = config.get("num_replicas", 1)
         retention = config.get("retention", "limits")
         storage = config.get("storage", "file")
@@ -510,10 +521,10 @@ class StreamConfig:
     def to_request(self) -> api.StreamConfig:
         """Convert StreamConfig to an API request dictionary."""
         result: api.StreamConfig = {
-            "max_age": self.max_age,
-            "max_bytes": self.max_bytes,
-            "max_consumers": self.max_consumers,
-            "max_msgs": self.max_msgs,
+            "max_age": self.max_age if self.max_age is not None else 0,
+            "max_bytes": self.max_bytes if self.max_bytes is not None else -1,
+            "max_consumers": self.max_consumers if self.max_consumers is not None else -1,
+            "max_msgs": self.max_msgs if self.max_msgs is not None else -1,
             "num_replicas": self.num_replicas,
             "retention": self.retention,
             "storage": self.storage,
