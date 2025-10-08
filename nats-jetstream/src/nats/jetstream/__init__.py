@@ -445,13 +445,13 @@ class JetStream:
         stream = await self.get_stream(stream_name)
 
         # Prepare consumer configuration
-        consumer_config = {}
+        consumer_config = {"name": name}
         if durable_name:
             consumer_config["durable_name"] = durable_name
         consumer_config.update(config)
 
-        # Create the consumer via the stream
-        return await stream.create_consumer(name, **consumer_config)
+        # Create the consumer via the stream (using keyword arguments)
+        return await stream.create_consumer(**consumer_config)
 
     async def get_consumer(
         self, stream_name: str, consumer_name: str

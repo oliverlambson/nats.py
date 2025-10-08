@@ -494,7 +494,7 @@ async def test_update_consumer(jetstream: JetStream):
     updated_consumer = await stream.update_consumer(
         "test_consumer", max_deliver=20
     )
-    assert updated_consumer.info.config["max_deliver"] == 20
+    assert updated_consumer.info.config.max_deliver == 20
 
 
 @pytest.mark.asyncio

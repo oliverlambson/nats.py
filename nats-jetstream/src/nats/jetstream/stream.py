@@ -12,10 +12,11 @@ from typing import (
     AsyncIterator,
     Literal,
     Protocol,
+    overload,
     runtime_checkable,
 )
 
-from .consumer import Consumer, ConsumerInfo
+from .consumer import Consumer, ConsumerConfig, ConsumerInfo
 from .consumer.pull import PullConsumer
 
 CONSUMER_ACTION_CREATE = "create"
@@ -1338,18 +1339,28 @@ class Stream:
         consumer_info = ConsumerInfo.from_response(response)
 
         # Check if this is a push consumer (has deliver_subject)
-        if consumer_info.config.get("deliver_subject"):
+        if consumer_info.config.deliver_subject:
             raise NotImplementedError("Push consumers are not supported yet")
 
         # Return new consumer instance using the actual name from the server response
         return PullConsumer(self, consumer_info)
 
-    async def create_consumer(self, name: str, **config) -> Consumer:
+    @overload
+    async def create_consumer(self, config: ConsumerConfig, /) -> Consumer:
+        """Create a consumer from a ConsumerConfig object."""
+        ...
+
+    @overload
+    async def create_consumer(self, *, name: str, **config) -> Consumer:
+        """Create a consumer with keyword arguments."""
+        ...
+
+    async def create_consumer(self, config: ConsumerConfig | None = None, /, **kwargs) -> Consumer:
         """Create a consumer for this stream.
 
         Args:
-            name: Name of the consumer
-            **config: Additional consumer configuration
+            config: A ConsumerConfig object to create the consumer from (positional-only)
+            **kwargs: Consumer configuration parameters as keyword arguments
 
         Returns:
             The created consumer
@@ -1359,11 +1370,20 @@ class Stream:
         if api is None:
             raise RuntimeError("JetStream does not have an API client")
 
+        if config is None:
+            # Create ConsumerConfig from kwargs
+            config = ConsumerConfig.from_kwargs(**kwargs)
+
+        # Validate consumer name
+        if config.name is None:
+            raise ValueError("ConsumerConfig must have a name")
+
+        # Convert ConsumerConfig to API request format and create consumer
+        config_dict = config.to_request()
+
         # Delegate to _upsert_consumer with "create" action
         return await self._upsert_consumer(
-            action=CONSUMER_ACTION_CREATE, **{
-                **config, "name": name
-            }
+            action=CONSUMER_ACTION_CREATE, **config_dict
         )
 
     async def get_consumer_info(self, consumer_name: str) -> ConsumerInfo:
@@ -1383,7 +1403,7 @@ class Stream:
         consumer_info = await self.get_consumer_info(consumer_name)
 
         # Check if this is a push consumer (has deliver_subject)
-        if consumer_info.config.get("deliver_subject"):
+        if consumer_info.config.deliver_subject:
             raise NotImplementedError("Push consumers are not supported yet")
 
         # Return new consumer instance
