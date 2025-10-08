@@ -34,8 +34,13 @@ if TYPE_CHECKING:
 
 @dataclass
 class LostStreamData:
+    """Records messages that were damaged and unrecoverable."""
+
     msgs: list[int] | None = None
+    """The messages that were lost."""
+
     bytes: int | None = None
+    """The number of bytes that were lost."""
 
     @classmethod
     def from_response(cls, data: api.LostStreamData) -> LostStreamData:
@@ -47,8 +52,13 @@ class LostStreamData:
 
 @dataclass
 class ExternalStreamSource:
+    """Configuration referencing a stream source in another account or JetStream domain."""
+
     api: str
+    """The subject prefix that imports the other account/domain $JS.API.CONSUMER.> subjects."""
+
     deliver: str | None = None
+    """The delivery subject to use for the push consumer."""
 
     @classmethod
     def from_response(cls, data: api.ExternalStreamSource) -> ExternalStreamSource:
@@ -70,8 +80,13 @@ class ExternalStreamSource:
 
 @dataclass
 class SubjectTransform:
+    """Subject transform to apply to matching messages going into the stream."""
+
     src: str
+    """The subject transform source."""
+
     dest: str
+    """The subject transform destination."""
 
     @classmethod
     def from_response(cls, data: api.SubjectTransform) -> SubjectTransform:
@@ -91,12 +106,25 @@ class SubjectTransform:
 
 @dataclass
 class StreamSource:
+    """Defines a source where streams should be replicated from."""
+
     name: str
+    """Stream name."""
+
     opt_start_seq: int | None = None
+    """Sequence to start replicating from."""
+
     opt_start_time: int | None = None
+    """Time stamp to start replicating from."""
+
     filter_subject: str | None = None
+    """Replicate only a subset of messages based on filter."""
+
     external: ExternalStreamSource | None = None
+    """Configuration referencing a stream source in another account or JetStream domain."""
+
     subject_transforms: Any | None = None
+    """The subject filtering sources and associated destination transforms."""
 
     @classmethod
     def from_response(cls, data: api.StreamSource) -> StreamSource:
@@ -137,13 +165,26 @@ class StreamSource:
 
 @dataclass
 class StreamSourceInfo:
+    """Information about an upstream stream source in a mirror."""
+
     name: str
+    """The name of the Stream being replicated."""
+
     lag: int
+    """How many messages behind the mirror operation is."""
+
     active: int
+    """When last the mirror had activity, in nanoseconds. Value will be -1 when there has been no activity."""
+
     filter_subject: str | None = None
+    """The subject filter to apply to the messages."""
+
     external: ExternalStreamSource | None = None
+
     error: dict[str, Any] | None = None
+
     subject_transforms: Any | None = None
+    """The subject filtering sources and associated destination transforms."""
 
     @classmethod
     def from_response(cls, data: api.StreamSourceInfo) -> StreamSourceInfo:
@@ -171,8 +212,13 @@ class StreamSourceInfo:
 
 @dataclass
 class Placement:
+    """Placement requirements for a stream or asset leader."""
+
     cluster: str | None = None
+    """The desired cluster name."""
+
     tags: list[str] | None = None
+    """Tags required on servers hosting this stream or leader."""
 
     @classmethod
     def from_response(cls, data: api.Placement) -> Placement:
@@ -196,9 +242,16 @@ class Placement:
 
 @dataclass
 class Republish:
+    """Rules for republishing messages from a stream with subject mapping onto new subjects for partitioning and more."""
+
     src: str
+    """The source subject to republish."""
+
     dest: str
+    """The destination to publish to."""
+
     headers_only: bool | None = None
+    """Only send message headers, no bodies."""
 
     @classmethod
     def from_response(cls, data: api.Republish) -> Republish:
@@ -222,8 +275,13 @@ class Republish:
 
 @dataclass
 class StreamConsumerLimits:
+    """Limits for consumers of this stream."""
+
     inactive_threshold: int | None = None
+    """Maximum value for inactive_threshold for consumers of this stream. Acts as a default when consumers do not set this value."""
+
     max_ack_pending: int | None = None
+    """Maximum value for max_ack_pending for consumers of this stream. Acts as a default when consumers do not set this value."""
 
     @classmethod
     def from_response(cls, data: api.StreamConsumerLimits) -> StreamConsumerLimits:
@@ -247,12 +305,25 @@ class StreamConsumerLimits:
 
 @dataclass
 class PeerInfo:
+    """Information about a peer in the cluster."""
+
     name: str
+    """The server name of the peer."""
+
     current: bool
+    """Indicates if the server is up to date and synchronised."""
+
     active: float
+    """Nanoseconds since this peer was last seen."""
+
     lag: int | None = None
+    """How many uncommitted operations this peer is behind the leader."""
+
     offline: bool | None = None
+    """Indicates the node is considered offline by the group."""
+
     observer: bool | None = None
+    """Indicates if the server is running as an observer only."""
 
     @classmethod
     def from_response(cls, data: api.PeerInfo) -> PeerInfo:
@@ -275,10 +346,19 @@ class PeerInfo:
 
 @dataclass
 class ClusterInfo:
+    """Information about the cluster and RAFT group managing an asset."""
+
     name: str | None = None
+    """The cluster name."""
+
     leader: str | None = None
+    """The server name of the RAFT leader."""
+
     replicas: list[PeerInfo] | None = None
+    """The members of the RAFT cluster."""
+
     raft_group: str | None = None
+    """In clustered environments the name of the Raft group managing the asset."""
 
     @classmethod
     def from_response(cls, data: api.ClusterInfo) -> ClusterInfo:
@@ -300,15 +380,33 @@ class ClusterInfo:
 
 @dataclass
 class StreamState:
+    """Current state information about a stream."""
+
     messages: int
+    """Number of messages stored in the Stream."""
+
     bytes: int
+    """Combined size of all messages in the Stream."""
+
     first_sequence: int
+    """Sequence number of the first message in the Stream."""
+
     last_sequence: int
+    """Sequence number of the last message in the Stream."""
+
     consumer_count: int
+    """Number of Consumers attached to the Stream."""
+
     deleted: list[int] | None = None
+    """IDs of messages that were deleted using the Message Delete API or Interest based streams removing messages out of order."""
+
     num_deleted: int | None = None
+    """The number of deleted messages."""
+
     lost: LostStreamData | None = None
+
     subjects: dict[str, int] | None = None
+    """Subjects and their message counts when a subjects_filter was set."""
 
     @classmethod
     def from_response(cls, data: api.StreamState) -> StreamState:
@@ -340,46 +438,108 @@ class StreamState:
 
 @dataclass
 class StreamConfig:
-    """Configuration for a JetStream stream"""
+    """Configuration for a JetStream stream."""
 
-    # Required fields with defaults
-    num_replicas: int = 1  # Number of replicas to keep for each message
-    retention: RetentionPolicy = "limits"  # How messages are retained
-    storage: StorageType = "file"  # Storage backend to use
+    num_replicas: int = 1
+    """How many replicas to keep for each message."""
 
-    # Optional limit fields (None means unlimited)
-    max_age: int | None = None  # Maximum age of any message in nanoseconds (None for unlimited)
-    max_bytes: int | None = None  # Maximum size in bytes (None for unlimited)
-    max_consumers: int | None = None  # Maximum number of consumers (None for unlimited)
-    max_msgs: int | None = None  # Maximum number of messages (None for unlimited)
+    retention: RetentionPolicy = "limits"
+    """How messages are retained in the Stream, once this is exceeded old messages are removed."""
 
-    allow_direct: bool | None = None  # Allow direct access to get messages
-    allow_msg_ttl: bool | None = None  # Enable per-message TTL using headers
-    allow_rollup_hdrs: bool | None = None  # Allow Nats-Rollup header usage
-    compression: CompressionType | None = None  # Compression algorithm
-    deny_delete: bool | None = None  # Restrict message deletion via API
-    deny_purge: bool | None = None  # Restrict stream purge via API
-    description: str | None = None  # Stream description
-    discard: DiscardPolicy | None = None  # Discard policy
-    discard_new_per_subject: bool | None = None  # Apply discard new per subject
-    duplicate_window: int | None = None  # Duplicate tracking window in ns
-    first_seq: int | None = None  # First message sequence number
-    max_msg_size: int | None = None  # Maximum message size (-1 for unlimited)
-    max_msgs_per_subject: int | None = None  # Per-subject message limit
-    metadata: dict[str, str] | None = None  # Additional metadata
-    mirror: StreamSource | None = None  # Mirror configuration
-    mirror_direct: bool | None = None  # Allow direct access for mirrors
-    name: str | None = None  # Stream name
-    no_ack: bool | None = None  # Disable message acknowledgment
-    placement: Placement | None = None  # Replica placement directives
-    republish: Republish | None = None  # Message republishing config
-    sealed: bool | None = None  # Prevent message deletion and updates
-    sources: list[StreamSource] | None = None  # Replication sources
-    subject_delete_marker_ttl: int | None = None  # TTL for delete markers
-    subject_transform: SubjectTransform | None = None  # Subject transform
-    subjects: list[str] | None = None  # Subjects to consume
-    template_owner: str | None = None  # Managing template name
-    consumer_limits: StreamConsumerLimits | None = None  # Consumer limits
+    storage: StorageType = "file"
+    """The storage backend to use for the Stream."""
+
+    max_age: int | None = None
+    """Maximum age of any message in the stream, expressed in nanoseconds. None for unlimited."""
+
+    max_bytes: int | None = None
+    """How big the Stream may be, when the combined stream size exceeds this old messages are removed. None for unlimited."""
+
+    max_consumers: int | None = None
+    """How many Consumers can be defined for a given Stream. None for unlimited."""
+
+    max_msgs: int | None = None
+    """How many messages may be in a Stream, oldest messages will be removed if the Stream exceeds this size. None for unlimited."""
+
+    allow_direct: bool | None = None
+    """Allow higher performance, direct access to get individual messages."""
+
+    allow_msg_ttl: bool | None = None
+    """Enables per-message TTL using headers."""
+
+    allow_rollup_hdrs: bool | None = None
+    """Allows the use of the Nats-Rollup header to replace all contents of a stream, or subject in a stream, with a single new message."""
+
+    compression: CompressionType | None = None
+    """Optional compression algorithm used for the Stream."""
+
+    deny_delete: bool | None = None
+    """Restricts the ability to delete messages from a stream via the API. Cannot be changed once set to true."""
+
+    deny_purge: bool | None = None
+    """Restricts the ability to purge messages from a stream via the API. Cannot be change once set to true."""
+
+    description: str | None = None
+    """A short description of the purpose of this stream."""
+
+    discard: DiscardPolicy | None = None
+    """When a Stream reach it's limits either old messages are deleted or new ones are denied."""
+
+    discard_new_per_subject: bool | None = None
+    """When discard policy is new and the stream is one with max messages per subject set, this will apply the new behavior to every subject. Essentially turning discard new from maximum number of subjects into maximum number of messages in a subject."""
+
+    duplicate_window: int | None = None
+    """The time window to track duplicate messages for, expressed in nanoseconds. 0 for default."""
+
+    first_seq: int | None = None
+    """A custom sequence to use for the first message in the stream."""
+
+    max_msg_size: int | None = None
+    """The largest message that will be accepted by the Stream. -1 for unlimited."""
+
+    max_msgs_per_subject: int | None = None
+    """For wildcard streams ensure that for every unique subject this many messages are kept - a per subject retention limit."""
+
+    metadata: dict[str, str] | None = None
+    """Additional metadata for the Stream."""
+
+    mirror: StreamSource | None = None
+    """Maintains a 1:1 mirror of another stream with name matching this property. When a mirror is configured subjects and sources must be empty."""
+
+    mirror_direct: bool | None = None
+    """Allow higher performance, direct access for mirrors as well."""
+
+    name: str | None = None
+    """A unique name for the Stream, empty for Stream Templates."""
+
+    no_ack: bool | None = None
+    """Disables acknowledging messages that are received by the Stream."""
+
+    placement: Placement | None = None
+    """Placement directives to consider when placing replicas of this stream, random placement when unset."""
+
+    republish: Republish | None = None
+
+    sealed: bool | None = None
+    """Sealed streams do not allow messages to be deleted via limits or API, sealed streams can not be unsealed via configuration update. Can only be set on already created streams via the Update API."""
+
+    sources: list[StreamSource] | None = None
+    """List of Stream names to replicate into this Stream."""
+
+    subject_delete_marker_ttl: int | None = None
+    """Enables and sets a duration for adding server markers for delete, purge and max age limits."""
+
+    subject_transform: SubjectTransform | None = None
+    """Subject transform to apply to matching messages."""
+
+    subjects: list[str] | None = None
+    """A list of subjects to consume, supports wildcards. Must be empty when a mirror is configured. May be empty when sources are configured."""
+
+    template_owner: str | None = None
+    """When the Stream is managed by a Stream Template this identifies the template that manages the Stream."""
+
+    consumer_limits: StreamConsumerLimits | None = None
+    """Limits of certain values that consumers can set, defaults for those who don't set these settings."""
 
     @classmethod
     def from_kwargs(cls, **kwargs) -> StreamConfig:
@@ -596,12 +756,23 @@ class StreamConfig:
 
 @dataclass
 class StreamInfo:
+    """Information about a JetStream stream."""
+
     config: StreamConfig
+    """The active configuration for the Stream."""
+
     created: int
+    """Timestamp when the stream was created."""
+
     state: StreamState
+    """Detail about the current State of the Stream."""
+
     cluster: ClusterInfo | None = None
+
     mirror: StreamSourceInfo | None = None
+
     sources: list[StreamSourceInfo] | None = None
+    """Streams being sourced into this Stream."""
 
     @classmethod
     def from_response(cls, data: api.StreamInfo) -> StreamInfo:
