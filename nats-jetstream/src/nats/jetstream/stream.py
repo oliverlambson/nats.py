@@ -814,7 +814,7 @@ class Stream:
 
         await api.stream_msg_delete(self._name, seq=sequence, no_erase=False)
 
-    async def upsert_consumer(
+    async def _upsert_consumer(
         self,
         action: str = CONSUMER_ACTION_CREATE_OR_UPDATE,
         **config
@@ -877,8 +877,8 @@ class Stream:
         if api is None:
             raise RuntimeError("JetStream does not have an API client")
 
-        # Delegate to upsert_consumer with "create" action
-        return await self.upsert_consumer(
+        # Delegate to _upsert_consumer with "create" action
+        return await self._upsert_consumer(
             action=CONSUMER_ACTION_CREATE, **{
                 **config, "name": name
             }
@@ -928,6 +928,6 @@ class Stream:
         Returns:
             The updated consumer
         """
-        return await self.upsert_consumer(
+        return await self._upsert_consumer(
             action=CONSUMER_ACTION_UPDATE, name=consumer_name, **config
         )
