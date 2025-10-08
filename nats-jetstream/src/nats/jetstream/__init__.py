@@ -32,9 +32,12 @@ class APIStats:
 
     @classmethod
     def from_response(cls, data: api.ApiStats) -> APIStats:
+        total = data["total"]
+        errors = data["errors"]
+
         return cls(
-            total=data["total"],
-            errors=data["errors"],
+            total=total,
+            errors=errors,
         )
 
 
