@@ -213,39 +213,7 @@ def parse_headers(data: bytes) -> tuple[dict[str, list[str]], str | None, str | 
     return headers, status_code, status_description
 
 
-def parse_info(json_data: str) -> ServerInfo:
-    """Parse INFO JSON into ServerInfo.
 
-    Args:
-        json_data: INFO message JSON string
-
-    Returns:
-        Parsed ServerInfo object
-
-    Raises:
-        ParseError: If JSON is invalid
-    """
-    try:
-        data = json.loads(json_data)
-        return ServerInfo(data)
-    except (json.JSONDecodeError, TypeError) as e:
-        msg = f"Invalid INFO JSON: {e}"
-        raise ParseError(msg) from e
-
-
-def parse_err(text: str) -> str:
-    """Parse ERR message.
-
-    Args:
-        text: Error message text
-
-    Returns:
-        Cleaned error message
-    """
-    # Remove quotes if present
-    if text.startswith("'") and text.endswith("'"):
-        text = text[1:-1]
-    return text
 
 
 async def parse_msg(reader: Reader, args: list[bytes]) -> Msg:
