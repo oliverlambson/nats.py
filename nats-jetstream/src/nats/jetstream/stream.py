@@ -103,6 +103,40 @@ class StreamSource:
 
 
 @dataclass
+class StreamSourceInfo:
+    name: str
+    lag: int
+    active: int
+    filter_subject: str | None = None
+    external: ExternalStreamSource | None = None
+    error: dict[str, Any] | None = None
+    subject_transforms: Any | None = None
+
+    @classmethod
+    def from_response(cls, data: api.StreamSourceInfo) -> StreamSourceInfo:
+        name = data["name"]
+        lag = data["lag"]
+        active = data["active"]
+        filter_subject = data.get("filter_subject")
+        subject_transforms = data.get("subject_transforms")
+        error = data.get("error")
+
+        external = None
+        if data.get("external"):
+            external = ExternalStreamSource.from_response(data["external"])
+
+        return cls(
+            name=name,
+            lag=lag,
+            active=active,
+            filter_subject=filter_subject,
+            external=external,
+            error=error,
+            subject_transforms=subject_transforms,
+        )
+
+
+@dataclass
 class PeerInfo:
     name: str
     current: bool
@@ -325,8 +359,8 @@ class StreamInfo:
     created: int
     state: StreamState
     cluster: ClusterInfo | None = None
-    mirror: dict[str, Any] | None = None
-    sources: list[dict[str, Any]] | None = None
+    mirror: StreamSourceInfo | None = None
+    sources: list[StreamSourceInfo] | None = None
 
     @classmethod
     def from_response(cls, data: api.StreamInfo) -> StreamInfo:
@@ -334,8 +368,14 @@ class StreamInfo:
         created = data["created"]
         state = StreamState.from_response(data["state"])
         cluster = ClusterInfo.from_response(data["cluster"]) if data.get("cluster") else None
-        mirror = data.get("mirror")
-        sources = data.get("sources")
+
+        mirror = None
+        if data.get("mirror"):
+            mirror = StreamSourceInfo.from_response(data["mirror"])
+
+        sources = None
+        if data.get("sources"):
+            sources = [StreamSourceInfo.from_response(s) for s in data["sources"]]
 
         return cls(
             config=config,

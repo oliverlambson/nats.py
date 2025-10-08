@@ -9,10 +9,17 @@ from typing import TYPE_CHECKING, AsyncIterator
 
 from nats.jetstream.consumer import Consumer, ConsumerInfo
 from nats.jetstream.stream import (
+    ClusterInfo,
+    ExternalStreamSource,
+    PeerInfo,
     Stream,
+    StreamConfig,
     StreamInfo,
     StreamMessage,
+    StreamSource,
+    StreamSourceInfo,
     StreamState,
+    SubjectTransform,
 )
 
 from .api import client
@@ -605,12 +612,19 @@ __all__ = [
     "Consumer",
     "ConsumerInfo",
     "Stream",
+    "StreamConfig",
     "StreamInfo",
+    "StreamMessage",
+    "StreamSource",
+    "StreamSourceInfo",
     "StreamState",
+    "ClusterInfo",
+    "PeerInfo",
+    "ExternalStreamSource",
+    "SubjectTransform",
     "AccountInfo",
     "AccountLimits",
     "Tier",
     "APIStats",
     "PublishAck",
-    "StreamMessage",
 ]

@@ -423,7 +423,7 @@ async def test_create_mirror_stream(jetstream: JetStream):
     mirror_info = await mirror.get_info()
     assert mirror_info.state.messages == 1
     assert mirror_info.mirror is not None
-    assert mirror_info.mirror["name"] == "source"
+    assert mirror_info.mirror.name == "source"
 
 
 @pytest.mark.asyncio

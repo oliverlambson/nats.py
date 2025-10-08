@@ -357,7 +357,7 @@ async def test_create_mirror_stream(jetstream: JetStream):
     )
 
     # Check mirror configuration
-    assert mirror.info.config.mirror["name"] == "source"
+    assert mirror.info.config.mirror.name == "source"
 
 
 @pytest.mark.asyncio
