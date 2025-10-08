@@ -10,14 +10,10 @@ from typing import TYPE_CHECKING, AsyncIterator, overload
 from nats.jetstream.consumer import Consumer, ConsumerInfo
 from nats.jetstream.stream import (
     ClusterInfo,
-    CompressionType,
-    DiscardPolicy,
     ExternalStreamSource,
     PeerInfo,
     Placement,
     Republish,
-    RetentionPolicy,
-    StorageType,
     Stream,
     StreamConfig,
     StreamConsumerLimits,
@@ -28,8 +24,6 @@ from nats.jetstream.stream import (
     StreamState,
     SubjectTransform,
 )
-
-from .api import client
 
 if TYPE_CHECKING:
     from nats.client import Client
