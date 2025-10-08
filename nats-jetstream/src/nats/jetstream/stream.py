@@ -153,6 +153,25 @@ class Placement:
 
 
 @dataclass
+class Republish:
+    src: str
+    dest: str
+    headers_only: bool | None = None
+
+    @classmethod
+    def from_response(cls, data: api.Republish) -> Republish:
+        src = data["src"]
+        dest = data["dest"]
+        headers_only = data.get("headers_only")
+
+        return cls(
+            src=src,
+            dest=dest,
+            headers_only=headers_only,
+        )
+
+
+@dataclass
 class PeerInfo:
     name: str
     current: bool
@@ -278,7 +297,7 @@ class StreamConfig:
     name: str | None = None  # Stream name
     no_ack: bool | None = None  # Disable message acknowledgment
     placement: Placement | None = None  # Replica placement directives
-    republish: api.Republish | None = None  # Message republishing config
+    republish: Republish | None = None  # Message republishing config
     sealed: bool | None = None  # Prevent message deletion and updates
     sources: list[StreamSource] | None = None  # Replication sources
     subject_delete_marker_ttl: int | None = None  # TTL for delete markers
@@ -315,7 +334,6 @@ class StreamConfig:
         mirror_direct = config.get("mirror_direct")
         name = config.get("name")
         no_ack = config.get("no_ack")
-        republish = config.get("republish")
         sealed = config.get("sealed")
         subjects = config.get("subjects")
         template_owner = config.get("template_owner")
@@ -335,6 +353,10 @@ class StreamConfig:
         placement = None
         if config.get("placement"):
             placement = Placement.from_response(config["placement"])
+
+        republish = None
+        if config.get("republish"):
+            republish = Republish.from_response(config["republish"])
 
         return cls(
             max_age=max_age,
