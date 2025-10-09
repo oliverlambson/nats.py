@@ -751,9 +751,6 @@ class Client(AbstractAsyncContextManager["Client"]):
     async def _subscribe(self, subject: str, sid: str, queue_group: str | None) -> asyncio.Queue:
         """Create a subscription on the server and return the message queue.
 
-        This method is deprecated and maintained for backward compatibility.
-        Use subscribe() instead.
-
         Args:
             subject: The subject to subscribe to
             sid: The subscription ID
