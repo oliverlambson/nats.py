@@ -56,7 +56,7 @@ class Error(Exception):
         self.description = description
 
     @classmethod
-    def from_response(cls, error: ApiError, *, strict: bool = True) -> Error:
+    def from_response(cls, error: ApiError, *, strict: bool = False) -> Error:
         description = error.pop("description", "Unknown error")
         code = error.pop("code", None)
         err_code = error.pop("err_code", None)

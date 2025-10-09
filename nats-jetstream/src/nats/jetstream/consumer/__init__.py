@@ -131,7 +131,7 @@ class ConsumerConfig:
     """Sets the percentage of acknowledgments that should be sampled for observability."""
 
     @classmethod
-    def from_response(cls, config: api.ConsumerConfig, *, strict: bool = True) -> ConsumerConfig:
+    def from_response(cls, config: api.ConsumerConfig, *, strict: bool = False) -> ConsumerConfig:
         """Create a ConsumerConfig from an API response."""
         # Pop fields as we consume them to detect unconsumed ones at the end
         ack_policy = config.pop("ack_policy", "none")
@@ -316,7 +316,7 @@ class ConsumerInfo:
     """The server time the consumer info was created."""
 
     @classmethod
-    def from_response(cls, data: api.ConsumerInfo, *, strict: bool = True) -> ConsumerInfo:
+    def from_response(cls, data: api.ConsumerInfo, *, strict: bool = False) -> ConsumerInfo:
         stream_name = data.pop("stream_name")
         name = data.pop("name")
         config_data = data.pop("config")

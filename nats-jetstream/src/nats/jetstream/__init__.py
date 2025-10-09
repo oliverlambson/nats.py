@@ -41,7 +41,7 @@ class APIStats:
     """The API level."""
 
     @classmethod
-    def from_response(cls, data: api.ApiStats, *, strict: bool = True) -> APIStats:
+    def from_response(cls, data: api.ApiStats, *, strict: bool = False) -> APIStats:
         total = data.pop("total")
         errors = data.pop("errors")
         level = data.pop("level", None)
@@ -71,7 +71,7 @@ class AccountLimits:
     max_bytes_required: bool
 
     @classmethod
-    def from_response(cls, data: api.AccountLimits, *, strict: bool = True) -> AccountLimits:
+    def from_response(cls, data: api.AccountLimits, *, strict: bool = False) -> AccountLimits:
         max_memory = data.pop("max_memory")
         max_storage = data.pop("max_storage")
         max_streams = data.pop("max_streams")
@@ -108,7 +108,7 @@ class Tier:
     limits: AccountLimits
 
     @classmethod
-    def from_response(cls, data: api.Tier, *, strict: bool = True) -> Tier:
+    def from_response(cls, data: api.Tier, *, strict: bool = False) -> Tier:
         memory = data.pop("memory")
         storage = data.pop("storage")
         streams = data.pop("streams")
@@ -146,7 +146,7 @@ class AccountInfo:
     """Reserved storage for the account."""
 
     @classmethod
-    def from_response(cls, data: api.AccountInfo, *, strict: bool = True) -> AccountInfo:
+    def from_response(cls, data: api.AccountInfo, *, strict: bool = False) -> AccountInfo:
         memory = data.pop("memory")
         storage = data.pop("storage")
         streams = data.pop("streams")
@@ -194,7 +194,7 @@ class PublishAck:
     duplicate: bool = False
 
     @classmethod
-    def from_response(cls, data: api.PublishAck, *, strict: bool = True) -> PublishAck:
+    def from_response(cls, data: api.PublishAck, *, strict: bool = False) -> PublishAck:
         stream = data.pop("stream")
         sequence = data.pop("seq", None)
         domain = data.pop("domain", None)

@@ -44,7 +44,7 @@ class LostStreamData:
     """The number of bytes that were lost."""
 
     @classmethod
-    def from_response(cls, data: api.LostStreamData, *, strict: bool = True) -> LostStreamData:
+    def from_response(cls, data: api.LostStreamData, *, strict: bool = False) -> LostStreamData:
         msgs = data.pop("msgs", None)
         bytes_val = data.pop("bytes", None)
 
@@ -69,7 +69,7 @@ class ExternalStreamSource:
     """The delivery subject to use for the push consumer."""
 
     @classmethod
-    def from_response(cls, data: api.ExternalStreamSource, *, strict: bool = True) -> ExternalStreamSource:
+    def from_response(cls, data: api.ExternalStreamSource, *, strict: bool = False) -> ExternalStreamSource:
         api_prefix = data.pop("api")
         deliver = data.pop("deliver", None)
 
@@ -101,7 +101,7 @@ class SubjectTransform:
     """The subject transform destination."""
 
     @classmethod
-    def from_response(cls, data: api.SubjectTransform, *, strict: bool = True) -> SubjectTransform:
+    def from_response(cls, data: api.SubjectTransform, *, strict: bool = False) -> SubjectTransform:
         src = data.pop("src")
         dest = data.pop("dest")
 
@@ -143,7 +143,7 @@ class StreamSource:
     """The subject filtering sources and associated destination transforms."""
 
     @classmethod
-    def from_response(cls, data: api.StreamSource, *, strict: bool = True) -> StreamSource:
+    def from_response(cls, data: api.StreamSource, *, strict: bool = False) -> StreamSource:
         name = data.pop("name")
         opt_start_seq = data.pop("opt_start_seq", None)
         opt_start_time = data.pop("opt_start_time", None)
@@ -208,7 +208,7 @@ class StreamSourceInfo:
     """The subject filtering sources and associated destination transforms."""
 
     @classmethod
-    def from_response(cls, data: api.StreamSourceInfo, *, strict: bool = True) -> StreamSourceInfo:
+    def from_response(cls, data: api.StreamSourceInfo, *, strict: bool = False) -> StreamSourceInfo:
         name = data.pop("name")
         lag = data.pop("lag")
         active = data.pop("active")
@@ -247,7 +247,7 @@ class Placement:
     """Tags required on servers hosting this stream or leader."""
 
     @classmethod
-    def from_response(cls, data: api.Placement, *, strict: bool = True) -> Placement:
+    def from_response(cls, data: api.Placement, *, strict: bool = False) -> Placement:
         cluster = data.pop("cluster", None)
         tags = data.pop("tags", None)
 
@@ -284,7 +284,7 @@ class Republish:
     """Only send message headers, no bodies."""
 
     @classmethod
-    def from_response(cls, data: api.Republish, *, strict: bool = True) -> Republish:
+    def from_response(cls, data: api.Republish, *, strict: bool = False) -> Republish:
         src = data.pop("src")
         dest = data.pop("dest")
         headers_only = data.pop("headers_only", None)
@@ -318,7 +318,7 @@ class StreamConsumerLimits:
     """Maximum value for max_ack_pending for consumers of this stream. Acts as a default when consumers do not set this value."""
 
     @classmethod
-    def from_response(cls, data: api.StreamConsumerLimits, *, strict: bool = True) -> StreamConsumerLimits:
+    def from_response(cls, data: api.StreamConsumerLimits, *, strict: bool = False) -> StreamConsumerLimits:
         inactive_threshold = data.pop("inactive_threshold", None)
         max_ack_pending = data.pop("max_ack_pending", None)
 
@@ -364,7 +364,7 @@ class PeerInfo:
     """Indicates if the server is running as an observer only."""
 
     @classmethod
-    def from_response(cls, data: api.PeerInfo, *, strict: bool = True) -> PeerInfo:
+    def from_response(cls, data: api.PeerInfo, *, strict: bool = False) -> PeerInfo:
         name = data.pop("name")
         current = data.pop("current")
         active = data.pop("active")
@@ -403,7 +403,7 @@ class ClusterInfo:
     """In clustered environments the name of the Raft group managing the asset."""
 
     @classmethod
-    def from_response(cls, data: api.ClusterInfo, *, strict: bool = True) -> ClusterInfo:
+    def from_response(cls, data: api.ClusterInfo, *, strict: bool = False) -> ClusterInfo:
         name = data.pop("name", None)
         leader = data.pop("leader", None)
         raft_group = data.pop("raft_group", None)
@@ -465,7 +465,7 @@ class StreamState:
     """The number of unique subjects in the Stream."""
 
     @classmethod
-    def from_response(cls, data: api.StreamState, *, strict: bool = True) -> StreamState:
+    def from_response(cls, data: api.StreamState, *, strict: bool = False) -> StreamState:
         messages = data.pop("messages")
         bytes_val = data.pop("bytes")
         first_sequence = data.pop("first_seq")
@@ -650,7 +650,7 @@ class StreamConfig:
         return cls(**kwargs)
 
     @classmethod
-    def from_response(cls, config: api.StreamConfig, *, strict: bool = True) -> StreamConfig:
+    def from_response(cls, config: api.StreamConfig, *, strict: bool = False) -> StreamConfig:
         """Create a StreamConfig from an API response"""
         # Pop fields as we consume them to detect unconsumed ones at the end
         # No need to copy - config comes from JSON and won't be reused
@@ -862,7 +862,7 @@ class StreamInfo:
     """The server time the stream info was created."""
 
     @classmethod
-    def from_response(cls, data: api.StreamInfo, *, strict: bool = True) -> StreamInfo:
+    def from_response(cls, data: api.StreamInfo, *, strict: bool = False) -> StreamInfo:
         config = StreamConfig.from_response(data.pop("config"), strict=strict)
         created = data.pop("created")
         state = StreamState.from_response(data.pop("state"), strict=strict)
