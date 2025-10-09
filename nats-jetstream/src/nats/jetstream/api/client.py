@@ -82,9 +82,9 @@ def is_error_response(data: Any) -> TypeGuard[ErrorResponse]:
 
 def check_response[ResponseT](
     data: Any, expected_type: type[ResponseT]
-) -> tuple[bool, set[str] | None, set[str] | None]:
+) -> tuple[bool, set[str], set[str]]:
     if not isinstance(data, dict):
-        return False, None, None
+        return False, set(), set()
 
     # Get expected keys from TypedDict annotations
     expected_keys = set(expected_type.__annotations__.keys())
@@ -100,15 +100,25 @@ def check_response[ResponseT](
         required_keys = expected_type.__required_keys__
         missing_keys = missing_keys & required_keys
 
-    is_valid = len(missing_keys) == 0
+    is_valid = len(missing_keys) == 0 and len(unknown_keys) == 0
 
-    return is_valid, unknown_keys if unknown_keys else None, missing_keys if missing_keys else None
+    return is_valid, unknown_keys, missing_keys
 
 
 class Client:
-    def __init__(self, client: NatsClient, prefix: str = "$JS.API") -> None:
+    def __init__(
+        self,
+        client: NatsClient,
+        prefix: str = "$JS.API",
+        validate_response: bool = False,
+        raise_on_missing_keys: bool = False,
+        raise_on_unknown_keys: bool = False,
+    ) -> None:
         self._client = client
         self._prefix = prefix
+        self._validate_response = validate_response
+        self._raise_on_missing_keys = raise_on_missing_keys
+        self._raise_on_unknown_keys = raise_on_unknown_keys
 
     async def account_info(self) -> AccountInfoResponse:
         return await self.request_json(
@@ -314,14 +324,22 @@ class Client:
             if raise_on_error and is_error_response(data):
                 raise Error.from_response(data["error"])
 
-            is_valid, unknown_keys, missing_keys = check_response(data, response_type)
-            if not is_valid:
-                if missing_keys:
-                    logger.warning("[%s] Missing keys in response: %s", request_id, missing_keys)
+            if self._validate_response:
+                is_valid, unknown_keys, missing_keys = check_response(data, response_type)
+                if not is_valid:
+                    if missing_keys:
+                        msg = f"Missing required keys in response: {missing_keys}"
+                        if self._raise_on_missing_keys:
+                            raise ValueError(msg)
+                        logger.warning("[%s] %s", request_id, msg)
+                    if not missing_keys and not unknown_keys:
+                        logger.warning("[%s] Expected %s, got %s", request_id, response_type.__name__, type(data).__name__)
+
                 if unknown_keys:
-                    logger.warning("[%s] Unknown keys in response: %s", request_id, unknown_keys)
-                if not missing_keys and not unknown_keys:
-                    logger.warning("[%s] Expected %s, got %s", request_id, response_type.__name__, type(data).__name__)
+                    msg = f"Unknown keys in response: {unknown_keys}"
+                    if self._raise_on_unknown_keys:
+                        raise ValueError(msg)
+                    logger.warning("[%s] %s", request_id, msg)
 
             return cast(ResponseT, data)
         except json.JSONDecodeError as e:

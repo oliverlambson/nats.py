@@ -32,8 +32,8 @@ def test_check_response_valid_exact_match():
     is_valid, unknown, missing = check_response(data, RequiredFieldsOnly)
 
     assert is_valid is True
-    assert unknown is None
-    assert missing is None
+    assert unknown == set()
+    assert missing == set()
 
 
 def test_check_response_valid_with_extra_keys():
@@ -41,9 +41,9 @@ def test_check_response_valid_with_extra_keys():
     data = {"name": "test", "value": 42, "extra_key": "unexpected"}
     is_valid, unknown, missing = check_response(data, RequiredFieldsOnly)
 
-    assert is_valid is True
+    assert is_valid is False
     assert unknown == {"extra_key"}
-    assert missing is None
+    assert missing == set()
 
 
 def test_check_response_missing_required_keys():
@@ -52,7 +52,7 @@ def test_check_response_missing_required_keys():
     is_valid, unknown, missing = check_response(data, RequiredFieldsOnly)
 
     assert is_valid is False
-    assert unknown is None
+    assert unknown == set()
     assert missing == {"value"}
 
 
@@ -62,7 +62,7 @@ def test_check_response_missing_all_required_keys():
     is_valid, unknown, missing = check_response(data, RequiredFieldsOnly)
 
     assert is_valid is False
-    assert unknown is None
+    assert unknown == set()
     assert missing == {"name", "value"}
 
 
@@ -72,8 +72,8 @@ def test_check_response_mixed_required_optional_all_present():
     is_valid, unknown, missing = check_response(data, MixedFields)
 
     assert is_valid is True
-    assert unknown is None
-    assert missing is None
+    assert unknown == set()
+    assert missing == set()
 
 
 def test_check_response_mixed_required_optional_only_required():
@@ -82,8 +82,8 @@ def test_check_response_mixed_required_optional_only_required():
     is_valid, unknown, missing = check_response(data, MixedFields)
 
     assert is_valid is True
-    assert unknown is None
-    assert missing is None
+    assert unknown == set()
+    assert missing == set()
 
 
 def test_check_response_mixed_missing_required():
@@ -92,7 +92,7 @@ def test_check_response_mixed_missing_required():
     is_valid, unknown, missing = check_response(data, MixedFields)
 
     assert is_valid is False
-    assert unknown is None
+    assert unknown == set()
     assert missing == {"required_field"}
 
 
@@ -102,8 +102,8 @@ def test_check_response_all_optional_empty():
     is_valid, unknown, missing = check_response(data, AllOptionalFields)
 
     assert is_valid is True
-    assert unknown is None
-    assert missing is None
+    assert unknown == set()
+    assert missing == set()
 
 
 def test_check_response_all_optional_partial():
@@ -112,8 +112,8 @@ def test_check_response_all_optional_partial():
     is_valid, unknown, missing = check_response(data, AllOptionalFields)
 
     assert is_valid is True
-    assert unknown is None
-    assert missing is None
+    assert unknown == set()
+    assert missing == set()
 
 
 def test_check_response_all_optional_with_extra():
@@ -121,9 +121,9 @@ def test_check_response_all_optional_with_extra():
     data = {"optional_name": "test", "unknown_key": "value"}
     is_valid, unknown, missing = check_response(data, AllOptionalFields)
 
-    assert is_valid is True
+    assert is_valid is False
     assert unknown == {"unknown_key"}
-    assert missing is None
+    assert missing == set()
 
 
 def test_check_response_non_dict_data():
@@ -131,8 +131,8 @@ def test_check_response_non_dict_data():
     is_valid, unknown, missing = check_response("not a dict", RequiredFieldsOnly)
 
     assert is_valid is False
-    assert unknown is None
-    assert missing is None
+    assert unknown == set()
+    assert missing == set()
 
 
 def test_check_response_none_data():
@@ -140,8 +140,8 @@ def test_check_response_none_data():
     is_valid, unknown, missing = check_response(None, RequiredFieldsOnly)
 
     assert is_valid is False
-    assert unknown is None
-    assert missing is None
+    assert unknown == set()
+    assert missing == set()
 
 
 def test_check_response_list_data():
@@ -149,5 +149,5 @@ def test_check_response_list_data():
     is_valid, unknown, missing = check_response([], RequiredFieldsOnly)
 
     assert is_valid is False
-    assert unknown is None
-    assert missing is None
+    assert unknown == set()
+    assert missing == set()
