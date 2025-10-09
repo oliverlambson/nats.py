@@ -6,6 +6,10 @@ from __future__ import annotations
 class StatusError(Exception):
     """Base class for NATS status-related errors."""
 
+    status: str
+    description: str
+    subject: str | None
+
     def __init__(self, status: str, description: str, subject: str | None = None) -> None:
         """Initialize StatusError.
 
