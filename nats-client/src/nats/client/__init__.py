@@ -15,10 +15,10 @@ The primary entry point is the `connect()` function which returns a `Client` ins
 from __future__ import annotations
 
 try:
-    from importlib.metadata import version
+    from importlib.metadata import version, PackageNotFoundError
 
     __version__ = version("nats-client")
-except Exception:
+except (ImportError, PackageNotFoundError):
     __version__ = "unknown"
 
 import asyncio
