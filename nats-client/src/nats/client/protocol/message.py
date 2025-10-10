@@ -117,42 +117,6 @@ class ParseError(Exception):
     """Parser error when handling NATS protocol messages."""
 
 
-def parse_control_line(line: bytes) -> tuple[str, list[str]]:
-    """Parse a control line into operation and arguments.
-
-    Args:
-        line: Raw control line bytes
-
-    Returns:
-        Tuple of (operation, arguments)
-
-    Raises:
-        ParseError: If line is invalid or too long
-    """
-    if len(line) > MAX_CONTROL_LINE:
-        msg = f"Control line too long: {len(line)} > {MAX_CONTROL_LINE}"
-        raise ParseError(msg)
-
-    try:
-        parts = line.decode().split()
-        if not parts:
-            msg = "Empty control line"
-            raise ParseError(msg)
-
-        op = parts[0]
-
-        # Validate operation
-        if op not in ("MSG", "HMSG", "PING", "PONG", "INFO", "ERR"):
-            msg = f"Unknown operation: {op}"
-            raise ParseError(msg)
-
-        return op, parts[1:]
-
-    except UnicodeDecodeError as e:
-        msg = f"Invalid control line encoding: {e}"
-        raise ParseError(msg) from e
-
-
 def parse_headers(data: bytes) -> tuple[dict[str, list[str]], str | None, str | None]:
     """Parse header data into multi-value dictionary and status information.
 
@@ -407,50 +371,40 @@ async def parse(reader: Reader) -> Message | None:
     Raises:
         ParseError: If message format is invalid
     """
-    try:
-        # Read control line
-        control_line = await reader.readline()
-        if not control_line:
-            return None
+    # Read control line
+    control_line = await reader.readline()
+    if not control_line:
+        return None
 
-        control_line = control_line.rstrip()
+    control_line = control_line.rstrip()
 
-        # Check control line length
-        if len(control_line) > MAX_CONTROL_LINE:
-            msg = f"Control line too long: {len(control_line)} bytes (max {MAX_CONTROL_LINE})"
+    # Check control line length
+    if len(control_line) > MAX_CONTROL_LINE:
+        msg = f"Control line too long: {len(control_line)} bytes (max {MAX_CONTROL_LINE})"
+        raise ParseError(msg)
+
+    # Parse operation and arguments
+    parts = control_line.split(b" ")
+    op = parts[0]  # Keep as bytes
+    args = parts[1:]  # Keep as bytes
+
+    # Handle different operations (case-insensitive)
+    op = op.upper()
+
+    match op:
+        case b"MSG":
+            return await parse_msg(reader, args)
+        case b"HMSG":
+            return await parse_hmsg(reader, args)
+        case b"PING":
+            return await ping()
+        case b"PONG":
+            return await pong()
+        case b"INFO":
+            return await parse_info(args)
+        case b"ERR":
+            return await parse_err(args)
+        case _:
+            # Use repr for better error reporting with control characters
+            msg = f"Unknown operation: {op!r}"
             raise ParseError(msg)
-
-        # Parse operation and arguments
-        try:
-            parts = control_line.split(b" ")
-            op = parts[0]  # Keep as bytes
-            args = parts[1:]  # Keep as bytes
-
-        except Exception as e:
-            msg = f"Invalid control line: {e}"
-            raise ParseError(msg) from e
-
-        # Handle different operations (case-insensitive)
-        op = op.upper()
-
-        match op:
-            case b"MSG":
-                return await parse_msg(reader, args)
-            case b"HMSG":
-                return await parse_hmsg(reader, args)
-            case b"PING":
-                return await ping()
-            case b"PONG":
-                return await pong()
-            case b"INFO":
-                return await parse_info(args)
-            case b"ERR":
-                return await parse_err(args)
-            case _:
-                # Use repr for better error reporting with control characters
-                msg = f"Unknown operation: {op!r}"
-                raise ParseError(msg)
-
-    except ValueError as e:
-        msg = f"Invalid message format: {e}"
-        raise ParseError(msg) from e

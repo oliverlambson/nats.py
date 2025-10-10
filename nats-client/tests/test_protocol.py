@@ -15,62 +15,11 @@ from nats.client.protocol.command import (
 )
 from nats.client.protocol.message import (
     ParseError,
-    parse_control_line,
     parse_headers,
     parse_hmsg,
     parse_msg,
 )
 from nats.client.protocol.types import ConnectInfo
-
-
-def test_parse_control_line():
-    """Test parsing control lines."""
-    # Test valid MSG
-    op, args = parse_control_line(b"MSG foo.bar 1 42")
-    assert op == "MSG"
-    assert args == ["foo.bar", "1", "42"]
-
-    # Test valid MSG with reply
-    op, args = parse_control_line(b"MSG foo.bar 1 reply.to 42")
-    assert op == "MSG"
-    assert args == ["foo.bar", "1", "reply.to", "42"]
-
-    # Test valid HMSG
-    op, args = parse_control_line(b"HMSG foo.bar 1 reply.to 10 52")
-    assert op == "HMSG"
-    assert args == ["foo.bar", "1", "reply.to", "10", "52"]
-
-    # Test valid PING
-    op, args = parse_control_line(b"PING")
-    assert op == "PING"
-    assert not args
-
-    # Test valid PONG
-    op, args = parse_control_line(b"PONG")
-    assert op == "PONG"
-    assert not args
-
-    # Test valid INFO
-    op, args = parse_control_line(b'INFO {"server_id":"test"}')
-    assert op == "INFO"
-    assert args == ['{"server_id":"test"}']
-
-    # Test valid ERR
-    op, args = parse_control_line(b"ERR 'Unknown subject'")
-    assert op == "ERR"
-    assert args == ["'Unknown", "subject'"]
-
-    # Test invalid operation
-    with pytest.raises(ParseError, match="Unknown operation"):
-        parse_control_line(b"INVALID foo bar")
-
-    # Test empty line
-    with pytest.raises(ParseError, match="Empty control line"):
-        parse_control_line(b"")
-
-    # Test line too long
-    with pytest.raises(ParseError, match="Control line too long"):
-        parse_control_line(b"MSG " + b"x" * 4096)
 
 
 @pytest.mark.asyncio
@@ -286,3 +235,130 @@ def test_encode_pong():
     """Test encoding PONG command."""
     command = encode_pong()
     assert command == b"PONG\r\n"
+
+
+def test_parse_headers_unicode_error():
+    """Test parsing headers with invalid UTF-8."""
+    # Invalid UTF-8 in headers
+    with pytest.raises(ParseError, match="Invalid header encoding"):
+        parse_headers(b"NATS/1.0\r\n\xff\xfe\r\n\r\n")
+
+
+def test_parse_headers_missing_colon():
+    """Test parsing header line without colon."""
+    with pytest.raises(ParseError, match="Invalid header line"):
+        parse_headers(b"NATS/1.0\r\nInvalidHeaderLine\r\n\r\n")
+
+
+@pytest.mark.asyncio
+async def test_parse_info_missing_json():
+    """Test parsing INFO message without JSON data."""
+    from nats.client.protocol.message import parse_info
+
+    with pytest.raises(ParseError, match="INFO message missing JSON data"):
+        await parse_info([])
+
+
+@pytest.mark.asyncio
+async def test_parse_info_invalid_json():
+    """Test parsing INFO message with invalid JSON."""
+    from nats.client.protocol.message import parse_info
+
+    with pytest.raises(ParseError, match="Invalid INFO JSON"):
+        await parse_info([b"not-valid-json"])
+
+
+@pytest.mark.asyncio
+async def test_parse_err_missing_text():
+    """Test parsing ERR message without error text."""
+    from nats.client.protocol.message import parse_err
+
+    with pytest.raises(ParseError, match="ERR message missing error text"):
+        await parse_err([])
+
+
+@pytest.mark.asyncio
+async def test_parse_err_with_quotes():
+    """Test parsing ERR message with quoted text."""
+    from nats.client.protocol.message import parse_err
+
+    err = await parse_err([b"'Permission", b"Denied'"])
+    assert err.op == "ERR"
+    assert err.error == "Permission Denied"
+
+
+@pytest.mark.asyncio
+async def test_parse_err_without_quotes():
+    """Test parsing ERR message without quotes."""
+    from nats.client.protocol.message import parse_err
+
+    err = await parse_err([b"Unknown", b"Protocol", b"Error"])
+    assert err.op == "ERR"
+    assert err.error == "Unknown Protocol Error"
+
+
+@pytest.mark.asyncio
+async def test_parse_ping_message():
+    """Test parsing PING message through parse() function."""
+    from nats.client.protocol.message import parse
+
+    reader = asyncio.StreamReader()
+    reader.feed_data(b"PING\r\n")
+    reader.feed_eof()
+
+    msg = await parse(reader)
+    assert msg.op == "PING"
+
+
+@pytest.mark.asyncio
+async def test_parse_pong_message():
+    """Test parsing PONG message through parse() function."""
+    from nats.client.protocol.message import parse
+
+    reader = asyncio.StreamReader()
+    reader.feed_data(b"PONG\r\n")
+    reader.feed_eof()
+
+    msg = await parse(reader)
+    assert msg.op == "PONG"
+
+
+@pytest.mark.asyncio
+async def test_parse_unknown_operation():
+    """Test parsing unknown operation raises ParseError."""
+    from nats.client.protocol.message import parse
+
+    reader = asyncio.StreamReader()
+    reader.feed_data(b"UNKNOWN\r\n")
+    reader.feed_eof()
+
+    with pytest.raises(ParseError, match="Unknown operation"):
+        await parse(reader)
+
+
+@pytest.mark.asyncio
+async def test_parse_control_line_too_long():
+    """Test parsing control line that exceeds max length."""
+    from nats.client.protocol.message import parse
+
+    reader = asyncio.StreamReader()
+    # Create a control line longer than MAX_CONTROL_LINE (4096)
+    reader.feed_data(b"MSG " + b"x" * 4096 + b"\r\n")
+    reader.feed_eof()
+
+    with pytest.raises(ParseError, match="Control line too long"):
+        await parse(reader)
+
+
+@pytest.mark.asyncio
+async def test_parse_err_message():
+    """Test parsing ERR message through parse() function."""
+    from nats.client.protocol.message import parse
+
+    reader = asyncio.StreamReader()
+    reader.feed_data(b"ERR 'Unknown Protocol'\r\n")
+    reader.feed_eof()
+
+    msg = await parse(reader)
+    assert msg.op == "ERR"
+    assert msg.error == "Unknown Protocol"
