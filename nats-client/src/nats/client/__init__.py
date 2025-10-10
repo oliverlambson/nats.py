@@ -958,7 +958,7 @@ async def connect(
         url: Server URL
         timeout: Connection timeout in seconds
         allow_reconnect: Whether to automatically reconnect if the connection is lost
-        reconnect_attempts: Maximum number of reconnection attempts (0 for unlimited)
+        reconnect_max_attempts: Maximum number of reconnection attempts (0 for unlimited)
         reconnect_time_wait: Initial wait time between reconnection attempts
         reconnect_time_wait_max: Maximum wait time between reconnection attempts
         reconnect_jitter: Jitter factor for reconnection attempts
