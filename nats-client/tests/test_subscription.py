@@ -754,3 +754,23 @@ async def test_subscription_callback_exception_handling(client):
     # Verify message is still available via next() despite callback exception
     message = await subscription.next(timeout=1.0)
     assert message.data == test_message
+
+
+@pytest.mark.asyncio
+async def test_subscription_stops_iterating_on_close(client):
+    """Test that async iterator stops when subscription is closed."""
+    test_subject = f"test.iterator_close.{uuid.uuid4()}"
+
+    subscription = await client.subscribe(test_subject)
+    await client.flush()
+
+    # Close the subscription
+    await subscription.close()
+
+    # Try to iterate - should stop immediately (StopAsyncIteration)
+    messages_received = 0
+    async for _msg in subscription:
+        messages_received += 1
+
+    # Should receive no messages since subscription is closed
+    assert messages_received == 0
