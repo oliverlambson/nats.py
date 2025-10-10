@@ -54,7 +54,6 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
         queue_group: str,
         pending_queue: asyncio.Queue,
         client: Client,
-        callback: Callable[[Message], None] | None = None,
     ):
         self._subject = subject
         self._sid = sid
@@ -63,8 +62,6 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
         self._pending_queue = pending_queue
         self._closed = False
         self._callbacks = []
-        if callback is not None:
-            self._callbacks.append(callback)
 
     @property
     def sid(self) -> str:
@@ -93,6 +90,12 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
 
     def add_callback(self, callback: Callable[[Message], None]) -> None:
         """Add a callback to be invoked when a message is received.
+
+        Callbacks are invoked synchronously as soon as a message is received,
+        before it is queued in the subscription's message queue.
+
+        Note: Avoid performing heavy computation or blocking operations in callbacks,
+        as this will block the I/O pipeline and prevent other messages from being received.
 
         Args:
             callback: Function to be called when a message is received

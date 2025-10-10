@@ -715,7 +715,6 @@ class Client(AbstractAsyncContextManager["Client"]):
         subject: str,
         *,
         queue_group: str = "",
-        callback: Callable[[Message], None] | None = None,
     ) -> Subscription:
         """Subscribe to a subject."""
         if self._status == ClientStatus.CLOSED:
@@ -733,7 +732,6 @@ class Client(AbstractAsyncContextManager["Client"]):
             queue_group,
             message_queue,
             self,
-            callback=callback,
         )
 
         self._subscriptions[sid] = subscription

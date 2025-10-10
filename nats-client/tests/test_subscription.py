@@ -626,7 +626,7 @@ async def test_subscription_remove_callback(client):
 
 @pytest.mark.asyncio
 async def test_subscription_callback_with_initial_callback(client):
-    """Test that initial callback passed to subscribe() works with add_callback/remove_callback."""
+    """Test that add_callback/remove_callback works correctly."""
     test_subject = f"test.initial_callback.{uuid.uuid4()}"
     test_message = b"Hello, initial callback!"
 
@@ -642,9 +642,9 @@ async def test_subscription_callback_with_initial_callback(client):
         nonlocal added_callback_count
         added_callback_count += 1
 
-    # Create subscription with initial callback
-    subscription = await client.subscribe(test_subject, callback=initial_callback)
-    # Add additional callback
+    # Create subscription and add callbacks
+    subscription = await client.subscribe(test_subject)
+    subscription.add_callback(initial_callback)
     subscription.add_callback(added_callback)
 
     await client.flush()
