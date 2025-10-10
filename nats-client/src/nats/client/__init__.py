@@ -15,7 +15,7 @@ The primary entry point is the `connect()` function which returns a `Client` ins
 from __future__ import annotations
 
 try:
-    from importlib.metadata import version, PackageNotFoundError
+    from importlib.metadata import PackageNotFoundError, version
 
     __version__ = version("nats-client")
 except (ImportError, PackageNotFoundError):
