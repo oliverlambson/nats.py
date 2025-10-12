@@ -16,6 +16,7 @@ from typing import (
     runtime_checkable,
 )
 
+from nats.client.message import Headers
 from .consumer import Consumer, ConsumerConfig, ConsumerInfo
 from .consumer.pull import PullConsumer
 
@@ -965,7 +966,7 @@ class StreamMessage:
     sequence: int
     data: bytes
     time: datetime
-    headers: dict[str, str] | None = None
+    headers: Headers | None = None
 
     def __getitem__(self, key):
         """Support dictionary-like access to message attributes."""
@@ -1097,33 +1098,23 @@ class Stream:
             if not timestamp:
                 raise RuntimeError("Direct get response missing Nats-Time-Stamp header")
 
-            # Convert list values to single values for all headers
-            headers = {}
+            # Extract user headers (excluding NATS metadata headers)
+            user_headers = {}
+            metadata_headers = {"Nats-Stream", "Nats-Subject", "Nats-Sequence", "Nats-Time-Stamp"}
+
             for key, value in response.headers.items():
-                if isinstance(value, list):
-                    headers[key] = value[0] if value else None
-                else:
-                    headers[key] = value
+                if key not in metadata_headers:
+                    user_headers[key] = value
 
-            # Remove metadata headers
-            for key in [
-                "Nats-Stream",
-                "Nats-Subject",
-                "Nats-Sequence",
-                "Nats-Time-Stamp",
-            ]:
-                headers.pop(key, None)
-
-            # Set headers to None if empty after removing metadata
-            if not headers:
-                headers = None
+            # Create Headers object if there are user headers
+            headers_obj = Headers(user_headers) if user_headers else None
 
             return StreamMessage(
                 subject=subject[0] if isinstance(subject, list) else subject,
                 sequence=int(sequence[0] if isinstance(sequence, list) else sequence),
                 data=response.data,
                 time=datetime.fromisoformat(timestamp[0] if isinstance(timestamp, list) else timestamp),
-                headers=headers,
+                headers=headers_obj,
             )
         else:
             # Use standard message get which returns:
@@ -1151,23 +1142,14 @@ class Stream:
         headers = None
         if "hdrs" in message:
             try:
-                headers_bytes = base64.b64decode(message["hdrs"])
-                headers_str = headers_bytes.decode("utf-8")
-                if headers_str.startswith("NATS/1.0\r\n"):
-                    # Parse NATS headers format
-                    headers = {}
-                    lines = headers_str.split("\r\n")
-                    for line in lines[1:]:  # Skip NATS/1.0
-                        if not line:  # Skip empty lines
-                            continue
-                        if ":" in line:
-                            key, value = line.split(":", 1)
-                            headers[key.strip()] = value.strip()
+                from nats.client.protocol.message import parse_headers
 
-                    # If no headers parsed, set to None
-                    if not headers:
-                        headers = None
-            except (ValueError, UnicodeDecodeError):
+                headers_bytes = base64.b64decode(message["hdrs"])
+                # parse_headers returns dict[str, list[str]], status_code, status_description
+                parsed_headers, _status_code, _status_description = parse_headers(headers_bytes)
+                if parsed_headers:
+                    headers = Headers(parsed_headers)
+            except Exception:
                 # If we can't parse headers, just ignore them
                 headers = None
 

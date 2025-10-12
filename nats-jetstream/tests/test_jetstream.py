@@ -52,7 +52,9 @@ async def test_publish_with_headers(jetstream: JetStream):
     assert ack.sequence > 0
 
     msg = await stream.get_message(ack.sequence)
-    assert msg.headers == headers
+    assert msg.headers is not None
+    assert msg.headers.get("X-Custom-Header") == "test"
+    assert msg.headers.get("X-Message-Type") == "example"
 
 
 @pytest.mark.asyncio
@@ -533,3 +535,140 @@ async def test_get_consumer_info_nonexistent_consumer_fails(jetstream: JetStream
     # Try to get info for a non-existent consumer
     with pytest.raises(Exception):  # TODO: Define specific error type
         await jetstream.get_consumer_info("test_stream", "nonexistent_consumer")
+
+
+# JetStream Message Retrieval Tests
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("allow_direct", [False, True])
+async def test_get_message_with_headers(jetstream: JetStream, allow_direct: bool):
+    """Test retrieving a message with headers using JetStream.get_message()."""
+    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
+
+    # Publish a message with headers
+    headers = {"X-Custom-Header": "test-value", "X-Message-Type": "example"}
+    ack = await jetstream.publish("FOO.A", b"test message", headers=headers)
+
+    # Retrieve the message using JetStream.get_message()
+    msg = await jetstream.get_message("test", ack.sequence)
+
+    # Verify headers are parsed correctly
+    assert msg.headers is not None
+    assert msg.headers.get("X-Custom-Header") == "test-value"
+    assert msg.headers.get("X-Message-Type") == "example"
+    assert msg.data == b"test message"
+    assert msg.subject == "FOO.A"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("allow_direct", [False, True])
+async def test_get_message_without_headers(jetstream: JetStream, allow_direct: bool):
+    """Test retrieving a message without headers using JetStream.get_message()."""
+    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
+
+    # Publish a message without headers
+    ack = await jetstream.publish("FOO.A", b"test message")
+
+    # Retrieve the message using JetStream.get_message()
+    msg = await jetstream.get_message("test", ack.sequence)
+
+    # Verify no headers are present
+    assert msg.headers is None
+    assert msg.data == b"test message"
+    assert msg.subject == "FOO.A"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("allow_direct", [False, True])
+async def test_get_message_with_multiple_headers(jetstream: JetStream, allow_direct: bool):
+    """Test retrieving a message with multiple different headers."""
+    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
+
+    # Publish a message with multiple different headers
+    headers = {
+        "X-Header-1": "value1",
+        "X-Header-2": "value2",
+        "X-Header-3": "value3",
+    }
+    ack = await jetstream.publish("FOO.A", b"test message", headers=headers)
+
+    # Retrieve the message using JetStream.get_message()
+    msg = await jetstream.get_message("test", ack.sequence)
+
+    # Verify all headers are parsed correctly
+    assert msg.headers is not None
+    assert msg.headers.get("X-Header-1") == "value1"
+    assert msg.headers.get("X-Header-2") == "value2"
+    assert msg.headers.get("X-Header-3") == "value3"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("allow_direct", [False, True])
+async def test_get_message_with_multi_value_header(jetstream: JetStream, allow_direct: bool):
+    """Test retrieving a message with multiple values for the same header key."""
+    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
+
+    # Publish a message with a header that has multiple values
+    # The client accepts dict[str, str | list[str]]
+    headers = {
+        "X-Multi-Value": ["value1", "value2", "value3"],
+        "X-Single-Value": "single",
+    }
+    ack = await jetstream.publish("FOO.A", b"test message", headers=headers)
+
+    # Retrieve the message using JetStream.get_message()
+    msg = await jetstream.get_message("test", ack.sequence)
+
+    # Verify headers are parsed correctly
+    # Headers.get() returns the first value, get_all() returns all values
+    assert msg.headers is not None
+    assert msg.headers.get("X-Single-Value") == "single"
+    assert msg.headers.get("X-Multi-Value") == "value1"  # get() returns first value
+    assert msg.headers.get_all("X-Multi-Value") == ["value1", "value2", "value3"]  # get_all() returns all
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("allow_direct", [False, True])
+async def test_get_last_message_for_subject_with_headers(jetstream: JetStream, allow_direct: bool):
+    """Test retrieving last message for a subject with headers."""
+    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
+
+    # Publish multiple messages to the same subject
+    await jetstream.publish("FOO.A", b"message 1")
+    await jetstream.publish("FOO.A", b"message 2")
+
+    # Publish the last message with headers
+    headers = {"X-Last-Message": "true", "X-Message-ID": "final"}
+    ack = await jetstream.publish("FOO.A", b"message 3", headers=headers)
+
+    # Retrieve the last message for the subject using JetStream.get_last_message_for_subject()
+    msg = await jetstream.get_last_message_for_subject("test", "FOO.A")
+
+    # Verify headers are parsed correctly
+    assert msg.headers is not None
+    assert msg.headers.get("X-Last-Message") == "true"
+    assert msg.headers.get("X-Message-ID") == "final"
+    assert msg.data == b"message 3"
+    assert msg.subject == "FOO.A"
+    assert msg.sequence == ack.sequence
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("allow_direct", [False, True])
+async def test_get_last_message_for_subject_without_headers(jetstream: JetStream, allow_direct: bool):
+    """Test retrieving last message for a subject without headers."""
+    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
+
+    # Publish multiple messages without headers
+    await jetstream.publish("FOO.A", b"message 1")
+    ack = await jetstream.publish("FOO.A", b"message 2")
+
+    # Retrieve the last message for the subject
+    msg = await jetstream.get_last_message_for_subject("test", "FOO.A")
+
+    # Verify no headers are present
+    assert msg.headers is None
+    assert msg.data == b"message 2"
+    assert msg.subject == "FOO.A"
+    assert msg.sequence == ack.sequence

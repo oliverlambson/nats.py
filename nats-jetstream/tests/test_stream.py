@@ -270,9 +270,10 @@ async def test_purge_with_keep(jetstream: JetStream):
 
 
 @pytest.mark.asyncio
-async def test_get_message_by_sequence(jetstream: JetStream):
+@pytest.mark.parametrize("allow_direct", [False, True])
+async def test_get_message_by_sequence(jetstream: JetStream, allow_direct: bool):
     """Test getting a message by sequence number."""
-    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"])
+    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
 
     # Publish a few messages
     messages = [f"msg {i}".encode() for i in range(5)]
@@ -287,9 +288,10 @@ async def test_get_message_by_sequence(jetstream: JetStream):
 
 
 @pytest.mark.asyncio
-async def test_get_last_message_for_subject(jetstream: JetStream):
+@pytest.mark.parametrize("allow_direct", [False, True])
+async def test_get_last_message_for_subject(jetstream: JetStream, allow_direct: bool):
     """Test getting the last message for a subject."""
-    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"])
+    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
 
     # Publish a few messages
     for i in range(5):
@@ -301,6 +303,77 @@ async def test_get_last_message_for_subject(jetstream: JetStream):
     assert isinstance(msg, StreamMessage)
     assert msg.subject == "FOO.A"
     assert msg.data == b"msg 4 on A"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("allow_direct", [False, True])
+async def test_stream_get_message_with_headers(jetstream: JetStream, allow_direct: bool):
+    """Test Stream.get_message() with headers for both direct and non-direct paths."""
+    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
+
+    # Publish a message with headers
+    headers = {"X-Custom-Header": "test-value", "X-Message-Type": "example"}
+    ack = await jetstream.publish("FOO.A", b"test message", headers=headers)
+
+    # Retrieve the message using Stream.get_message()
+    msg = await stream.get_message(ack.sequence)
+
+    # Verify headers are parsed correctly
+    assert msg.headers is not None
+    assert msg.headers.get("X-Custom-Header") == "test-value"
+    assert msg.headers.get("X-Message-Type") == "example"
+    assert msg.data == b"test message"
+    assert msg.subject == "FOO.A"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("allow_direct", [False, True])
+async def test_stream_get_last_message_for_subject_with_headers(jetstream: JetStream, allow_direct: bool):
+    """Test Stream.get_last_message_for_subject() with headers for both direct and non-direct paths."""
+    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
+
+    # Publish multiple messages
+    await jetstream.publish("FOO.A", b"message 1")
+    await jetstream.publish("FOO.A", b"message 2")
+
+    # Publish the last message with headers
+    headers = {"X-Last-Message": "true", "X-Message-ID": "final"}
+    ack = await jetstream.publish("FOO.A", b"message 3", headers=headers)
+
+    # Retrieve the last message
+    msg = await stream.get_last_message_for_subject("FOO.A")
+
+    # Verify headers are parsed correctly
+    assert msg.headers is not None
+    assert msg.headers.get("X-Last-Message") == "true"
+    assert msg.headers.get("X-Message-ID") == "final"
+    assert msg.data == b"message 3"
+    assert msg.subject == "FOO.A"
+    assert msg.sequence == ack.sequence
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("allow_direct", [False, True])
+async def test_stream_get_message_with_multi_value_header(jetstream: JetStream, allow_direct: bool):
+    """Test Stream.get_message() with multiple values for the same header key."""
+    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
+
+    # Publish a message with a header that has multiple values
+    headers = {
+        "X-Multi-Value": ["value1", "value2", "value3"],
+        "X-Single-Value": "single",
+    }
+    ack = await jetstream.publish("FOO.A", b"test message", headers=headers)
+
+    # Retrieve the message using Stream.get_message()
+    msg = await stream.get_message(ack.sequence)
+
+    # Verify headers are parsed correctly
+    # Headers.get() returns the first value, get_all() returns all values
+    assert msg.headers is not None
+    assert msg.headers.get("X-Single-Value") == "single"
+    assert msg.headers.get("X-Multi-Value") == "value1"  # get() returns first value
+    assert msg.headers.get_all("X-Multi-Value") == ["value1", "value2", "value3"]  # get_all() returns all
 
 
 @pytest.mark.asyncio

@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import base64
 import json
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, AsyncIterator, overload
 
+from nats.client.message import Headers
+from nats.client.protocol.message import parse_headers
+from nats.jetstream import api
 from nats.jetstream.consumer import Consumer, ConsumerInfo
 from nats.jetstream.stream import (
     ClusterInfo,
@@ -27,8 +31,6 @@ from nats.jetstream.stream import (
 
 if TYPE_CHECKING:
     from nats.client import Client
-
-    from . import api
 
 
 @dataclass
@@ -562,15 +564,20 @@ class JetStream:
         # Decode base64 data if present
         data = None
         if "data" in message:
-            import base64
-
             data = base64.b64decode(message["data"])
 
         # Decode base64 headers if present
         headers = None
         if "hdrs" in message:
-            # TODO: Parse headers from bytes
-            pass
+            try:
+                headers_bytes = base64.b64decode(message["hdrs"])
+                # parse_headers returns dict[str, list[str]]
+                parsed_headers, _status_code, _status_description = parse_headers(headers_bytes)
+                if parsed_headers:
+                    headers = Headers(parsed_headers)
+            except Exception:
+                # If we can't parse headers, just set to None
+                headers = None
 
         return StreamMessage(
             subject=message["subject"],
@@ -599,15 +606,20 @@ class JetStream:
         # Decode base64 data if present
         data = None
         if "data" in message:
-            import base64
-
             data = base64.b64decode(message["data"])
 
         # Decode base64 headers if present
         headers = None
         if "hdrs" in message:
-            # TODO: Parse headers from bytes
-            pass
+            try:
+                headers_bytes = base64.b64decode(message["hdrs"])
+                # parse_headers returns dict[str, list[str]]
+                parsed_headers, _status_code, _status_description = parse_headers(headers_bytes)
+                if parsed_headers:
+                    headers = Headers(parsed_headers)
+            except Exception:
+                # If we can't parse headers, just set to None
+                headers = None
 
         return StreamMessage(
             subject=message["subject"],
