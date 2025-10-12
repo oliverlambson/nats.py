@@ -7,8 +7,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
-    Awaitable,
-    Callable,
     overload,
 )
 
@@ -25,33 +23,6 @@ if TYPE_CHECKING:
     from nats.client import Subscription
     from nats.client.message import Message as ClientMessage
     from nats.jetstream.stream import Stream
-
-MessageCallback = Callable[[Message], Awaitable[None]]
-
-
-class MessageHandler:
-    """Handler for message consumption with callback processing."""
-
-    _task: asyncio.Task[None]
-    _message_stream: PullMessageStream
-
-    def __init__(self, task: asyncio.Task, message_stream: PullMessageStream):
-        self._task = task
-        self._message_stream = message_stream
-
-    async def stop(self):
-        """Stop the consume task and clean up resources."""
-        self._task.cancel()
-        try:
-            await self._task
-        except asyncio.CancelledError:
-            pass
-        await self._message_stream.stop()
-
-    def __await__(self):
-        """Allow awaiting the task directly."""
-        return self._task.__await__()
-
 
 class PullMessageBatch(MessageBatch):
     _subscription: Subscription
@@ -394,45 +365,6 @@ class PullConsumer(Consumer):
         )
 
         return stream
-
-    async def consume(
-        self,
-        callback: MessageCallback,
-        *,
-        max_messages: int = 100,
-        max_wait: float = 30.0,
-        heartbeat: float | None = None,
-        max_bytes: int | None = None,
-    ) -> MessageHandler:
-        """Start consuming messages with a callback function.
-
-        Args:
-            callback: Async function to call for each message
-            max_messages: Maximum number of messages to request per batch
-            max_wait: Request expiration time in seconds
-            heartbeat: Heartbeat interval in seconds
-            max_bytes: Maximum bytes per batch
-
-        Returns:
-            MessageHandler that processes messages with the callback
-        """
-
-        # Get a message stream (callback-unaware, minimal background processing)
-        # Support both max_messages and max_bytes together (like Go's PullMaxMessagesWithBytesLimit)
-        message_stream = await self.messages(
-            max_messages=max_messages, max_bytes=max_bytes, heartbeat=heartbeat, max_wait=max_wait
-        )
-
-        # Higher-level callback handling: create a task that iterates over the stream
-        async def consume_loop():
-            try:
-                async for message in message_stream:
-                    await callback(message)
-            finally:
-                await message_stream.stop()
-
-        task = asyncio.create_task(consume_loop())
-        return MessageHandler(task, message_stream)
 
     @overload
     async def fetch(

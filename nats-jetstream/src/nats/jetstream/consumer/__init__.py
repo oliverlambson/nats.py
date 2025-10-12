@@ -7,8 +7,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
-    Awaitable,
-    Callable,
     Literal,
     Protocol,
     overload,
@@ -443,18 +441,6 @@ class Consumer(Protocol):
 
     async def next(self, max_wait: float = 5.0) -> Message:
         """Fetch a single message from the consumer."""
-        ...
-
-    async def consume(
-        self,
-        callback: Callable[[Message], Awaitable[None]],
-        *,
-        max_messages: int = 100,
-        max_wait: float = 30.0,
-        heartbeat: float | None = None,
-        max_bytes: int | None = None,
-    ) -> MessageStream:
-        """Continuously consume messages using a callback handler."""
         ...
 
     async def messages(
