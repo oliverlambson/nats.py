@@ -80,9 +80,7 @@ def is_error_response(data: Any) -> TypeGuard[ErrorResponse]:
     return isinstance(data, dict) and "error" in data
 
 
-def check_response[ResponseT](
-    data: Any, expected_type: type[ResponseT]
-) -> tuple[bool, set[str], set[str]]:
+def check_response[ResponseT](data: Any, expected_type: type[ResponseT]) -> tuple[bool, set[str], set[str]]:
     if not isinstance(data, dict):
         return False, set(), set()
 
@@ -333,7 +331,9 @@ class Client:
                             raise ValueError(msg)
                         logger.warning("[%s] %s", request_id, msg)
                     if not missing_keys and not unknown_keys:
-                        logger.warning("[%s] Expected %s, got %s", request_id, response_type.__name__, type(data).__name__)
+                        logger.warning(
+                            "[%s] Expected %s, got %s", request_id, response_type.__name__, type(data).__name__
+                        )
 
                 if unknown_keys:
                     msg = f"Unknown keys in response: {unknown_keys}"

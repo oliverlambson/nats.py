@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from nats.client.message import Message as ClientMessage
     from nats.jetstream.stream import Stream
 
+
 class PullMessageBatch(MessageBatch):
     _subscription: Subscription
     _pending_messages: int
