@@ -37,7 +37,7 @@ class PullMessageBatch(MessageBatch):
         self._pending_messages = batch_size
         self._jetstream = jetstream
         self._terminated = False
-        self._error: Exception | None = None
+        self._error = None
         self._deadline = time.time() + max_wait if max_wait is not None else None
 
     @property
