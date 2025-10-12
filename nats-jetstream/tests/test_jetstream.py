@@ -544,7 +544,7 @@ async def test_get_consumer_info_nonexistent_consumer_fails(jetstream: JetStream
 @pytest.mark.parametrize("allow_direct", [False, True])
 async def test_get_message_with_headers(jetstream: JetStream, allow_direct: bool):
     """Test retrieving a message with headers using JetStream.get_message()."""
-    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
+    await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
 
     # Publish a message with headers
     headers = {"X-Custom-Header": "test-value", "X-Message-Type": "example"}
@@ -565,7 +565,7 @@ async def test_get_message_with_headers(jetstream: JetStream, allow_direct: bool
 @pytest.mark.parametrize("allow_direct", [False, True])
 async def test_get_message_without_headers(jetstream: JetStream, allow_direct: bool):
     """Test retrieving a message without headers using JetStream.get_message()."""
-    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
+    await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
 
     # Publish a message without headers
     ack = await jetstream.publish("FOO.A", b"test message")
@@ -583,7 +583,7 @@ async def test_get_message_without_headers(jetstream: JetStream, allow_direct: b
 @pytest.mark.parametrize("allow_direct", [False, True])
 async def test_get_message_with_multiple_headers(jetstream: JetStream, allow_direct: bool):
     """Test retrieving a message with multiple different headers."""
-    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
+    await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
 
     # Publish a message with multiple different headers
     headers = {
@@ -607,7 +607,7 @@ async def test_get_message_with_multiple_headers(jetstream: JetStream, allow_dir
 @pytest.mark.parametrize("allow_direct", [False, True])
 async def test_get_message_with_multi_value_header(jetstream: JetStream, allow_direct: bool):
     """Test retrieving a message with multiple values for the same header key."""
-    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
+    await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
 
     # Publish a message with a header that has multiple values
     # The client accepts dict[str, str | list[str]]
@@ -632,7 +632,7 @@ async def test_get_message_with_multi_value_header(jetstream: JetStream, allow_d
 @pytest.mark.parametrize("allow_direct", [False, True])
 async def test_get_last_message_for_subject_with_headers(jetstream: JetStream, allow_direct: bool):
     """Test retrieving last message for a subject with headers."""
-    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
+    await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
 
     # Publish multiple messages to the same subject
     await jetstream.publish("FOO.A", b"message 1")
@@ -658,7 +658,7 @@ async def test_get_last_message_for_subject_with_headers(jetstream: JetStream, a
 @pytest.mark.parametrize("allow_direct", [False, True])
 async def test_get_last_message_for_subject_without_headers(jetstream: JetStream, allow_direct: bool):
     """Test retrieving last message for a subject without headers."""
-    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
+    await jetstream.create_stream(name="test", subjects=["FOO.*"], allow_direct=allow_direct)
 
     # Publish multiple messages without headers
     await jetstream.publish("FOO.A", b"message 1")

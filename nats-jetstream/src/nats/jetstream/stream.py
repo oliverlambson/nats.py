@@ -17,6 +17,7 @@ from typing import (
 )
 
 from nats.client.message import Headers
+
 from .consumer import Consumer, ConsumerConfig, ConsumerInfo
 from .consumer.pull import PullConsumer
 
