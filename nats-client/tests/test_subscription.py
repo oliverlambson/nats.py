@@ -362,8 +362,8 @@ async def test_subscription_close_is_same_as_unsubscribe(client):
     message = await subscription.next(timeout=1.0)
     assert message.data == b"Before close"
 
-    # Close instead of unsubscribe
-    await subscription.close()
+    # Unsubscribe from the subscription
+    await subscription.unsubscribe()
 
     # Publish another message
     await client.publish(test_subject, b"After close")
@@ -764,8 +764,8 @@ async def test_subscription_stops_iterating_on_close(client):
     subscription = await client.subscribe(test_subject)
     await client.flush()
 
-    # Close the subscription
-    await subscription.close()
+    # Unsubscribe from the subscription
+    await subscription.unsubscribe()
 
     # Try to iterate - should stop immediately (StopAsyncIteration)
     messages_received = 0

@@ -136,16 +136,6 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
         except RuntimeError:
             raise StopAsyncIteration from None
 
-    async def close(self) -> None:
-        """Close the subscription.
-
-        This marks the subscription as draining and prevents further messages
-        from being added to the queue.
-
-        This is an alias for unsubscribe().
-        """
-        await self.unsubscribe()
-
     async def unsubscribe(self) -> None:
         """Unsubscribe from this subscription.
 
