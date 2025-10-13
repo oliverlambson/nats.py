@@ -8,8 +8,7 @@ import asyncio
 import sys
 import time
 from dataclasses import dataclass
-
-from nats.client import Headers, connect
+from typing import Any
 
 
 @dataclass
@@ -43,16 +42,24 @@ class BenchmarkResults:
 
 async def run_pub_benchmark(
     *,
+    client_type: str = "client",
     url: str = "nats://localhost:4222",
     msg_count: int = 100_000,
     msg_size: int = 128,
     pub_subject: str = "test",
-    headers: Headers | None = None,
+    headers: dict[str, str] | Any | None = None,
 ) -> BenchmarkResults:
     """Run publisher benchmark."""
 
-    # Connect to server
-    nc = await connect(url)
+    # Connect to server based on client type
+    if client_type == "aio":
+        import nats
+
+        nc = await nats.connect(url)
+    else:
+        from nats.client import connect
+
+        nc = await connect(url)
 
     try:
         # Prepare payload
@@ -103,12 +110,23 @@ async def run_pub_benchmark(
 
 
 async def run_sub_benchmark(
-    *, url: str = "nats://localhost:4222", msg_count: int = 100_000, sub_subject: str = "test"
+    *,
+    client_type: str = "client",
+    url: str = "nats://localhost:4222",
+    msg_count: int = 100_000,
+    sub_subject: str = "test",
 ) -> BenchmarkResults:
     """Run subscriber benchmark."""
 
-    # Connect to server
-    nc = await connect(url)
+    # Connect to server based on client type
+    if client_type == "aio":
+        import nats
+
+        nc = await nats.connect(url)
+    else:
+        from nats.client import connect
+
+        nc = await connect(url)
     received = 0
     first_msg_time = 0.0
     last_msg_time = 0.0
@@ -120,8 +138,13 @@ async def run_sub_benchmark(
         sub = await nc.subscribe(sub_subject)
         start_time = time.perf_counter()
 
-        # Receive messages
-        async for msg in sub:
+        # Receive messages - handle different iterator styles
+        if client_type == "aio":
+            iterator = sub.messages
+        else:
+            iterator = sub
+
+        async for msg in iterator:
             msg_time = time.perf_counter()
             if received == 0:
                 first_msg_time = msg_time
@@ -135,6 +158,9 @@ async def run_sub_benchmark(
                 break
 
         duration = last_msg_time - first_msg_time
+
+        # Assert we received all expected messages
+        assert received == msg_count, f"Message loss detected! Received {received}/{msg_count} messages"
 
         # Calculate stats
         throughput = received / duration
@@ -167,23 +193,26 @@ async def run_sub_benchmark(
 
 async def run_pubsub_benchmark(
     *,
+    client_type: str = "client",
     url: str = "nats://localhost:4222",
     msg_count: int = 100_000,
     msg_size: int = 128,
     subject: str = "test",
-    headers: Headers | None = None,
+    headers: dict[str, str] | Any | None = None,
 ) -> tuple[BenchmarkResults, BenchmarkResults]:
     """Run combined publisher/subscriber benchmark."""
 
     # Start subscriber first
-    sub_task = asyncio.create_task(run_sub_benchmark(url=url, msg_count=msg_count, sub_subject=subject))
+    sub_task = asyncio.create_task(
+        run_sub_benchmark(client_type=client_type, url=url, msg_count=msg_count, sub_subject=subject)
+    )
 
     # Small delay to ensure subscriber is ready
     await asyncio.sleep(0.1)
 
     # Run publisher
     pub_results = await run_pub_benchmark(
-        url=url, msg_count=msg_count, msg_size=msg_size, pub_subject=subject, headers=headers
+        client_type=client_type, url=url, msg_count=msg_count, msg_size=msg_size, pub_subject=subject, headers=headers
     )
 
     # Wait for subscriber to finish
@@ -195,6 +224,12 @@ async def run_pubsub_benchmark(
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description="NATS benchmarking tool")
+    parser.add_argument(
+        "--client",
+        choices=["client", "aio"],
+        default="client",
+        help="Client type to use: 'client' (nats-client) or 'aio' (nats.aio)",
+    )
     parser.add_argument("--url", default="nats://localhost:4222", help="NATS server URL")
     parser.add_argument("--msgs", type=int, default=100_000, help="Number of messages to publish")
     parser.add_argument("--size", type=int, default=128, help="Size of the message payload")
@@ -213,27 +248,49 @@ def main():
     # Create headers if requested
     headers = None
     if args.headers:
-        headers = Headers({f"key{i}": f"value{i}" for i in range(args.headers)})
+        if args.client == "client":
+            from nats.client import Headers
+
+            headers = Headers({f"key{i}": f"value{i}" for i in range(args.headers)})
+        else:
+            headers = {f"key{i}": f"value{i}" for i in range(args.headers)}
 
     async def run():
+        client_name = "nats-client" if args.client == "client" else "nats.aio"
         if args.pub and args.sub:
-            sys.stdout.write(f"\nStarting pub/sub benchmark [msgs={args.msgs:,}, size={args.size:,} B]\n")
+            sys.stdout.write(
+                f"\nStarting pub/sub benchmark with {client_name} [msgs={args.msgs:,}, size={args.size:,} B]\n"
+            )
             pub_results, sub_results = await run_pubsub_benchmark(
-                url=args.url, msg_count=args.msgs, msg_size=args.size, subject=args.subject, headers=headers
+                client_type=args.client,
+                url=args.url,
+                msg_count=args.msgs,
+                msg_size=args.size,
+                subject=args.subject,
+                headers=headers,
             )
             sys.stdout.write(f"\nPublisher results: {pub_results}\n")
             sys.stdout.write(f"\nSubscriber results: {sub_results}\n")
 
         elif args.pub:
-            sys.stdout.write(f"\nStarting publisher benchmark [msgs={args.msgs:,}, size={args.size:,} B]\n")
+            sys.stdout.write(
+                f"\nStarting publisher benchmark with {client_name} [msgs={args.msgs:,}, size={args.size:,} B]\n"
+            )
             results = await run_pub_benchmark(
-                url=args.url, msg_count=args.msgs, msg_size=args.size, pub_subject=args.subject, headers=headers
+                client_type=args.client,
+                url=args.url,
+                msg_count=args.msgs,
+                msg_size=args.size,
+                pub_subject=args.subject,
+                headers=headers,
             )
             sys.stdout.write(f"\nResults: {results}\n")
 
         elif args.sub:
-            sys.stdout.write(f"\nStarting subscriber benchmark [msgs={args.msgs:,}]\n")
-            results = await run_sub_benchmark(url=args.url, msg_count=args.msgs, sub_subject=args.subject)
+            sys.stdout.write(f"\nStarting subscriber benchmark with {client_name} [msgs={args.msgs:,}]\n")
+            results = await run_sub_benchmark(
+                client_type=args.client, url=args.url, msg_count=args.msgs, sub_subject=args.subject
+            )
             sys.stdout.write(f"\nResults: {results}\n")
 
     asyncio.run(run())
