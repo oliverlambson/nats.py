@@ -188,6 +188,8 @@ class Client(AbstractAsyncContextManager["Client"]):
         reconnect_timeout: float = 2.0,
         no_randomize: bool = False,
         inbox_prefix: str = "_INBOX",
+        ping_interval: float = 120.0,
+        max_outstanding_pings: int = 2,
     ):
         """Initialize the client.
 
@@ -203,6 +205,8 @@ class Client(AbstractAsyncContextManager["Client"]):
             reconnect_timeout: Timeout for reconnection attempts
             no_randomize: Whether to disable randomizing the server pool
             inbox_prefix: Prefix for inbox subjects (default: "_INBOX")
+            ping_interval: Interval between PINGs in seconds (default: 120.0)
+            max_outstanding_pings: Maximum number of outstanding PINGs before disconnecting (default: 2)
         """
         self._connection = connection
         self._server_info = server_info
@@ -250,8 +254,8 @@ class Client(AbstractAsyncContextManager["Client"]):
         self._flush_waker = asyncio.Event()
 
         # Ping/Pong keep-alive
-        self._ping_interval = 120.0
-        self._max_outstanding_pings = 2
+        self._ping_interval = ping_interval
+        self._max_outstanding_pings = max_outstanding_pings
         self._pings_outstanding = 0
         self._last_pong_received = asyncio.get_event_loop().time()
         self._last_ping_sent = self._last_pong_received
@@ -977,6 +981,8 @@ async def connect(
     reconnect_timeout: float | None = None,
     no_randomize: bool = False,
     inbox_prefix: str = "_INBOX",
+    ping_interval: float = 120.0,
+    max_outstanding_pings: int = 2,
 ) -> Client:
     """Connect to a NATS server.
 
@@ -991,6 +997,8 @@ async def connect(
         reconnect_timeout: Timeout for individual reconnection attempts (defaults to timeout value)
         no_randomize: Whether to disable randomizing the server pool
         inbox_prefix: Prefix for inbox subjects (default: "_INBOX")
+        ping_interval: Interval between PINGs in seconds (default: 120.0)
+        max_outstanding_pings: Maximum number of outstanding PINGs before disconnecting (default: 2)
 
     Returns:
         Client instance
@@ -1067,6 +1075,8 @@ async def connect(
         reconnect_timeout=reconnect_timeout if reconnect_timeout is not None else timeout,
         no_randomize=no_randomize,
         inbox_prefix=inbox_prefix,
+        ping_interval=ping_interval,
+        max_outstanding_pings=max_outstanding_pings,
     )
 
     # Send CONNECT message

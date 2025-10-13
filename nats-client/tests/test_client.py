@@ -620,6 +620,69 @@ async def test_custom_inbox_prefix(server):
 
 
 @pytest.mark.asyncio
+async def test_max_outstanding_pings_closes_connection():
+    """Test that connection closes when max outstanding pings is exceeded."""
+    async def mock_server(reader, writer):
+        """Mock NATS server that stops responding to PINGs."""
+        # Send INFO
+        info = b'INFO {"server_id":"test","version":"2.0.0","go":"go1.20","host":"127.0.0.1","port":4222,"headers":true,"max_payload":1048576}\r\n'
+        writer.write(info)
+        await writer.drain()
+
+        # Read CONNECT from client
+        await reader.readline()
+
+        # Read and respond to first PING
+        await reader.readline()
+        writer.write(b'PONG\r\n')
+        await writer.drain()
+
+        # Now stop responding to PINGs - just read them without PONGing
+        # This will cause outstanding pings to accumulate
+        try:
+            while True:
+                line = await reader.readline()
+                if not line:
+                    break
+        except Exception:
+            pass
+        finally:
+            writer.close()
+            await writer.wait_closed()
+
+    # Start mock server
+    server = await asyncio.start_server(mock_server, '127.0.0.1', 0)
+    addr = server.sockets[0].getsockname()
+    server_url = f"nats://{addr[0]}:{addr[1]}"
+
+    try:
+        # Connect with short ping interval and low max pings
+        client = await connect(
+            server_url,
+            ping_interval=0.05,  # Ping every 50ms
+            max_outstanding_pings=2,
+            allow_reconnect=False,
+            timeout=1.0,
+        )
+
+        try:
+            # Verify client starts connected
+            assert client.status == ClientStatus.CONNECTED
+
+            # Wait for outstanding pings to accumulate and trigger disconnect
+            # With ping_interval=0.05 and max=2, should disconnect after ~150ms
+            await asyncio.sleep(0.3)
+
+            # Verify client is no longer connected (closed due to max pings exceeded)
+            assert client.status == ClientStatus.CLOSED, f"Expected CLOSED status, got {client.status}"
+        finally:
+            await client.close()
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
+@pytest.mark.asyncio
 async def test_inbox_prefix_cannot_be_empty(server):
     """Test that empty inbox prefix is rejected."""
     with pytest.raises(ValueError, match="inbox_prefix cannot be empty"):
