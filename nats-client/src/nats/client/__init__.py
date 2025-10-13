@@ -35,7 +35,7 @@ from typing import TYPE_CHECKING, Self
 from urllib.parse import urlparse
 
 from nats.client.connection import Connection, open_tcp_connection
-from nats.client.errors import BadRequestError, NoRespondersError, StatusError
+from nats.client.errors import NoRespondersError, StatusError
 from nats.client.message import Headers, Message, Status
 from nats.client.protocol.command import (
     encode_connect,
@@ -1066,6 +1066,5 @@ __all__ = [
     "ServerInfo",
     "ClientStatus",
     "StatusError",
-    "BadRequestError",
     "NoRespondersError",
 ]
