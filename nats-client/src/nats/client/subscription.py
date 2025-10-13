@@ -113,12 +113,8 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
 
         Raises:
             asyncio.TimeoutError: If timeout is reached waiting for a message
-            RuntimeError: If the subscription is closed
+            RuntimeError: If the subscription is closed and queue is empty
         """
-        if self._closed:
-            msg = "Subscription is closed"
-            raise RuntimeError(msg)
-
         try:
             if timeout is not None:
                 return await asyncio.wait_for(self._pending_queue.get(), timeout)
@@ -147,9 +143,27 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
         preventing further messages from being added to the queue.
         """
         if not self._closed:
-            # First unsubscribe from server
+            # Send UNSUB to server and remove from client's subscription map
             await self._client._unsubscribe(self._sid)
-            # Then mark as closed
+            # Shutdown queue immediately (discard pending messages)
+            self._pending_queue.shutdown(immediate=True)
+            # Mark as closed
+            self._closed = True
+
+    async def drain(self) -> None:
+        """Drain the subscription.
+
+        This unsubscribes from the server (stopping new messages), allowing all pending
+        messages that are already in the queue to be processed. After drain, the
+        subscription is marked as closed but pending messages can still be consumed.
+        """
+        if not self._closed:
+            # Send UNSUB to server to stop new messages
+            await self._client._unsubscribe(self._sid)
+            # Shutdown queue gracefully (allow pending messages to be consumed)
+            self._pending_queue.shutdown(immediate=False)
+            # Keep in client's subscription list until queue is drained
+            # Mark as closed
             self._closed = True
 
     async def __aenter__(self) -> Self:

@@ -774,3 +774,50 @@ async def test_subscription_stops_iterating_on_close(client):
 
     # Should receive no messages since subscription is closed
     assert messages_received == 0
+
+
+@pytest.mark.asyncio
+async def test_subscription_drain_processes_pending_messages(client):
+    """Test that drain allows pending messages to be processed."""
+    test_subject = f"test.drain.{uuid.uuid4()}"
+
+    # Subscribe
+    subscription = await client.subscribe(test_subject)
+    await client.flush()
+
+    # Publish multiple messages
+    for i in range(5):
+        await client.publish(test_subject, f"message-{i}".encode())
+    await client.flush()
+
+    # Wait for one message to be received
+    messages_received = []
+    message = await subscription.next(timeout=0.5)
+    messages_received.append(message.data.decode())
+
+    # Drain the subscription (stops new messages, allows pending to be consumed)
+    await subscription.drain()
+
+    # We should still be able to read all pending messages
+    try:
+        while True:
+            message = await subscription.next(timeout=0.5)
+            messages_received.append(message.data.decode())
+    except (RuntimeError, asyncio.TimeoutError):
+        # Expected when queue is exhausted or closed
+        pass
+
+    # Verify we received all 5 messages
+    assert len(messages_received) == 5
+    assert messages_received == ["message-0", "message-1", "message-2", "message-3", "message-4"]
+
+    # Verify subscription is closed
+    assert subscription.closed
+
+    # Publish another message - it should NOT be received since we drained
+    await client.publish(test_subject, b"after-drain")
+    await client.flush()
+
+    # Try to get a message - should fail since subscription is closed
+    with pytest.raises(RuntimeError, match="Subscription is closed"):
+        await subscription.next(timeout=0.5)

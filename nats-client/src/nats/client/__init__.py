@@ -791,19 +791,18 @@ class Client(AbstractAsyncContextManager["Client"]):
         return queue
 
     async def _unsubscribe(self, sid: str) -> None:
-        """Unsubscribe from a subject."""
+        """Send UNSUB command to server for a subscription.
+
+        Args:
+            sid: Subscription ID
+        """
         logger.debug("->> UNSUB %s", sid)
 
         if sid in self._subscriptions:
-            try:
-                if self._status not in (ClientStatus.CLOSED, ClientStatus.CLOSING):
-                    await self._connection.write(encode_unsub(sid))
-
-                self._subscriptions[sid]._pending_queue.shutdown(immediate=True)
-            except Exception:
-                logger.exception("Error during unsubscribe")
-            finally:
-                del self._subscriptions[sid]
+            if self._status not in (ClientStatus.CLOSED, ClientStatus.CLOSING):
+                await self._connection.write(encode_unsub(sid))
+            # Remove from subscriptions map
+            del self._subscriptions[sid]
 
     def new_inbox(self) -> str:
         """Generate a new inbox subject.
