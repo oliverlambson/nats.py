@@ -167,6 +167,9 @@ class Client(AbstractAsyncContextManager["Client"]):
     _reconnected_callbacks: list[Callable[[], None]]
     _error_callbacks: list[Callable[[str], None]]
 
+    # Inbox prefix
+    _inbox_prefix: str
+
     # Background tasks
     _read_task: asyncio.Task[None]
     _write_task: asyncio.Task[None]
@@ -184,6 +187,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         reconnect_jitter: float = 0.1,
         reconnect_timeout: float = 2.0,
         no_randomize: bool = False,
+        inbox_prefix: str = "_INBOX",
     ):
         """Initialize the client.
 
@@ -198,6 +202,7 @@ class Client(AbstractAsyncContextManager["Client"]):
             reconnect_jitter: Jitter factor for reconnection attempts
             reconnect_timeout: Timeout for reconnection attempts
             no_randomize: Whether to disable randomizing the server pool
+            inbox_prefix: Prefix for inbox subjects (default: "_INBOX")
         """
         self._connection = connection
         self._server_info = server_info
@@ -208,6 +213,18 @@ class Client(AbstractAsyncContextManager["Client"]):
         self._reconnect_jitter = reconnect_jitter
         self._reconnect_timeout = reconnect_timeout
         self._no_randomize = no_randomize
+
+        # Validate inbox prefix (same rules as nats.go)
+        if not inbox_prefix:
+            raise ValueError("inbox_prefix cannot be empty")
+        if ">" in inbox_prefix:
+            raise ValueError("inbox_prefix cannot contain '>' wildcard")
+        if "*" in inbox_prefix:
+            raise ValueError("inbox_prefix cannot contain '*' wildcard")
+        if inbox_prefix.endswith("."):
+            raise ValueError("inbox_prefix cannot end with '.'")
+
+        self._inbox_prefix = inbox_prefix
         self._status = ClientStatus.CONNECTING
         self._subscriptions = {}
         self._next_sid = 1
@@ -784,6 +801,14 @@ class Client(AbstractAsyncContextManager["Client"]):
             finally:
                 del self._subscriptions[sid]
 
+    def new_inbox(self) -> str:
+        """Generate a new inbox subject.
+
+        Returns:
+            A unique inbox subject using the configured inbox prefix
+        """
+        return f"{self._inbox_prefix}.{uuid.uuid4().hex}"
+
     async def request(
         self,
         subject: str,
@@ -815,7 +840,7 @@ class Client(AbstractAsyncContextManager["Client"]):
             msg = "Connection is closed"
             raise RuntimeError(msg)
 
-        inbox = f"_INBOX.{uuid.uuid4().hex}"
+        inbox = self.new_inbox()
         logger.debug("Created inbox %s for request to %s", inbox, subject)
 
         sub = await self.subscribe(inbox)
@@ -951,6 +976,7 @@ async def connect(
     reconnect_jitter: float = 0.1,
     reconnect_timeout: float | None = None,
     no_randomize: bool = False,
+    inbox_prefix: str = "_INBOX",
 ) -> Client:
     """Connect to a NATS server.
 
@@ -964,6 +990,7 @@ async def connect(
         reconnect_jitter: Jitter factor for reconnection attempts
         reconnect_timeout: Timeout for individual reconnection attempts (defaults to timeout value)
         no_randomize: Whether to disable randomizing the server pool
+        inbox_prefix: Prefix for inbox subjects (default: "_INBOX")
 
     Returns:
         Client instance
@@ -984,6 +1011,7 @@ async def connect(
 
     logger.info("Connecting to %s:%s", host, port)
 
+    # Open connection with timeout
     try:
         match parsed_url.scheme:
             case "tls":
@@ -1000,60 +1028,62 @@ async def connect(
             case _:
                 msg = f"Unsupported scheme: {parsed_url.scheme}"
                 raise ValueError(msg)
-
-        try:
-            msg = await parse(connection)
-            if not msg or msg.op != "INFO":
-                msg = "Expected INFO message"
-                raise RuntimeError(msg)
-
-            server_info = ServerInfo.from_protocol(msg.info)
-            logger.info("Connected to %s (version %s)", server_info.server_id, server_info.version)
-
-            # Build server pool: start with the URL we connected to, then add cluster URLs
-            servers = [f"{host}:{port}"]
-            if server_info.connect_urls:
-                servers.extend(server_info.connect_urls)
-
-            client = Client(
-                connection,
-                server_info,
-                servers=servers,
-                allow_reconnect=allow_reconnect,
-                reconnect_max_attempts=reconnect_max_attempts,
-                reconnect_time_wait=reconnect_time_wait,
-                reconnect_time_wait_max=reconnect_time_wait_max,
-                reconnect_jitter=reconnect_jitter,
-                reconnect_timeout=reconnect_timeout if reconnect_timeout is not None else timeout,
-                no_randomize=no_randomize,
-            )
-
-            connect_info = ConnectInfo(
-                verbose=False,
-                pedantic=False,
-                lang="python",
-                version=__version__,
-                protocol=1,
-                headers=True,
-                no_responders=True,
-            )
-            logger.debug("->> CONNECT %s", json.dumps(connect_info))
-            await connection.write(encode_connect(connect_info))
-            client._status = ClientStatus.CONNECTED
-
-            return client
-
-        except Exception as e:
-            await connection.close()
-            msg = f"Failed to connect: {e}"
-            raise ConnectionError(msg)
-
     except asyncio.TimeoutError:
         msg = f"Connection timed out after {timeout} seconds"
         raise TimeoutError(msg)
     except Exception as e:
         msg = f"Failed to connect: {e}"
         raise ConnectionError(msg)
+
+    # Parse server INFO message
+    try:
+        msg = await parse(connection)
+        if not msg or msg.op != "INFO":
+            msg = "Expected INFO message"
+            raise RuntimeError(msg)
+
+        server_info = ServerInfo.from_protocol(msg.info)
+        logger.info("Connected to %s (version %s)", server_info.server_id, server_info.version)
+    except Exception as e:
+        await connection.close()
+        msg = f"Failed to connect: {e}"
+        raise ConnectionError(msg)
+
+    # Build server pool: start with the URL we connected to, then add cluster URLs
+    servers = [f"{host}:{port}"]
+    if server_info.connect_urls:
+        servers.extend(server_info.connect_urls)
+
+    # Create client (validation happens here)
+    client = Client(
+        connection,
+        server_info,
+        servers=servers,
+        allow_reconnect=allow_reconnect,
+        reconnect_max_attempts=reconnect_max_attempts,
+        reconnect_time_wait=reconnect_time_wait,
+        reconnect_time_wait_max=reconnect_time_wait_max,
+        reconnect_jitter=reconnect_jitter,
+        reconnect_timeout=reconnect_timeout if reconnect_timeout is not None else timeout,
+        no_randomize=no_randomize,
+        inbox_prefix=inbox_prefix,
+    )
+
+    # Send CONNECT message
+    connect_info = ConnectInfo(
+        verbose=False,
+        pedantic=False,
+        lang="python",
+        version=__version__,
+        protocol=1,
+        headers=True,
+        no_responders=True,
+    )
+    logger.debug("->> CONNECT %s", json.dumps(connect_info))
+    await connection.write(encode_connect(connect_info))
+    client._status = ClientStatus.CONNECTED
+
+    return client
 
 
 __all__ = [

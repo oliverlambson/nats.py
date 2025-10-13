@@ -546,3 +546,102 @@ async def test_cluster_reconnect_sequential_shutdown(cluster_size):
 
     finally:
         await cluster.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_new_inbox(server):
+    """Test that new_inbox generates unique inbox subjects with the configured prefix."""
+    custom_prefix = "_MY_INBOX"
+    client = await connect(server.client_url, inbox_prefix=custom_prefix, timeout=1.0)
+
+    try:
+        # Generate multiple inboxes
+        inbox1 = client.new_inbox()
+        inbox2 = client.new_inbox()
+        inbox3 = client.new_inbox()
+
+        # All should start with the custom prefix
+        assert inbox1.startswith(custom_prefix)
+        assert inbox2.startswith(custom_prefix)
+        assert inbox3.startswith(custom_prefix)
+
+        # All should be unique
+        assert inbox1 != inbox2
+        assert inbox1 != inbox3
+        assert inbox2 != inbox3
+
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_custom_inbox_prefix(server):
+    """Test that custom inbox prefix is used for request-reply inboxes."""
+    custom_prefix = "_MY_CUSTOM_INBOX"
+
+    # Connect with custom inbox prefix
+    client = await connect(server.client_url, inbox_prefix=custom_prefix, timeout=1.0)
+
+    try:
+        test_subject = f"test.custom_inbox.{uuid.uuid4()}"
+        request_payload = b"Request data"
+        reply_payload = b"Reply data"
+
+        # Track the inbox subject used in the request
+        received_reply_to = None
+
+        # Setup responder that captures the reply-to subject
+        subscription = await client.subscribe(test_subject)
+        await client.flush()
+
+        async def handle_request():
+            nonlocal received_reply_to
+            message = await subscription.next(timeout=2.0)
+            received_reply_to = message.reply_to
+            await client.publish(message.reply_to, reply_payload)
+
+        responder_task = asyncio.create_task(handle_request())
+
+        # Send request
+        response = await client.request(test_subject, request_payload, timeout=2.0)
+
+        # Verify response
+        assert response.data == reply_payload
+        await responder_task
+
+        # Verify that the inbox used the custom prefix
+        assert received_reply_to is not None
+        assert received_reply_to.startswith(custom_prefix), (
+            f"Expected inbox to start with '{custom_prefix}', got '{received_reply_to}'"
+        )
+
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_inbox_prefix_cannot_be_empty(server):
+    """Test that empty inbox prefix is rejected."""
+    with pytest.raises(ValueError, match="inbox_prefix cannot be empty"):
+        await connect(server.client_url, inbox_prefix="", timeout=1.0)
+
+
+@pytest.mark.asyncio
+async def test_inbox_prefix_cannot_contain_greater_than_wildcard(server):
+    """Test that inbox prefix with '>' wildcard is rejected."""
+    with pytest.raises(ValueError, match="inbox_prefix cannot contain '>' wildcard"):
+        await connect(server.client_url, inbox_prefix="test.>", timeout=1.0)
+
+
+@pytest.mark.asyncio
+async def test_inbox_prefix_cannot_contain_asterisk_wildcard(server):
+    """Test that inbox prefix with '*' wildcard is rejected."""
+    with pytest.raises(ValueError, match=r"inbox_prefix cannot contain '\*' wildcard"):
+        await connect(server.client_url, inbox_prefix="test.*", timeout=1.0)
+
+
+@pytest.mark.asyncio
+async def test_inbox_prefix_cannot_end_with_dot(server):
+    """Test that inbox prefix ending with '.' is rejected."""
+    with pytest.raises(ValueError, match="inbox_prefix cannot end with '.'"):
+        await connect(server.client_url, inbox_prefix="test.", timeout=1.0)
