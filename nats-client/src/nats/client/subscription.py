@@ -64,11 +64,6 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
         self._callbacks = []
 
     @property
-    def sid(self) -> str:
-        """Get the subscription ID."""
-        return self._sid
-
-    @property
     def subject(self) -> str:
         """Get the subscription subject."""
         return self._subject

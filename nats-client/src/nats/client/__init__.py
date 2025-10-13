@@ -837,7 +837,7 @@ class Client(AbstractAsyncContextManager["Client"]):
                 raise TimeoutError(msg)
 
         finally:
-            await self._unsubscribe(sub.sid)
+            await self._unsubscribe(sub._sid)
 
     async def close(self) -> None:
         """Close the connection."""
