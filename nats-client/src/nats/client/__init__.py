@@ -393,7 +393,7 @@ class Client(AbstractAsyncContextManager["Client"]):
                     logger.exception("Error in subscription callback")
 
             try:
-                await subscription.queue.put(msg)
+                await subscription._pending_queue.put(msg)
             except Exception:
                 logger.exception("Error putting message in queue")
 
@@ -429,7 +429,7 @@ class Client(AbstractAsyncContextManager["Client"]):
                     logger.exception("Error in subscription callback")
 
             try:
-                await subscription.queue.put(msg)
+                await subscription._pending_queue.put(msg)
             except Exception:
                 logger.exception("Error putting message in queue")
 
@@ -778,7 +778,7 @@ class Client(AbstractAsyncContextManager["Client"]):
                 if self._status not in (ClientStatus.CLOSED, ClientStatus.CLOSING):
                     await self._connection.write(encode_unsub(sid))
 
-                await self._subscriptions[sid].queue.put(None)
+                await self._subscriptions[sid]._pending_queue.put(None)
             except Exception:
                 logger.exception("Error during unsubscribe")
             finally:

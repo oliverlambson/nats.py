@@ -83,11 +83,6 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
         """Get whether the subscription is closed."""
         return self._closed
 
-    @property
-    def queue(self) -> asyncio.Queue:
-        """Get the message queue for this subscription."""
-        return self._pending_queue
-
     def add_callback(self, callback: Callable[[Message], None]) -> None:
         """Add a callback to be invoked when a message is received.
 
