@@ -622,6 +622,7 @@ async def test_custom_inbox_prefix(server):
 @pytest.mark.asyncio
 async def test_max_outstanding_pings_closes_connection():
     """Test that connection closes when max outstanding pings is exceeded."""
+
     async def mock_server(reader, writer):
         """Mock NATS server that stops responding to PINGs."""
         # Send INFO
@@ -634,7 +635,7 @@ async def test_max_outstanding_pings_closes_connection():
 
         # Read and respond to first PING
         await reader.readline()
-        writer.write(b'PONG\r\n')
+        writer.write(b"PONG\r\n")
         await writer.drain()
 
         # Now stop responding to PINGs - just read them without PONGing
@@ -651,7 +652,7 @@ async def test_max_outstanding_pings_closes_connection():
             await writer.wait_closed()
 
     # Start mock server
-    server = await asyncio.start_server(mock_server, '127.0.0.1', 0)
+    server = await asyncio.start_server(mock_server, "127.0.0.1", 0)
     addr = server.sockets[0].getsockname()
     server_url = f"nats://{addr[0]}:{addr[1]}"
 
