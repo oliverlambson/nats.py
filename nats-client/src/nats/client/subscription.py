@@ -43,7 +43,7 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
     _sid: str
     _queue_group: str
     _client: Client
-    _pending_queue: asyncio.Queue[Message | None]
+    _pending_queue: asyncio.Queue[Message]
     _closed: bool
     _callbacks: list[Callable[[Message], None]]
 
@@ -119,10 +119,14 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
             msg = "Subscription is closed"
             raise RuntimeError(msg)
 
-        if timeout is not None:
-            return await asyncio.wait_for(self._pending_queue.get(), timeout)
+        try:
+            if timeout is not None:
+                return await asyncio.wait_for(self._pending_queue.get(), timeout)
 
-        return await self._pending_queue.get()
+            return await self._pending_queue.get()
+        except asyncio.QueueShutDown:
+            msg = "Subscription is closed"
+            raise RuntimeError(msg) from None
 
     async def __anext__(self) -> Message:
         """Get the next message from the subscription.

@@ -778,7 +778,7 @@ class Client(AbstractAsyncContextManager["Client"]):
                 if self._status not in (ClientStatus.CLOSED, ClientStatus.CLOSING):
                     await self._connection.write(encode_unsub(sid))
 
-                await self._subscriptions[sid]._pending_queue.put(None)
+                self._subscriptions[sid]._pending_queue.shutdown(immediate=True)
             except Exception:
                 logger.exception("Error during unsubscribe")
             finally:
