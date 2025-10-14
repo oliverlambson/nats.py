@@ -9,18 +9,18 @@ from dataclasses import dataclass
 class Headers:
     """NATS message headers."""
 
-    _headers: dict[str, list[str]]
+    _data: dict[str, list[str]]
 
     def __init__(self, headers: dict[str, str | list[str]]) -> None:
-        self._headers = {}
+        self._data = {}
         for key, value in headers.items():
             if isinstance(value, str):
-                self._headers[key] = [value]
+                self._data[key] = [value]
             elif isinstance(value, list):
                 if not all(isinstance(v, str) for v in value):
                     msg = "All items in header value list must be strings"
                     raise ValueError(msg)
-                self._headers[key] = value
+                self._data[key] = value
             else:
                 msg = "Header values must be strings or lists of strings"
                 raise TypeError(msg)
@@ -34,7 +34,7 @@ class Headers:
         Returns:
             The first header value or None if the header doesn't exist
         """
-        values = self._headers.get(key)
+        values = self._data.get(key)
         if values is None or len(values) == 0:
             return None
         return values[0]
@@ -48,7 +48,7 @@ class Headers:
         Returns:
             A list of all values for the header. Returns an empty list if the header doesn't exist.
         """
-        return self._headers.get(key, [])
+        return self._data.get(key, [])
 
     def items(self):
         """Get all header items as key-value pairs.
@@ -56,7 +56,7 @@ class Headers:
         Returns:
             An iterable of (key, value_list) pairs.
         """
-        return self._headers.items()
+        return self._data.items()
 
     def asdict(self) -> dict[str, list[str]]:
         """Convert headers to a dictionary.
@@ -64,12 +64,12 @@ class Headers:
         Returns:
             A dictionary mapping header names to lists of values.
         """
-        return self._headers.copy()
+        return self._data.copy()
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Headers):
             return NotImplemented
-        return self._headers == other._headers
+        return self._data == other._data
 
 
 @dataclass
