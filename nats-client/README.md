@@ -43,7 +43,7 @@ if __name__ == "__main__":
 
 This client implementation delivers significant performance improvements over the nats.aio client, particularly for high-frequency, small message workloads.
 
-Do note tho, it is not as feature complete at this point in time.
+Do note though, it is not as feature complete at this point in time.
 
 | Message Size | nats.py (python3) | nats.py (pypy3) | experimental-nats.py (python3) | experimental-nats (pypy3) | Performance Gain |
 |--------------|-------------------|-----------------|--------------------------------|---------------------------|------------------|
