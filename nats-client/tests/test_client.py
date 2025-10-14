@@ -347,9 +347,8 @@ async def test_message_status_properties(client):
     response = await client.request(test_subject, b"test", timeout=1.0, return_on_error=True)
 
     # Verify status properties
+    assert response.status is not None
     assert response.status.code == "503"
-    assert response.has_status is True
-    assert response.is_error_status is True
 
     # Test normal message (no status)
     subscription = await client.subscribe(test_subject)
@@ -361,8 +360,6 @@ async def test_message_status_properties(client):
 
     normal_msg = await subscription.next(timeout=1.0)
     assert normal_msg.status is None
-    assert normal_msg.has_status is False
-    assert normal_msg.is_error_status is False
 
 
 @pytest.mark.asyncio

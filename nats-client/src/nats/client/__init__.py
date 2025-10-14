@@ -853,7 +853,7 @@ class Client(AbstractAsyncContextManager["Client"]):
             try:
                 response = await asyncio.wait_for(sub.next(), timeout)
 
-                if not return_on_error and response.is_error_status:
+                if not return_on_error and response.status is not None and response.status.code != "200":
                     status = response.status.code
                     description = response.status.description or "Unknown error"
                     raise StatusError.from_status(status, description, subject=subject)

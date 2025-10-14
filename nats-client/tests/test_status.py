@@ -16,23 +16,7 @@ def test_status_creation():
     assert status.description == "No Responders"
 
 
-def test_status_is_error():
-    """Test Status.is_error property."""
-    # 200 is not an error
-    status_ok = Status(code="200")
-    assert status_ok.is_error is False
 
-    # 503 is an error
-    status_error = Status(code="503", description="No Responders")
-    assert status_error.is_error is True
-
-    # 400 is an error
-    status_bad_request = Status(code="400", description="Bad Request")
-    assert status_bad_request.is_error is True
-
-    # 500 is an error
-    status_server_error = Status(code="500", description="Internal Server Error")
-    assert status_server_error.is_error is True
 
 
 def test_status_string_representation():
@@ -75,20 +59,16 @@ def test_status_common_codes():
     """Test common status codes."""
     # Success
     success = Status(code="200", description="OK")
-    assert success.is_error is False
     assert str(success) == "200: OK"
 
     # Bad Request
     bad_request = Status(code="400", description="Bad Request")
-    assert bad_request.is_error is True
     assert str(bad_request) == "400: Bad Request"
 
     # No Responders
     no_responders = Status(code="503", description="No Responders")
-    assert no_responders.is_error is True
     assert str(no_responders) == "503: No Responders"
 
     # Server Error
     server_error = Status(code="500", description="Internal Server Error")
-    assert server_error.is_error is True
     assert str(server_error) == "500: Internal Server Error"

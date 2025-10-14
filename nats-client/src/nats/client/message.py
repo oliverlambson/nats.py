@@ -84,15 +84,6 @@ class Status:
     code: str
     description: str | None = None
 
-    @property
-    def is_error(self) -> bool:
-        """Check if this status represents an error.
-
-        Returns:
-            True if the status code is not "200"
-        """
-        return self.code != "200"
-
     def __str__(self) -> str:
         """String representation of the status."""
         if self.description:
@@ -117,21 +108,3 @@ class Message:
     reply_to: str | None = None
     headers: Headers | None = None
     status: Status | None = None
-
-    @property
-    def has_status(self) -> bool:
-        """Check if this message has a NATS status.
-
-        Returns:
-            True if the message has status information
-        """
-        return self.status is not None
-
-    @property
-    def is_error_status(self) -> bool:
-        """Check if this message has an error status.
-
-        Returns:
-            True if the message has a non-200 status code
-        """
-        return self.status is not None and self.status.is_error
