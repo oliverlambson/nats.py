@@ -411,12 +411,12 @@ class Client(AbstractAsyncContextManager["Client"]):
                 try:
                     callback(msg)
                 except Exception:
-                    logger.exception("Error in subscription callback")
+                    logger.exception("Error in subscription callback for subject %s (sid %s)", subject, sid)
 
             try:
                 await subscription._pending_queue.put(msg)
             except Exception:
-                logger.exception("Error putting message in queue")
+                logger.exception("Error putting message in queue for subject %s (sid %s)", subject, sid)
 
     async def _handle_hmsg(
         self,
@@ -447,12 +447,12 @@ class Client(AbstractAsyncContextManager["Client"]):
                 try:
                     callback(msg)
                 except Exception:
-                    logger.exception("Error in subscription callback")
+                    logger.exception("Error in subscription callback for subject %s (sid %s)", subject, sid)
 
             try:
                 await subscription._pending_queue.put(msg)
             except Exception:
-                logger.exception("Error putting message in queue")
+                logger.exception("Error putting message in queue for subject %s (sid %s)", subject, sid)
 
     async def _handle_info(self, info: dict) -> None:
         """Handle INFO from server."""
@@ -473,7 +473,7 @@ class Client(AbstractAsyncContextManager["Client"]):
                 try:
                     callback(error)
                 except Exception:
-                    logger.exception("Error in error callback")
+                    logger.exception("Error in error callback while handling server error: %s", error)
 
     async def _force_disconnect(self) -> None:
         """Force disconnect from server."""
