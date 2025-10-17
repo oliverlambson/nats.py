@@ -77,4 +77,4 @@ async def jetstream(client: Client) -> JetStream:
     Returns:
         A JetStream instance.
     """
-    return new_jetstream(client)
+    return new_jetstream(client, strict=True)

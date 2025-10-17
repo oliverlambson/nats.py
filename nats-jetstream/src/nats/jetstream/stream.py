@@ -1255,7 +1255,7 @@ class Stream:
 
         # Create/update consumer via API
         response = await api.consumer_create(**request)
-        consumer_info = ConsumerInfo.from_response(response)
+        consumer_info = ConsumerInfo.from_response(response, strict=self._jetstream.strict)
 
         # Check if this is a push consumer (has deliver_subject)
         if consumer_info.config.deliver_subject:
@@ -1312,7 +1312,7 @@ class Stream:
 
         # Get consumer info via API
         response = await api.consumer_info(self._name, consumer_name)
-        return ConsumerInfo.from_response(response)
+        return ConsumerInfo.from_response(response, strict=self._jetstream.strict)
 
     async def get_consumer(self, consumer_name: str) -> Consumer:
         """Get a consumer by name."""

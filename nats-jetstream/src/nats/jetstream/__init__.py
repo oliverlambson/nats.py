@@ -217,18 +217,20 @@ class PublishAck:
 class JetStream:
     """JetStream context."""
 
-    def __init__(self, client: Client, prefix: str = "$JS.API", domain: str | None = None) -> None:
+    def __init__(self, client: Client, prefix: str = "$JS.API", domain: str | None = None, strict: bool = False) -> None:
         """Initialize JetStream client.
 
         Args:
             client: NATS client
             prefix: API prefix
             domain: JetStream domain
+            strict: Enable strict mode for from_response methods
         """
         self._client = client
         if domain:
             prefix = f"$JS.{domain}.API"
         self._prefix = prefix
+        self._strict = strict
         self._api = api.Client(client, prefix)
 
     @property
@@ -240,6 +242,11 @@ class JetStream:
     def api_prefix(self) -> str:
         """Get the API prefix."""
         return self._prefix
+
+    @property
+    def strict(self) -> bool:
+        """Get the strict mode flag."""
+        return self._strict
 
     async def publish(
         self,
@@ -265,7 +272,7 @@ class JetStream:
             timeout=5.0,
         )
 
-        publish_ack = PublishAck.from_response(json.loads(response.data))
+        publish_ack = PublishAck.from_response(json.loads(response.data), strict=self._strict)
 
         return publish_ack
 
@@ -318,7 +325,7 @@ class JetStream:
                 streams = []
 
             for stream in streams:
-                yield StreamInfo.from_response(stream)
+                yield StreamInfo.from_response(stream, strict=self._strict)
 
             # Update total if not set
             if total is None:
@@ -362,13 +369,13 @@ class JetStream:
         # Convert StreamConfig to API request format and create stream
         config_dict = config.to_request()
         response = await self._api.stream_create(**config_dict)
-        info = StreamInfo.from_response(response)
+        info = StreamInfo.from_response(response, strict=self._strict)
         return Stream(self, config.name, info)
 
     async def update_stream(self, **config) -> StreamInfo:
         """Update an existing stream."""
         response = await self._api.stream_update(**config)
-        return StreamInfo.from_response(response)
+        return StreamInfo.from_response(response, strict=self._strict)
 
     async def delete_stream(self, name: str) -> bool:
         """Delete a stream."""
@@ -390,7 +397,7 @@ class JetStream:
             subjects_filter=subjects_filter,
             offset=offset,
         )
-        return StreamInfo.from_response(response)
+        return StreamInfo.from_response(response, strict=self._strict)
 
     async def get_stream(self, name: str) -> Stream:
         """Get a stream by name."""
@@ -514,7 +521,7 @@ class JetStream:
                 consumers = []
 
             for consumer in consumers:
-                yield ConsumerInfo.from_response(consumer)
+                yield ConsumerInfo.from_response(consumer, strict=self._strict)
 
             # Update total if not set
             if total is None:
@@ -538,12 +545,12 @@ class JetStream:
             Consumer information
         """
         response = await self._api.consumer_info(stream_name, consumer_name)
-        return ConsumerInfo.from_response(response)
+        return ConsumerInfo.from_response(response, strict=self._strict)
 
     async def account_info(self) -> AccountInfo:
         """Get account information."""
         response = await self._api.account_info()
-        return AccountInfo.from_response(response)
+        return AccountInfo.from_response(response, strict=self._strict)
 
     async def get_message(self, stream: str, sequence: int) -> StreamMessage:
         """Get a message directly from a stream by sequence number.
@@ -630,18 +637,19 @@ class JetStream:
         )
 
 
-def new(client: Client, prefix: str = "$JS.API", domain: str | None = None) -> JetStream:
+def new(client: Client, prefix: str = "$JS.API", domain: str | None = None, strict: bool = False) -> JetStream:
     """Create a new JetStream instance.
 
     Args:
         client: NATS client
         prefix: API prefix
         domain: JetStream domain
+        strict: Enable strict mode for from_response methods
 
     Returns:
         A new JetStream instance
     """
-    return JetStream(client, prefix, domain)
+    return JetStream(client, prefix, domain, strict)
 
 
 __all__ = [
