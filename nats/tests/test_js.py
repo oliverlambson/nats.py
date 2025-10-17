@@ -1847,7 +1847,7 @@ class SubscribeTest(SingleJetStreamServerTestCase):
             await js.publish("pconfig", f"Hello World {i}".encode())
 
         await asyncio.sleep(0.5)
-        # Both subs should recieve same messages, but we are not sure about order
+        # Both subs should receive same messages, but we are not sure about order
         assert len(s) == len(d)
         assert set(s) == set(d)
 
@@ -2792,7 +2792,7 @@ class KVTest(SingleJetStreamServerTestCase):
         assert ok
 
         # Deleting then getting again should be a not found error still,
-        # although internall this is a KeyDeletedError.
+        # although internally this is a KeyDeletedError.
         with pytest.raises(KeyNotFoundError):
             await kv.get("name")
 
@@ -2991,7 +2991,7 @@ class KVTest(SingleJetStreamServerTestCase):
         assert ok
 
         # Deleting then getting again should be a not found error still,
-        # although internall this is a KeyDeletedError.
+        # although internally this is a KeyDeletedError.
         with pytest.raises(KeyNotFoundError):
             await kv.get("name")
 
