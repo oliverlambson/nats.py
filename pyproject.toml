@@ -13,7 +13,7 @@ dev = [
 workspace = { members = ["nats", "nats-server", "nats-client"] }
 
 [tool.ty.environment]
-root = ["nats-server/src"]
+root = ["nats-client/src", "nats-server/src"]
 
 [tool.ty.src]
 exclude = ["nats/"]
