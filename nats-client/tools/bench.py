@@ -8,7 +8,10 @@ import asyncio
 import sys
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from nats.client.message import Headers
 
 
 @dataclass
@@ -47,7 +50,7 @@ async def run_pub_benchmark(
     msg_count: int = 100_000,
     msg_size: int = 128,
     pub_subject: str = "test",
-    headers: dict[str, str] | Any | None = None,
+    headers: dict[str, str | list[str]] | Any | None = None,
 ) -> BenchmarkResults:
     """Run publisher benchmark."""
 
@@ -72,7 +75,8 @@ async def run_pub_benchmark(
         # Publish messages
         for _ in range(msg_count):
             msg_start = time.perf_counter()
-            await nc.publish(pub_subject, payload, headers=headers)
+            # Type checker sees nc as a union of both client types, so we need to ignore
+            await nc.publish(pub_subject, payload, headers=headers)  # type: ignore[arg-type]
             latencies.append(time.perf_counter() - msg_start)
 
         await nc.flush()
@@ -139,12 +143,8 @@ async def run_sub_benchmark(
         start_time = time.perf_counter()
 
         # Receive messages - handle different iterator styles
-        if client_type == "aio":
-            iterator = sub.messages
-        else:
-            iterator = sub
-
-        async for msg in iterator:
+        iterator = sub.messages if client_type == "aio" else sub  # type: ignore[attr-defined]
+        async for msg in iterator:  # type: ignore[misc]
             msg_time = time.perf_counter()
             if received == 0:
                 first_msg_time = msg_time
@@ -198,7 +198,7 @@ async def run_pubsub_benchmark(
     msg_count: int = 100_000,
     msg_size: int = 128,
     subject: str = "test",
-    headers: dict[str, str] | Any | None = None,
+    headers: dict[str, str | list[str]] | Any | None = None,
 ) -> tuple[BenchmarkResults, BenchmarkResults]:
     """Run combined publisher/subscriber benchmark."""
 
