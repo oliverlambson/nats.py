@@ -1084,6 +1084,7 @@ async def connect(
     connect_info = ConnectInfo(
         verbose=False,
         pedantic=False,
+        tls_required=False,
         lang="python",
         version=__version__,
         protocol=1,
