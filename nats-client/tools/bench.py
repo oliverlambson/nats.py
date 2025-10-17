@@ -8,10 +8,7 @@ import asyncio
 import sys
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from nats.client.message import Headers
+from typing import Any
 
 
 @dataclass
