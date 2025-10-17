@@ -25,10 +25,10 @@ def test_headers_init():
 
     # Invalid header values
     with pytest.raises(TypeError):
-        Headers({"key1": 123})
+        Headers({"key1": 123})  # type: ignore[dict-item]
 
     with pytest.raises(ValueError):
-        Headers({"key1": ["value1", 123]})
+        Headers({"key1": ["value1", 123]})  # type: ignore[list-item]
 
 
 def test_headers_get():

@@ -9,7 +9,7 @@ reads and interprets messages from a NATS server connection.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Final, Literal, NamedTuple, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Final, Literal, NamedTuple, Protocol, cast, runtime_checkable
 
 from nats.client.protocol.types import ServerInfo
 
@@ -308,7 +308,7 @@ async def parse_info(args: list[bytes]) -> Info:
 
     try:
         data = json.loads(info_data)
-        return Info("INFO", ServerInfo(data))
+        return Info("INFO", cast(ServerInfo, data))
     except json.JSONDecodeError as e:
         msg = f"Invalid INFO JSON: {e}"
         raise ParseError(msg) from e

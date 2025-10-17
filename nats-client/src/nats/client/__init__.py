@@ -439,7 +439,7 @@ class Client(AbstractAsyncContextManager["Client"]):
                 subject=subject,
                 data=payload,
                 reply_to=reply_to,
-                headers=Headers(headers) if headers else None,
+                headers=Headers(headers) if headers else None,  # type: ignore[arg-type]
                 status=status,
             )
 
@@ -566,6 +566,10 @@ class Client(AbstractAsyncContextManager["Client"]):
                             host = parsed_url.hostname
                             port = parsed_url.port or 4222
                             scheme = parsed_url.scheme
+
+                            if not host:
+                                logger.warning("Failed to parse hostname from server URL: %s", server)
+                                continue
 
                             try:
                                 if scheme in ("tls", "wss"):
@@ -709,7 +713,7 @@ class Client(AbstractAsyncContextManager["Client"]):
                 subject,
                 payload,
                 reply_to=reply_to,
-                headers=headers_dict,
+                headers=headers_dict,  # type: ignore[arg-type]
             )
         else:
             command_parts = encode_pub(

@@ -144,16 +144,10 @@ def test_encode_connect():
         verbose=False,
         pedantic=False,
         tls_required=False,
-        auth_token=None,
-        user=None,
-        pass_=None,
-        name=None,
         lang="python",
         version="0.1.0",
         protocol=1,
         echo=True,
-        sig=None,
-        jwt=None,
         no_responders=False,
         headers=True,
     )
@@ -307,6 +301,7 @@ async def test_parse_ping_message():
     reader.feed_eof()
 
     msg = await parse(reader)
+    assert msg is not None
     assert msg.op == "PING"
 
 
@@ -320,6 +315,7 @@ async def test_parse_pong_message():
     reader.feed_eof()
 
     msg = await parse(reader)
+    assert msg is not None
     assert msg.op == "PONG"
 
 
@@ -360,5 +356,6 @@ async def test_parse_err_message():
     reader.feed_eof()
 
     msg = await parse(reader)
+    assert msg is not None
     assert msg.op == "ERR"
     assert msg.error == "Unknown Protocol"

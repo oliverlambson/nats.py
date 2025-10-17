@@ -330,6 +330,7 @@ async def test_request_with_no_responders_raises_error(client):
 
     # Verify the exception details
     error = exc_info.value
+    assert isinstance(error, NoRespondersError)
     assert error.subject == test_subject
     assert error.status == "503"
 
@@ -502,6 +503,7 @@ async def test_cluster_reconnect_sequential_shutdown(cluster_size):
         # Shut down servers one by one (shut down the server we're connected to)
         for i in range(len(cluster.servers) - 1):  # Keep last server running
             # Find which server the client is currently connected to using server_info
+            assert client.server_info is not None
             connected_port = client.server_info.port
 
             # Find the matching server in the cluster by port
@@ -595,7 +597,8 @@ async def test_custom_inbox_prefix(server):
             nonlocal received_reply_to
             message = await subscription.next(timeout=2.0)
             received_reply_to = message.reply_to
-            await client.publish(message.reply_to, reply_payload)
+            assert received_reply_to is not None
+            await client.publish(received_reply_to, reply_payload)
 
         responder_task = asyncio.create_task(handle_request())
 
