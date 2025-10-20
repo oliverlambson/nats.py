@@ -593,3 +593,199 @@ async def test_consumer_prioritized_messages_stream(jetstream: JetStream):
     finally:
         await stream1.stop()
         await stream2.stop()
+
+
+@pytest.mark.asyncio
+async def test_consumer_pause_resume(jetstream: JetStream):
+    """Test pausing and resuming a consumer.
+
+    Requires NATS server 2.11.0+
+    """
+    import time
+
+    # Create a stream
+    stream = await jetstream.create_stream(name="test_pause", subjects=["PAUSE.*"])
+
+    # Create a consumer
+    consumer = await stream.create_consumer(
+        name="pause_consumer",
+        durable_name="pause_consumer",
+        filter_subject="PAUSE.*",
+        deliver_policy="all",
+        ack_policy="explicit",
+    )
+
+    # Publish some messages
+    for i in range(10):
+        await jetstream.publish("PAUSE.test", f"message {i}".encode())
+
+    # Fetch a few messages to verify consumer is working
+    batch = await consumer.fetch(max_messages=3, max_wait=1.0)
+    received = []
+    async for msg in batch:
+        received.append(msg.data)
+        await msg.ack()
+    assert len(received) == 3
+
+    # Pause the consumer for 2 seconds
+    pause_until = time.time() + 2.0
+    await stream.pause_consumer("pause_consumer", pause_until)
+
+    # Verify consumer info shows it's paused
+    info = await stream.get_consumer_info("pause_consumer")
+    assert info.paused is True
+    assert info.pause_remaining is not None
+    assert info.pause_remaining > 0
+
+    # Try to fetch messages while paused - should timeout/get no messages quickly
+    batch = await consumer.fetch(max_messages=5, max_wait=0.5)
+    received_while_paused = []
+    async for msg in batch:
+        received_while_paused.append(msg.data)
+        await msg.ack()
+
+    # Should get no messages while paused (or very few if there's timing issues)
+    assert len(received_while_paused) == 0
+
+    # Wait for pause to expire
+    await asyncio.sleep(2.1)
+
+    # Verify consumer is automatically unpaused
+    # When unpaused, server may not return paused/pause_remaining fields at all
+    info = await stream.get_consumer_info("pause_consumer")
+    assert info.paused is False or info.paused is None or info.pause_remaining == 0
+
+    # Should be able to fetch messages again
+    batch = await consumer.fetch(max_messages=5, max_wait=1.0)
+    received_after = []
+    async for msg in batch:
+        received_after.append(msg.data)
+        await msg.ack()
+    assert len(received_after) > 0
+
+
+@pytest.mark.asyncio
+async def test_consumer_resume(jetstream: JetStream):
+    """Test explicitly resuming a paused consumer.
+
+    Requires NATS server 2.11.0+
+    """
+    import time
+
+    # Create a stream
+    stream = await jetstream.create_stream(name="test_resume", subjects=["RESUME.*"])
+
+    # Create a consumer
+    consumer = await stream.create_consumer(
+        name="resume_consumer",
+        durable_name="resume_consumer",
+        filter_subject="RESUME.*",
+        deliver_policy="all",
+        ack_policy="explicit",
+    )
+
+    # Publish some messages
+    for i in range(10):
+        await jetstream.publish("RESUME.test", f"message {i}".encode())
+
+    # Pause the consumer for a long time (10 seconds)
+    pause_until = time.time() + 10.0
+    await stream.pause_consumer("resume_consumer", pause_until)
+
+    # Verify it's paused
+    info = await stream.get_consumer_info("resume_consumer")
+    assert info.paused is True
+
+    # Explicitly resume it
+    await stream.resume_consumer("resume_consumer")
+
+    # Verify it's resumed (when unpaused, server may not return the paused field)
+    info = await stream.get_consumer_info("resume_consumer")
+    assert info.paused is False or info.paused is None
+
+    # Should be able to fetch messages
+    batch = await consumer.fetch(max_messages=5, max_wait=1.0)
+    received = []
+    async for msg in batch:
+        received.append(msg.data)
+        await msg.ack()
+    assert len(received) == 5
+
+
+@pytest.mark.asyncio
+async def test_consumer_pause_invalid_stream(jetstream: JetStream):
+    """Test error handling when pausing consumer with invalid stream name.
+
+    Requires NATS server 2.11.0+
+    """
+    import time
+    from nats.jetstream.api.client import Error as ApiError
+
+    # Create a stream
+    stream = await jetstream.create_stream(name="test_pause_error", subjects=["ERROR.*"])
+
+    # Try to pause a consumer on a non-existent stream
+    # Access the internal API to test this
+    api = getattr(jetstream, "_api", None)
+    assert api is not None
+
+    pause_until = time.time() + 60.0
+    from datetime import datetime, timezone
+    dt = datetime.fromtimestamp(pause_until, tz=timezone.utc)
+    pause_until_str = dt.isoformat().replace('+00:00', 'Z')
+
+    # Should raise an error for non-existent stream
+    with pytest.raises(ApiError) as exc_info:
+        await api.consumer_pause("nonexistent_stream", "nonexistent_consumer", pause_until_str)
+
+    assert exc_info.value.code is not None
+
+
+@pytest.mark.asyncio
+async def test_consumer_resume_invalid_stream(jetstream: JetStream):
+    """Test error handling when resuming consumer with invalid stream name.
+
+    Requires NATS server 2.11.0+
+    """
+    from nats.jetstream.api.client import Error as ApiError
+
+    # Create a stream
+    stream = await jetstream.create_stream(name="test_resume_error", subjects=["RERROR.*"])
+
+    # Try to resume a consumer on a non-existent stream
+    # Access the internal API to test this
+    api = getattr(jetstream, "_api", None)
+    assert api is not None
+
+    # Should raise an error for non-existent stream
+    with pytest.raises(ApiError) as exc_info:
+        await api.consumer_pause("nonexistent_stream", "nonexistent_consumer", "1970-01-01T00:00:00Z")
+
+    assert exc_info.value.code is not None
+
+
+@pytest.mark.asyncio
+async def test_consumer_info_not_paused_initially(jetstream: JetStream):
+    """Test that newly created consumers are not paused.
+
+    Validates that ConsumerInfo shows correct initial pause state.
+    """
+    # Create a stream
+    stream = await jetstream.create_stream(name="test_initial_pause_state", subjects=["INITIAL.*"])
+
+    # Create a consumer
+    consumer = await stream.create_consumer(
+        name="initial_consumer",
+        durable_name="initial_consumer",
+        filter_subject="INITIAL.*",
+        deliver_policy="all",
+        ack_policy="explicit",
+    )
+
+    # Get consumer info
+    info = await stream.get_consumer_info("initial_consumer")
+
+    # Verify new consumer is not paused
+    # paused and pause_remaining may be None (not returned) or False/0
+    assert info.paused is None or info.paused is False
+    assert info.pause_remaining is None or info.pause_remaining == 0

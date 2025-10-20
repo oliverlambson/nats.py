@@ -314,6 +314,10 @@ class ConsumerInfo:
     """The server time the consumer info was created."""
     priority_groups: list[dict[str, Any]] | None = None
     """Current priority group state information."""
+    paused: bool | None = None
+    """Indicates if the consumer is currently in a paused state."""
+    pause_remaining: int | None = None
+    """When paused, the time remaining until unpause (in nanoseconds)."""
 
     @classmethod
     def from_response(cls, data: api.ConsumerInfo, *, strict: bool = False) -> ConsumerInfo:
@@ -332,6 +336,8 @@ class ConsumerInfo:
         push_bound = data.pop("push_bound", None)
         ts = data.pop("ts", None)
         priority_groups = data.pop("priority_groups", None)
+        paused = data.pop("paused", None)
+        pause_remaining = data.pop("pause_remaining", None)
 
         # Pop response envelope fields that aren't part of ConsumerInfo
         data.pop("type", None)  # Response type discriminator
@@ -355,6 +361,8 @@ class ConsumerInfo:
             push_bound=push_bound,
             ts=ts,
             priority_groups=priority_groups,
+            paused=paused,
+            pause_remaining=pause_remaining,
         )
 
 

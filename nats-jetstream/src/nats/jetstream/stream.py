@@ -1348,3 +1348,39 @@ class Stream:
             The updated consumer
         """
         return await self._upsert_consumer(action=CONSUMER_ACTION_UPDATE, name=consumer_name, **config)
+
+    async def pause_consumer(self, consumer_name: str, pause_until: float) -> None:
+        """Pause a consumer until a specific time.
+
+        Args:
+            consumer_name: Name of the consumer to pause
+            pause_until: Unix timestamp (in seconds) to pause until
+        """
+        from datetime import datetime, timezone
+
+        # Get API client from jetstream
+        api = getattr(self._jetstream, "_api", None)
+        if api is None:
+            raise RuntimeError("JetStream does not have an API client")
+
+        # Convert Unix timestamp to RFC3339 string (ISO 8601 format with timezone)
+        dt = datetime.fromtimestamp(pause_until, tz=timezone.utc)
+        pause_until_str = dt.isoformat().replace('+00:00', 'Z')
+
+        # Pause consumer via API
+        await api.consumer_pause(self._name, consumer_name, pause_until_str)
+
+    async def resume_consumer(self, consumer_name: str) -> None:
+        """Resume a paused consumer immediately.
+
+        Args:
+            consumer_name: Name of the consumer to resume
+        """
+        # Get API client from jetstream
+        api = getattr(self._jetstream, "_api", None)
+        if api is None:
+            raise RuntimeError("JetStream does not have an API client")
+
+        # Resume by setting pause_until to a time in the past (epoch)
+        # RFC3339 format: "1970-01-01T00:00:00Z"
+        await api.consumer_pause(self._name, consumer_name, pause_until="1970-01-01T00:00:00Z")

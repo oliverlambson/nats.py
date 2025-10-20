@@ -21,6 +21,7 @@ from .types import (
     ConsumerInfoResponse,
     ConsumerListResponse,
     ConsumerNamesResponse,
+    ConsumerPauseResponse,
     ErrorResponse,
     StreamCreateRequest,
     StreamCreateResponse,
@@ -176,6 +177,29 @@ class Client:
             f"{self._prefix}.CONSUMER.NAMES.{stream_name}",
             request if request else None,
             response_type=ConsumerNamesResponse,
+        )
+
+    async def consumer_pause(
+        self, stream_name: str, consumer_name: str, pause_until: str | None = None
+    ) -> ConsumerPauseResponse:
+        """Pause or resume a consumer.
+
+        Args:
+            stream_name: The stream name
+            consumer_name: The consumer name
+            pause_until: RFC3339 timestamp string to pause until. If None or in the past, resumes the consumer.
+
+        Returns:
+            ConsumerPauseResponse with pause state
+        """
+        request = {}
+        if pause_until is not None:
+            request["pause_until"] = pause_until
+
+        return await self.request_json(
+            f"{self._prefix}.CONSUMER.PAUSE.{stream_name}.{consumer_name}",
+            request if request else None,
+            response_type=ConsumerPauseResponse,
         )
 
     async def stream_create(self, name: str, **kwargs: Unpack[StreamCreateRequest]) -> StreamCreateResponse:
