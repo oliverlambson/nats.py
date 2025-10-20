@@ -79,17 +79,45 @@ class PullMessageBatch(MessageBatch):
                             raise StopAsyncIteration
                         case "408":  # Timeout
                             raise StopAsyncIteration
-                        case "409":  # Could be consumer deleted or max bytes exceeded
-                            # Check if this is a consumer deleted error
+                        case "400":  # Bad Request - terminal error
+                            description = raw_msg.status.description or "Bad Request"
+                            self._error = ValueError(f"Bad Request: {description}")
+                            raise StopAsyncIteration
+                        case "409":  # Multiple meanings - need to parse description
                             description = raw_msg.status.description or ""
-                            if "consumer deleted" in description.lower():
+                            description_lower = description.lower()
+
+                            # Terminal 409 errors
+                            if "consumer deleted" in description_lower:
                                 from nats.jetstream.api.client import ConsumerDeletedError
                                 self._error = ConsumerDeletedError(description)
+                                raise StopAsyncIteration
+                            elif "consumer is push based" in description_lower:
+                                self._error = ValueError(f"Consumer type mismatch: {description}")
+                                raise StopAsyncIteration
+
+                            # Non-terminal 409 errors (silently handled)
+                            elif "message size exceeds maxbytes" in description_lower:
+                                # Single message too large - skip and continue
+                                raise StopAsyncIteration
+                            elif "exceeded maxrequestbatch" in description_lower:
+                                # Batch size too large - batch complete, no error
+                                raise StopAsyncIteration
+                            elif "exceeded maxrequestexpires" in description_lower:
+                                # Expiration too long - batch complete, no error
+                                raise StopAsyncIteration
+                            elif "exceeded maxrequestmaxbytes" in description_lower:
+                                # Byte limit too large - batch complete, no error
+                                raise StopAsyncIteration
+                            elif "exceeded maxwaiting" in description_lower:
+                                # Too many pending requests - batch complete, no error
+                                raise StopAsyncIteration
                             else:
-                                # Message size exceeds MaxBytes or other 409 error
+                                # Unknown 409 error - treat as terminal
                                 self._error = Exception(f"Status 409: {description}")
-                            raise StopAsyncIteration
+                                raise StopAsyncIteration
                         case _:
+                            # Unknown status code - treat as terminal
                             self._error = Exception(f"Status {raw_msg.status.code}: {raw_msg.status.description or ''}")
                             raise StopAsyncIteration
 
@@ -196,16 +224,59 @@ class PullMessageStream(MessageStream):
                         # Immediately request more messages
                         await self._send_request()
                         continue
-                    case "408":  # Timeout
+                    case "408":  # Timeout - continue requesting
                         continue
-                    case "409":  # Message Size Exceeds MaxBytes - batch is complete due to size limit
-                        # Reset pending counts as the batch is done
-                        self._pending_messages = 0
-                        self._pending_bytes = 0
-                        # Immediately request more messages
-                        await self._send_request()
-                        continue
-                    case _:  # Error
+                    case "400":  # Bad Request - terminal error
+                        await self._cleanup()
+                        raise StopAsyncIteration
+                    case "409":  # Multiple meanings - need to parse description
+                        description = raw_msg.status.description or ""
+                        description_lower = description.lower()
+
+                        # Terminal 409 errors
+                        if "consumer deleted" in description_lower:
+                            await self._cleanup()
+                            raise StopAsyncIteration
+                        elif "consumer is push based" in description_lower:
+                            await self._cleanup()
+                            raise StopAsyncIteration
+
+                        # Non-terminal 409 errors (continue with warning/handling)
+                        elif "message size exceeds maxbytes" in description_lower:
+                            # Single message too large - reset and request more
+                            self._pending_messages = 0
+                            self._pending_bytes = 0
+                            await self._send_request()
+                            continue
+                        elif "exceeded maxrequestbatch" in description_lower:
+                            # Batch size too large - reset and request more
+                            self._pending_messages = 0
+                            self._pending_bytes = 0
+                            await self._send_request()
+                            continue
+                        elif "exceeded maxrequestexpires" in description_lower:
+                            # Expiration too long - reset and request more
+                            self._pending_messages = 0
+                            self._pending_bytes = 0
+                            await self._send_request()
+                            continue
+                        elif "exceeded maxrequestmaxbytes" in description_lower:
+                            # Byte limit too large - reset and request more
+                            self._pending_messages = 0
+                            self._pending_bytes = 0
+                            await self._send_request()
+                            continue
+                        elif "exceeded maxwaiting" in description_lower:
+                            # Too many pending requests - reset and request more
+                            self._pending_messages = 0
+                            self._pending_bytes = 0
+                            await self._send_request()
+                            continue
+                        else:
+                            # Unknown 409 error - treat as terminal
+                            await self._cleanup()
+                            raise StopAsyncIteration
+                    case _:  # Unknown error - terminal
                         await self._cleanup()
                         raise StopAsyncIteration
 
