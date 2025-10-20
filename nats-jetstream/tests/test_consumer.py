@@ -967,3 +967,92 @@ async def test_update_consumer_with_filter_subjects(jetstream: JetStream):
     assert "BAR.A" in subjects
     assert "BAR.B" in subjects
     assert "BAR.C" not in subjects
+
+
+@pytest.mark.asyncio
+async def test_messages_with_custom_thresholds(jetstream: JetStream):
+    """Test messages() with configurable threshold_messages and threshold_bytes (ADR-37).
+
+    Verifies that custom thresholds work instead of the default 50%.
+    """
+    # Create a stream
+    stream = await jetstream.create_stream(name="test_thresholds", subjects=["THRESH.*"])
+
+    # Create a consumer
+    consumer = await stream.create_consumer(
+        name="threshold_consumer",
+        filter_subject="THRESH.*",
+        deliver_policy="all",
+        ack_policy="explicit",
+    )
+
+    # Publish some messages
+    for i in range(20):
+        await jetstream.publish("THRESH.test", f"message {i}".encode())
+
+    # Create message stream with custom thresholds
+    # Request batches of 10 messages, but refill when < 8 messages remain (80% threshold instead of 50%)
+    message_stream = await consumer.messages(
+        max_messages=10,
+        threshold_messages=8,  # Refill at 80% consumed instead of default 50%
+        max_wait=2.0,
+    )
+
+    try:
+        received = []
+        async for msg in message_stream:
+            received.append(msg.data)
+            await msg.ack()
+            if len(received) >= 20:
+                break
+
+        # Should have received all 20 messages
+        assert len(received) == 20
+
+    finally:
+        await message_stream.stop()
+
+
+@pytest.mark.asyncio
+async def test_messages_with_threshold_bytes(jetstream: JetStream):
+    """Test messages() with threshold_bytes parameter (ADR-37).
+
+    Verifies that byte-based thresholds work for refilling.
+    """
+    # Create a stream
+    stream = await jetstream.create_stream(name="test_thresh_bytes", subjects=["TBYTES.*"])
+
+    # Create a consumer
+    consumer = await stream.create_consumer(
+        name="thresh_bytes_consumer",
+        filter_subject="TBYTES.*",
+        deliver_policy="all",
+        ack_policy="explicit",
+    )
+
+    # Publish 10 messages of ~100 bytes each
+    for i in range(10):
+        await jetstream.publish("TBYTES.test", b"x" * 100)
+
+    # Create message stream with byte thresholds
+    # Request up to 500 bytes, refill when < 400 bytes remain (80% threshold)
+    message_stream = await consumer.messages(
+        max_messages=10,
+        max_bytes=500,
+        threshold_bytes=400,  # Refill when less than 400 bytes buffered
+        max_wait=2.0,
+    )
+
+    try:
+        received = []
+        async for msg in message_stream:
+            received.append(msg.data)
+            await msg.ack()
+            if len(received) >= 10:
+                break
+
+        # Should have received all 10 messages
+        assert len(received) == 10
+
+    finally:
+        await message_stream.stop()

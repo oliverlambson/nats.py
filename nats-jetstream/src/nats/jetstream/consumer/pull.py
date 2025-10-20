@@ -170,6 +170,8 @@ class PullMessageStream(MessageStream):
         min_pending: int | None = None,
         priority_group: str | None = None,
         priority: int | None = None,
+        threshold_messages: int | None = None,
+        threshold_bytes: int | None = None,
     ):
         self._consumer = consumer
         self._subscription = subscription
@@ -181,6 +183,9 @@ class PullMessageStream(MessageStream):
         self._min_pending = min_pending
         self._priority_group = priority_group
         self._priority = priority
+        # Set thresholds with defaults to 50% if not specified
+        self._threshold_messages = threshold_messages if threshold_messages is not None else batch // 2
+        self._threshold_bytes = threshold_bytes if threshold_bytes is not None and max_bytes is not None else (max_bytes // 2 if max_bytes is not None else None)
         self._terminated = False
         self._pending_messages = 0
         self._pending_bytes = 0
@@ -344,11 +349,11 @@ class PullMessageStream(MessageStream):
                 await asyncio.sleep(0.1)  # Check every 100ms
 
                 # Send new request if we're running low on messages
-                should_request = self._pending_messages < self._batch // 2
+                should_request = self._pending_messages < self._threshold_messages
 
-                # Also consider bytes if we have a limit
-                if self._max_bytes is not None:
-                    should_request = should_request or self._pending_bytes < self._max_bytes // 2
+                # Also consider bytes if we have a limit and threshold
+                if self._threshold_bytes is not None:
+                    should_request = should_request or self._pending_bytes < self._threshold_bytes
 
                 if should_request:
                     await self._send_request()
@@ -455,6 +460,8 @@ class PullConsumer(Consumer):
         min_pending: int | None = None,
         priority_group: str | None = None,
         priority: int | None = None,
+        threshold_messages: int | None = None,
+        threshold_bytes: int | None = None,
     ) -> MessageStream:
         """Create a continuous message stream for manual iteration.
 
@@ -468,6 +475,10 @@ class PullConsumer(Consumer):
             priority_group: Priority group for message fetching
             priority: Priority level (0-9, lower is higher priority). Requires priority_group
                      and consumer with PriorityPolicyPrioritized.
+            threshold_messages: Refill threshold for messages (default: max_messages // 2).
+                              When pending messages falls below this, a new batch is requested.
+            threshold_bytes: Refill threshold for bytes (default: max_bytes // 2).
+                           When pending bytes falls below this, a new batch is requested.
 
         Returns:
             MessageStream for manual message consumption
@@ -488,6 +499,8 @@ class PullConsumer(Consumer):
             min_pending=min_pending,
             priority_group=priority_group,
             priority=priority,
+            threshold_messages=threshold_messages,
+            threshold_bytes=threshold_bytes,
         )
 
         return stream
