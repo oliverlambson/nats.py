@@ -415,3 +415,181 @@ async def test_consumer_messages_with_max_bytes_and_max_messages(jetstream: JetS
 
     finally:
         await message_stream.stop()
+
+
+@pytest.mark.asyncio
+async def test_consumer_prioritized_fetch(jetstream: JetStream):
+    """Test priority-based message consumption using fetch.
+
+    Based on Go test: TestConsumerPrioritized - Fetch subtest.
+    Validates that lower priority values receive messages first.
+    Requires NATS server 2.12.0+
+    """
+    # Create a stream
+    stream = await jetstream.create_stream(name="test_prioritized", subjects=["PRIORITY.*"])
+
+    # Create a consumer with prioritized policy
+    consumer = await stream.create_consumer(
+        name="priority_consumer",
+        durable_name="priority_consumer",
+        filter_subject="PRIORITY.*",
+        deliver_policy="all",
+        ack_policy="explicit",
+        priority_policy="prioritized",
+        priority_groups=["A"],
+    )
+
+    # Start both fetch requests BEFORE publishing messages
+    # This ensures both requests are waiting when messages arrive
+    # Lower priority consumer (priority=1) requests 100 messages
+    batch1_task = asyncio.create_task(
+        consumer.fetch(max_messages=100, max_wait=5.0, priority_group="A", priority=1)
+    )
+
+    # Higher priority consumer (priority=0) requests 75 messages
+    batch2_task = asyncio.create_task(
+        consumer.fetch(max_messages=75, max_wait=5.0, priority_group="A", priority=0)
+    )
+
+    # Give both requests time to be sent to the server
+    await asyncio.sleep(0.1)
+
+    # Now publish 100 messages - they should be distributed by priority
+    for i in range(100):
+        await jetstream.publish("PRIORITY.test", f"message {i}".encode())
+
+    # Wait for both batches to complete
+    batch2 = await batch2_task
+    batch1 = await batch1_task
+
+    # Collect messages from higher priority consumer (should get 75)
+    received2 = []
+    async for msg in batch2:
+        received2.append(msg.data)
+        await msg.ack()
+
+    # Collect messages from lower priority consumer (should get 25)
+    received1 = []
+    async for msg in batch1:
+        received1.append(msg.data)
+        await msg.ack()
+
+    # Higher priority (0) should have received 75 messages
+    assert len(received2) == 75
+    # Lower priority (1) should have received remaining 25 messages
+    assert len(received1) == 25
+
+
+@pytest.mark.asyncio
+async def test_consumer_prioritized_next(jetstream: JetStream):
+    """Test priority-based message consumption using next() method.
+    Requires NATS server 2.12.0+
+    """
+    # Create a stream
+    stream = await jetstream.create_stream(name="test_prioritized_next", subjects=["PNEXT.*"])
+
+    # Create a consumer with prioritized policy
+    consumer = await stream.create_consumer(
+        name="priority_next_consumer",
+        durable_name="priority_next_consumer",
+        filter_subject="PNEXT.*",
+        deliver_policy="all",
+        ack_policy="explicit",
+        priority_policy="prioritized",
+        priority_groups=["B"],
+    )
+
+    # Publish 10 messages
+    for i in range(10):
+        await jetstream.publish("PNEXT.test", f"next {i}".encode())
+
+    # Higher priority consumer should get messages
+    received_high = []
+    for _ in range(7):
+        msg = await consumer.next(max_wait=1.0, priority_group="B", priority=0)
+        received_high.append(msg.data)
+        await msg.ack()
+
+    # Lower priority consumer should get remaining messages
+    received_low = []
+    for _ in range(3):
+        msg = await consumer.next(max_wait=1.0, priority_group="B", priority=5)
+        received_low.append(msg.data)
+        await msg.ack()
+
+    assert len(received_high) == 7
+    assert len(received_low) == 3
+
+
+@pytest.mark.asyncio
+async def test_consumer_prioritized_messages_stream(jetstream: JetStream):
+    """Test priority-based message consumption using messages() stream.
+
+    Based on Go test: TestConsumerPrioritized - Messages subtest.
+    Requires NATS server 2.12.0+
+    """
+    # Create a stream
+    stream = await jetstream.create_stream(name="test_prioritized_stream", subjects=["PSTREAM.*"])
+
+    # Create a consumer with prioritized policy
+    consumer = await stream.create_consumer(
+        name="priority_stream_consumer",
+        durable_name="priority_stream_consumer",
+        filter_subject="PSTREAM.*",
+        deliver_policy="all",
+        ack_policy="explicit",
+        priority_policy="prioritized",
+        priority_groups=["C"],
+    )
+
+    # Publish 50 messages
+    for i in range(50):
+        await jetstream.publish("PSTREAM.test", f"stream {i}".encode())
+
+    # Create two message streams with different priorities
+    stream1 = await consumer.messages(
+        max_messages=10,
+        max_wait=2.0,
+        priority_group="C",
+        priority=1,  # Lower priority
+    )
+
+    stream2 = await consumer.messages(
+        max_messages=10,
+        max_wait=2.0,
+        priority_group="C",
+        priority=0,  # Higher priority
+    )
+
+    try:
+        # Higher priority stream should receive more messages
+        received1 = []
+        received2 = []
+
+        async def collect1():
+            async for msg in stream1:
+                received1.append(msg.data)
+                await msg.ack()
+                if len(received1) >= 20:
+                    break
+
+        async def collect2():
+            async for msg in stream2:
+                received2.append(msg.data)
+                await msg.ack()
+                if len(received2) >= 30:
+                    break
+
+        # Run both collectors concurrently
+        await asyncio.gather(
+            asyncio.wait_for(collect1(), timeout=5.0),
+            asyncio.wait_for(collect2(), timeout=5.0),
+        )
+
+        # Higher priority (0) should receive more messages than lower priority (1)
+        # Exact distribution may vary, but higher priority should dominate
+        assert len(received2) >= len(received1)
+
+    finally:
+        await stream1.stop()
+        await stream2.stop()

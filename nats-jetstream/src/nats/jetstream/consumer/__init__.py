@@ -312,6 +312,8 @@ class ConsumerInfo:
     push_bound: bool | None = None
     ts: int | None = None
     """The server time the consumer info was created."""
+    priority_groups: list[dict[str, Any]] | None = None
+    """Current priority group state information."""
 
     @classmethod
     def from_response(cls, data: api.ConsumerInfo, *, strict: bool = False) -> ConsumerInfo:
@@ -329,6 +331,7 @@ class ConsumerInfo:
         cluster = data.pop("cluster", None)
         push_bound = data.pop("push_bound", None)
         ts = data.pop("ts", None)
+        priority_groups = data.pop("priority_groups", None)
 
         # Pop response envelope fields that aren't part of ConsumerInfo
         data.pop("type", None)  # Response type discriminator
@@ -351,6 +354,7 @@ class ConsumerInfo:
             cluster=cluster,
             push_bound=push_bound,
             ts=ts,
+            priority_groups=priority_groups,
         )
 
 

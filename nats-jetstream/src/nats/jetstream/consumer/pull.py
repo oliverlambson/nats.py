@@ -112,6 +112,10 @@ class PullMessageStream(MessageStream):
     _max_bytes: int | None
     _heartbeat: float | None
     _expires: float
+    _min_ack_pending: int | None
+    _min_pending: int | None
+    _priority_group: str | None
+    _priority: int | None
     _terminated: bool
     _pending_messages: int
     _pending_bytes: int
@@ -126,6 +130,10 @@ class PullMessageStream(MessageStream):
         max_bytes: int | None = None,
         heartbeat: float | None = None,
         expires: float = 30.0,
+        min_ack_pending: int | None = None,
+        min_pending: int | None = None,
+        priority_group: str | None = None,
+        priority: int | None = None,
     ):
         self._consumer = consumer
         self._subscription = subscription
@@ -133,6 +141,10 @@ class PullMessageStream(MessageStream):
         self._max_bytes = max_bytes
         self._heartbeat = heartbeat
         self._expires = expires
+        self._min_ack_pending = min_ack_pending
+        self._min_pending = min_pending
+        self._priority_group = priority_group
+        self._priority = priority
         self._terminated = False
         self._pending_messages = 0
         self._pending_bytes = 0
@@ -221,6 +233,18 @@ class PullMessageStream(MessageStream):
         if self._max_bytes is not None:
             request["max_bytes"] = self._max_bytes
 
+        if self._min_ack_pending is not None:
+            request["min_ack_pending"] = self._min_ack_pending
+
+        if self._min_pending is not None:
+            request["min_pending"] = self._min_pending
+
+        if self._priority_group is not None:
+            request["group"] = self._priority_group
+
+        if self._priority is not None:
+            request["priority"] = self._priority
+
         api_prefix = jetstream.api_prefix
         subject = f"{api_prefix}.CONSUMER.MSG.NEXT.{self._consumer.stream_name}.{self._consumer.name}"
         payload = json.dumps(request).encode()
@@ -304,6 +328,7 @@ class PullConsumer(Consumer):
         min_ack_pending: int | None = None,
         min_pending: int | None = None,
         priority_group: str | None = None,
+        priority: int | None = None,
     ) -> Message:
         """Fetch the next single message from the consumer.
 
@@ -313,6 +338,8 @@ class PullConsumer(Consumer):
             min_ack_pending: Minimum number of unacknowledged messages that can be pending
             min_pending: Minimum number of messages that should be pending in the stream
             priority_group: Priority group for message fetching
+            priority: Priority level (0-9, lower is higher priority). Requires priority_group
+                     and consumer with PriorityPolicyPrioritized.
 
         Returns:
             The next message
@@ -327,6 +354,7 @@ class PullConsumer(Consumer):
             min_ack_pending=min_ack_pending,
             min_pending=min_pending,
             priority_group=priority_group,
+            priority=priority,
         )
         async for msg in batch:
             return msg
@@ -339,6 +367,10 @@ class PullConsumer(Consumer):
         max_bytes: int | None = None,
         heartbeat: float | None = None,
         max_wait: float = 30.0,
+        min_ack_pending: int | None = None,
+        min_pending: int | None = None,
+        priority_group: str | None = None,
+        priority: int | None = None,
     ) -> MessageStream:
         """Create a continuous message stream for manual iteration.
 
@@ -347,6 +379,11 @@ class PullConsumer(Consumer):
             max_bytes: Maximum bytes per batch (can be used together with max_messages)
             heartbeat: Heartbeat interval in seconds
             max_wait: Request expiration time in seconds
+            min_ack_pending: Minimum number of unacknowledged messages that can be pending
+            min_pending: Minimum number of messages that should be pending in the stream
+            priority_group: Priority group for message fetching
+            priority: Priority level (0-9, lower is higher priority). Requires priority_group
+                     and consumer with PriorityPolicyPrioritized.
 
         Returns:
             MessageStream for manual message consumption
@@ -363,6 +400,10 @@ class PullConsumer(Consumer):
             max_bytes=max_bytes,
             heartbeat=heartbeat,
             expires=max_wait,
+            min_ack_pending=min_ack_pending,
+            min_pending=min_pending,
+            priority_group=priority_group,
+            priority=priority,
         )
 
         return stream
@@ -377,6 +418,7 @@ class PullConsumer(Consumer):
         min_ack_pending: int | None = None,
         min_pending: int | None = None,
         priority_group: str | None = None,
+        priority: int | None = None,
     ) -> MessageBatch: ...
 
     @overload
@@ -389,6 +431,7 @@ class PullConsumer(Consumer):
         min_ack_pending: int | None = None,
         min_pending: int | None = None,
         priority_group: str | None = None,
+        priority: int | None = None,
     ) -> MessageBatch: ...
 
     async def fetch(
@@ -401,6 +444,7 @@ class PullConsumer(Consumer):
         min_ack_pending: int | None = None,
         min_pending: int | None = None,
         priority_group: str | None = None,
+        priority: int | None = None,
     ) -> MessageBatch:
         """Fetch a batch of messages from the consumer.
 
@@ -412,6 +456,8 @@ class PullConsumer(Consumer):
             min_ack_pending: Minimum number of unacknowledged messages that can be pending
             min_pending: Minimum number of messages that should be pending in the stream
             priority_group: Priority group for message fetching
+            priority: Priority level (0-9, lower is higher priority). Requires priority_group
+                     and consumer with PriorityPolicyPrioritized.
 
         Returns:
             MessageBatch containing the fetched messages
@@ -433,6 +479,7 @@ class PullConsumer(Consumer):
             min_ack_pending=min_ack_pending,
             min_pending=min_pending,
             priority_group=priority_group,
+            priority=priority,
             no_wait=False,
         )
 
@@ -444,6 +491,7 @@ class PullConsumer(Consumer):
         min_ack_pending: int | None = None,
         min_pending: int | None = None,
         priority_group: str | None = None,
+        priority: int | None = None,
     ) -> MessageBatch: ...
 
     @overload
@@ -454,6 +502,7 @@ class PullConsumer(Consumer):
         min_ack_pending: int | None = None,
         min_pending: int | None = None,
         priority_group: str | None = None,
+        priority: int | None = None,
     ) -> MessageBatch: ...
 
     async def fetch_nowait(
@@ -464,6 +513,7 @@ class PullConsumer(Consumer):
         min_ack_pending: int | None = None,
         min_pending: int | None = None,
         priority_group: str | None = None,
+        priority: int | None = None,
     ) -> MessageBatch:
         """Fetch messages without waiting (returns immediately).
 
@@ -473,6 +523,8 @@ class PullConsumer(Consumer):
             min_ack_pending: Minimum number of unacknowledged messages that can be pending
             min_pending: Minimum number of messages that should be pending in the stream
             priority_group: Priority group for message fetching
+            priority: Priority level (0-9, lower is higher priority). Requires priority_group
+                     and consumer with PriorityPolicyPrioritized.
 
         Returns:
             MessageBatch containing the available messages
@@ -494,6 +546,7 @@ class PullConsumer(Consumer):
             min_ack_pending=min_ack_pending,
             min_pending=min_pending,
             priority_group=priority_group,
+            priority=priority,
             no_wait=True,
         )
 
@@ -507,6 +560,7 @@ class PullConsumer(Consumer):
         min_ack_pending: int | None = None,
         min_pending: int | None = None,
         priority_group: str | None = None,
+        priority: int | None = None,
         no_wait: bool,
     ) -> MessageBatch:
         jetstream = self._stream._jetstream
@@ -531,7 +585,10 @@ class PullConsumer(Consumer):
             request["min_pending"] = min_pending
 
         if priority_group is not None:
-            request["priority_group"] = priority_group
+            request["group"] = priority_group
+
+        if priority is not None:
+            request["priority"] = priority
 
         api_prefix = jetstream.api_prefix
         subject = f"{api_prefix}.CONSUMER.MSG.NEXT.{self.stream_name}.{self.name}"
