@@ -165,7 +165,6 @@ async def test_consumer_fetch_with_max_bytes(jetstream: JetStream):
         assert large_msg in received
 
 
-@pytest.mark.skip(reason="FIXME")
 @pytest.mark.asyncio
 async def test_consumer_delete_during_fetch(jetstream: JetStream):
     """Test deleting a consumer while a fetch is in progress."""
@@ -177,34 +176,38 @@ async def test_consumer_delete_during_fetch(jetstream: JetStream):
         name="delete_consumer", durable_name="delete_consumer", filter_subject="DELETE.*", deliver_policy="all"
     )
 
-    # Start a fetch with a long max_wait - since there are no messages, it will wait
+    # Publish some messages first (like Go test does)
+    for i in range(5):
+        await jetstream.publish(f"DELETE.{i}", f"delete {i}".encode())
+
+    # Start a fetch for more messages than exist
     batch = await consumer.fetch(max_messages=10, max_wait=5.0)
 
     # In another task, delete the consumer after a short delay
     async def delete_after_delay():
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.1)
         await stream.delete_consumer(consumer.name)
 
     # Start the deletion task
     delete_task = asyncio.create_task(delete_after_delay())
 
-    # Process messages - since there are none and the consumer is deleted,
-    # we expect an exception when trying to iterate
-    with pytest.raises(Exception) as excinfo:
-        async for msg in batch:
-            # We shouldn't get here, but if we do, acknowledge the message
-            await msg.ack()
+    # Process messages - we should get the 5 messages, then consumer deleted error
+    received = []
+    async for msg in batch:
+        received.append(msg)
+        await msg.ack()
 
-    # Verify the exception is related to consumer deletion
-    assert "consumer" in str(excinfo.value).lower() or "timeout" in str(excinfo.value).lower()
+    # Should have received the 5 messages before consumer was deleted
+    assert len(received) == 5
+
+    # Check that the batch has the consumer deleted error
+    from nats.jetstream.api import ConsumerDeletedError
+    assert batch.error is not None
+    assert isinstance(batch.error, ConsumerDeletedError)
+    assert "consumer deleted" in str(batch.error).lower()
 
     # Make sure the delete task completes
     await delete_task
-
-    # Now try to publish some messages - this won't affect the test outcome
-    # since the consumer is already deleted
-    for i in range(5):
-        await jetstream.publish(f"DELETE.{i}", f"delete {i}".encode())
 
 
 @pytest.mark.asyncio
@@ -242,7 +245,6 @@ async def test_consumer_next(jetstream: JetStream):
         await consumer.next(max_wait=0.5)
 
 
-@pytest.mark.skip(reason="FIXME")
 @pytest.mark.asyncio
 async def test_consumer_delete_during_next(jetstream: JetStream):
     """Test deleting a consumer while waiting for a message with next."""
@@ -259,7 +261,7 @@ async def test_consumer_delete_during_next(jetstream: JetStream):
 
     # In another task, delete the consumer after a short delay
     async def delete_after_delay():
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.1)
         await stream.delete_consumer(consumer.name)
 
     # Start the deletion task
@@ -267,18 +269,15 @@ async def test_consumer_delete_during_next(jetstream: JetStream):
 
     # Try to get a next message with a longer timeout (should be interrupted by deletion)
     # since there are no messages, next() will wait until the consumer is deleted
-    with pytest.raises(Exception) as excinfo:
+    from nats.jetstream.api import ConsumerDeletedError
+    with pytest.raises(ConsumerDeletedError) as excinfo:
         await consumer.next(max_wait=2.0)
 
     # Verify the exception is related to consumer deletion
-    assert "consumer" in str(excinfo.value).lower() or "delete" in str(excinfo.value).lower()
+    assert "consumer deleted" in str(excinfo.value).lower()
 
     # Make sure the delete task completes
     await delete_task
-
-    # Now try to publish a message - this won't affect the test outcome
-    # since the consumer is already deleted
-    await jetstream.publish("DELNEXT.1", b"test message")
 
 
 @pytest.mark.asyncio

@@ -79,7 +79,15 @@ class PullMessageBatch(MessageBatch):
                             raise StopAsyncIteration
                         case "408":  # Timeout
                             raise StopAsyncIteration
-                        case "409":  # Message Size Exceeds MaxBytes
+                        case "409":  # Could be consumer deleted or max bytes exceeded
+                            # Check if this is a consumer deleted error
+                            description = raw_msg.status.description or ""
+                            if "consumer deleted" in description.lower():
+                                from nats.jetstream.api.client import ConsumerDeletedError
+                                self._error = ConsumerDeletedError(description)
+                            else:
+                                # Message size exceeds MaxBytes or other 409 error
+                                self._error = Exception(f"Status 409: {description}")
                             raise StopAsyncIteration
                         case _:
                             self._error = Exception(f"Status {raw_msg.status.code}: {raw_msg.status.description or ''}")
@@ -358,6 +366,11 @@ class PullConsumer(Consumer):
         )
         async for msg in batch:
             return msg
+
+        # Check if there was an error during fetch
+        if batch.error is not None:
+            raise batch.error
+
         raise asyncio.TimeoutError("No message received within timeout")
 
     async def messages(

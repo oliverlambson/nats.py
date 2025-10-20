@@ -489,7 +489,6 @@ async def test_create_consumer_with_duplicate_name_fails(jetstream: JetStream):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="FIXME")
 async def test_update_consumer_via_jetstream(jetstream: JetStream):
     """Test updating a consumer directly via JetStream."""
     # Create a stream and consumer
@@ -499,7 +498,7 @@ async def test_update_consumer_via_jetstream(jetstream: JetStream):
     )
 
     # Update the consumer via JetStream
-    updated_consumer = await jetstream.update_consumer(stream_name="test_stream", name="test_consumer", max_deliver=20)
+    updated_consumer = await jetstream.update_consumer(stream_name="test_stream", consumer_name="test_consumer", max_deliver=20)
 
     assert updated_consumer.info.config.max_deliver == 20
 

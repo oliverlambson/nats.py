@@ -77,6 +77,11 @@ class Error(Exception):
         )
 
 
+class ConsumerDeletedError(Error):
+    """Error raised when a consumer has been deleted."""
+    pass
+
+
 def is_error_response(data: Any) -> TypeGuard[ErrorResponse]:
     return isinstance(data, dict) and "error" in data
 
