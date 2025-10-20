@@ -788,3 +788,182 @@ async def test_consumer_info_not_paused_initially(jetstream: JetStream):
     # paused and pause_remaining may be None (not returned) or False/0
     assert info.paused is None or info.paused is False
     assert info.pause_remaining is None or info.pause_remaining == 0
+
+
+@pytest.mark.asyncio
+async def test_create_consumer_with_multiple_filter_subjects(jetstream: JetStream):
+    """Test creating consumer with multiple filter subjects (ADR-34).
+
+    Based on Go test: TestCreateConsumer - "with multiple filter subjects"
+    Requires NATS server 2.10+
+    """
+    # Create a stream with wildcard subject
+    stream = await jetstream.create_stream(name="test_multi_filter", subjects=["FOO.*"])
+
+    # Create consumer with multiple filter subjects
+    consumer = await stream.create_consumer(
+        name="multi_filter_consumer",
+        filter_subjects=["FOO.A", "FOO.B"],
+        deliver_policy="all",
+        ack_policy="explicit",
+    )
+
+    # Verify consumer was created
+    assert consumer is not None
+
+    # Verify filter_subjects was persisted correctly
+    info = await stream.get_consumer_info(consumer.name)
+    assert info.config.filter_subjects == ["FOO.A", "FOO.B"]
+    # filter_subject (singular) should not be set
+    assert info.config.filter_subject is None
+
+    # Publish messages to different subjects
+    await jetstream.publish("FOO.A", b"message A1")
+    await jetstream.publish("FOO.B", b"message B1")
+    await jetstream.publish("FOO.C", b"message C1")  # Should NOT be received
+    await jetstream.publish("FOO.A", b"message A2")
+
+    # Fetch messages - should only get FOO.A and FOO.B
+    batch = await consumer.fetch(max_messages=10, max_wait=1.0)
+    received = []
+    async for msg in batch:
+        received.append((msg.subject, msg.data))
+        await msg.ack()
+
+    # Should have received 3 messages (A1, B1, A2) but not C1
+    assert len(received) == 3
+    subjects = [subj for subj, _ in received]
+    assert "FOO.A" in subjects
+    assert "FOO.B" in subjects
+    assert "FOO.C" not in subjects
+
+
+@pytest.mark.asyncio
+async def test_create_consumer_with_overlapping_filter_subjects(jetstream: JetStream):
+    """Test error when creating consumer with overlapping filter subjects (ADR-34).
+
+    Based on Go test: TestCreateConsumer - "with multiple filter subjects, overlapping subjects"
+    Server should reject overlapping subjects with error code 10136.
+    """
+    from nats.jetstream.api.client import Error as ApiError
+
+    # Create a stream with wildcard subject
+    stream = await jetstream.create_stream(name="test_overlap_filter", subjects=["FOO.*"])
+
+    # Attempt to create consumer with overlapping filter subjects
+    # FOO.* overlaps with FOO.B
+    with pytest.raises(ApiError) as exc_info:
+        await stream.create_consumer(
+            name="overlap_consumer",
+            filter_subjects=["FOO.*", "FOO.B"],
+            deliver_policy="all",
+            ack_policy="explicit",
+        )
+
+    # Verify error message mentions overlapping
+    error = exc_info.value
+    assert "overlap" in str(error).lower()
+
+
+@pytest.mark.asyncio
+async def test_create_consumer_with_both_filter_subject_and_filter_subjects(jetstream: JetStream):
+    """Test error when both filter_subject and filter_subjects are provided (ADR-34).
+
+    Based on Go test: TestCreateConsumer - "with multiple filter subjects and filter subject provided"
+    Server should reject with error code 10134 (duplicate filter subjects).
+    """
+    from nats.jetstream.api.client import Error as ApiError
+
+    # Create a stream with wildcard subject
+    stream = await jetstream.create_stream(name="test_both_filters", subjects=["FOO.*"])
+
+    # Attempt to create consumer with both filter_subject AND filter_subjects
+    with pytest.raises(ApiError) as exc_info:
+        await stream.create_consumer(
+            name="both_filters_consumer",
+            filter_subject="FOO.C",
+            filter_subjects=["FOO.A", "FOO.B"],
+            deliver_policy="all",
+            ack_policy="explicit",
+        )
+
+    # Verify error message mentions the conflict
+    error = exc_info.value
+    error_str = str(error).lower()
+    assert "filter" in error_str and ("both" in error_str or "duplicate" in error_str)
+
+
+@pytest.mark.asyncio
+async def test_create_consumer_with_empty_filter_in_filter_subjects(jetstream: JetStream):
+    """Test error when filter_subjects contains empty string (ADR-34).
+
+    Based on Go test: TestCreateConsumer - "with empty subject in FilterSubjects"
+    Server should reject with error about empty filter.
+    """
+    from nats.jetstream.api.client import Error as ApiError
+
+    # Create a stream with wildcard subject
+    stream = await jetstream.create_stream(name="test_empty_filter", subjects=["FOO.*"])
+
+    # Attempt to create consumer with empty string in filter_subjects
+    with pytest.raises(ApiError) as exc_info:
+        await stream.create_consumer(
+            name="empty_filter_consumer",
+            filter_subjects=["FOO.A", ""],
+            deliver_policy="all",
+            ack_policy="explicit",
+        )
+
+    # Verify error message mentions empty filter
+    error = exc_info.value
+    assert "empty" in str(error).lower() or "filter" in str(error).lower()
+
+
+@pytest.mark.asyncio
+async def test_update_consumer_with_filter_subjects(jetstream: JetStream):
+    """Test updating consumer to add filter_subjects (ADR-34).
+
+    Verifies that filter_subjects can be set when updating an existing consumer.
+    """
+    # Create a stream with wildcard subject
+    stream = await jetstream.create_stream(name="test_update_filter", subjects=["BAR.*"])
+
+    # Create consumer without filter_subjects
+    consumer = await stream.create_consumer(
+        name="update_filter_consumer",
+        deliver_policy="all",
+        ack_policy="explicit",
+    )
+
+    # Verify initial state - no filters
+    info = await stream.get_consumer_info(consumer.name)
+    assert info.config.filter_subject is None
+    assert info.config.filter_subjects is None or info.config.filter_subjects == []
+
+    # Update consumer to add filter_subjects
+    updated_consumer = await stream.update_consumer(
+        consumer.name,
+        filter_subjects=["BAR.A", "BAR.B"],
+    )
+
+    # Verify filter_subjects was set
+    info = await stream.get_consumer_info(updated_consumer.name)
+    assert info.config.filter_subjects == ["BAR.A", "BAR.B"]
+
+    # Test that filtering works
+    await jetstream.publish("BAR.A", b"message A")
+    await jetstream.publish("BAR.C", b"message C")  # Should not be received
+    await jetstream.publish("BAR.B", b"message B")
+
+    batch = await updated_consumer.fetch(max_messages=10, max_wait=1.0)
+    received = []
+    async for msg in batch:
+        received.append((msg.subject, msg.data))
+        await msg.ack()
+
+    # Should only receive BAR.A and BAR.B
+    assert len(received) == 2
+    subjects = [subj for subj, _ in received]
+    assert "BAR.A" in subjects
+    assert "BAR.B" in subjects
+    assert "BAR.C" not in subjects
