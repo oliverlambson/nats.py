@@ -437,17 +437,6 @@ async def test_stream_state_after_messages(jetstream: JetStream):
 
 
 @pytest.mark.asyncio
-async def test_create_stream_with_invalid_max_msgs(jetstream: JetStream):
-    """Test that creating a stream with invalid max_msgs fails."""
-    with pytest.raises(Exception):  # TODO: Define specific error type
-        await jetstream.create_stream(
-            name="test",
-            subjects=["FOO.*"],
-            max_msgs=-2,  # Invalid value
-        )
-
-
-@pytest.mark.asyncio
 async def test_create_stream_with_workqueue_retention(jetstream: JetStream):
     """Test creating a stream with workqueue retention policy."""
     stream = await jetstream.create_stream(

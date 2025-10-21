@@ -1254,7 +1254,7 @@ class Stream:
         }
 
         # Create/update consumer via API
-        response = await api.consumer_create(**request)
+        response = await api.consumer_create(self._name, name, **request)
         consumer_info = ConsumerInfo.from_response(response, strict=self._jetstream.strict)
 
         # Check if this is a push consumer (has deliver_subject)
@@ -1390,7 +1390,7 @@ class Stream:
         pause_until_str = dt.isoformat().replace('+00:00', 'Z')
 
         # Pause consumer via API
-        await api.consumer_pause(self._name, consumer_name, pause_until_str)
+        await api.consumer_pause(self._name, consumer_name, pause_until=pause_until_str)
 
     async def resume_consumer(self, consumer_name: str) -> None:
         """Resume a paused consumer immediately.
@@ -1405,4 +1405,4 @@ class Stream:
 
         # Resume by setting pause_until to a time in the past (epoch)
         # RFC3339 format: "1970-01-01T00:00:00Z"
-        await api.consumer_pause(self._name, consumer_name, pause_until="1970-01-01T00:00:00Z")
+        await api.consumer_pause(self._name, consumer_name)

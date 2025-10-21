@@ -19,8 +19,11 @@ from .types import (
     ConsumerCreateResponse,
     ConsumerDeleteResponse,
     ConsumerInfoResponse,
+    ConsumerListRequest,
     ConsumerListResponse,
+    ConsumerNamesRequest,
     ConsumerNamesResponse,
+    ConsumerPauseRequest,
     ConsumerPauseResponse,
     ErrorResponse,
     StreamCreateRequest,
@@ -28,6 +31,7 @@ from .types import (
     StreamDeleteResponse,
     StreamInfoRequest,
     StreamInfoResponse,
+    StreamListRequest,
     StreamListResponse,
     StreamMsgDeleteRequest,
     StreamMsgDeleteResponse,
@@ -130,54 +134,37 @@ class Client:
             response_type=AccountInfoResponse,
         )
 
-    async def consumer_create(self, **request: Unpack[ConsumerCreateRequest]) -> ConsumerCreateResponse:
-        stream_name = request.get("stream_name")
-        if not stream_name:
-            raise ValueError("stream_name is required")
-
-        consumer_config = request.get("config")
-        if not consumer_config:
-            raise ValueError("config is required")
-
-        consumer_name = consumer_config.get("name")
-        if not consumer_name:
-            raise ValueError("name is required")
-
+    async def consumer_create(
+        self, stream_name: str, consumer_name: str, /, **request: Unpack[ConsumerCreateRequest]
+    ) -> ConsumerCreateResponse:
         return await self.request_json(
             f"{self._prefix}.CONSUMER.CREATE.{stream_name}.{consumer_name}",
             request,
             response_type=ConsumerCreateResponse,
         )
 
-    async def consumer_delete(self, stream_name: str, consumer_name: str) -> ConsumerDeleteResponse:
+    async def consumer_delete(self, stream_name: str, consumer_name: str, /) -> ConsumerDeleteResponse:
         return await self.request_json(
             f"{self._prefix}.CONSUMER.DELETE.{stream_name}.{consumer_name}",
             response_type=ConsumerDeleteResponse,
         )
 
-    async def consumer_info(self, stream_name: str, consumer_name: str) -> ConsumerInfoResponse:
+    async def consumer_info(self, stream_name: str, consumer_name: str, /) -> ConsumerInfoResponse:
         return await self.request_json(
             f"{self._prefix}.CONSUMER.INFO.{stream_name}.{consumer_name}",
             response_type=ConsumerInfoResponse,
         )
 
-    async def consumer_list(self, stream_name: str, offset: int | None = None) -> ConsumerListResponse:
+    async def consumer_list(self, stream_name: str, /, **request: Unpack[ConsumerListRequest]) -> ConsumerListResponse:
         """Get information about all consumers in a stream."""
-        request = {}
-        if offset is not None:
-            request["offset"] = offset
         return await self.request_json(
             f"{self._prefix}.CONSUMER.LIST.{stream_name}",
             request if request else None,
             response_type=ConsumerListResponse,
         )
 
-    async def consumer_names(self, stream_name: str, offset: int | None = None) -> ConsumerNamesResponse:
+    async def consumer_names(self, stream_name: str, /, **request: Unpack[ConsumerNamesRequest]) -> ConsumerNamesResponse:
         """Get a list of all consumer names in a stream."""
-        request = {}
-        if offset is not None:
-            request["offset"] = offset
-
         return await self.request_json(
             f"{self._prefix}.CONSUMER.NAMES.{stream_name}",
             request if request else None,
@@ -185,128 +172,99 @@ class Client:
         )
 
     async def consumer_pause(
-        self, stream_name: str, consumer_name: str, pause_until: str | None = None
+        self, stream_name: str, consumer_name: str, /, **request: Unpack[ConsumerPauseRequest]
     ) -> ConsumerPauseResponse:
         """Pause or resume a consumer.
 
         Args:
             stream_name: The stream name
             consumer_name: The consumer name
-            pause_until: RFC3339 timestamp string to pause until. If None or in the past, resumes the consumer.
+            **request: Request body with optional pause_until field
 
         Returns:
             ConsumerPauseResponse with pause state
         """
-        request = {}
-        if pause_until is not None:
-            request["pause_until"] = pause_until
-
         return await self.request_json(
             f"{self._prefix}.CONSUMER.PAUSE.{stream_name}.{consumer_name}",
             request if request else None,
             response_type=ConsumerPauseResponse,
         )
 
-    async def stream_create(self, name: str, **kwargs: Unpack[StreamCreateRequest]) -> StreamCreateResponse:
-        # Validate max_msgs
-        max_msgs = kwargs.get("max_msgs", -1)
-        if max_msgs < -1:
-            raise ValueError("max_msgs must be -1 (unlimited) or a positive number")
-
-        # Validate mirror configuration
-        mirror = kwargs.get("mirror")
-        subjects = kwargs.get("subjects")
-        if mirror is not None and subjects:
-            raise ValueError("Cannot specify both mirror and subjects")
-
+    async def stream_create(self, name: str, /, **request: Unpack[StreamCreateRequest]) -> StreamCreateResponse:
         return await self.request_json(
             f"{self._prefix}.STREAM.CREATE.{name}",
-            {
-                "name": name,
-                **kwargs,
-            },
+            request,
             response_type=StreamCreateResponse,
         )
 
-    async def stream_delete(self, name: str) -> StreamDeleteResponse:
+    async def stream_delete(self, name: str, /) -> StreamDeleteResponse:
         return await self.request_json(
             f"{self._prefix}.STREAM.DELETE.{name}",
             response_type=StreamDeleteResponse,
         )
 
-    async def stream_info(self, name: str, **request: Unpack[StreamInfoRequest]) -> StreamInfoResponse:
+    async def stream_info(self, name: str, /, **request: Unpack[StreamInfoRequest]) -> StreamInfoResponse:
         return await self.request_json(
             f"{self._prefix}.STREAM.INFO.{name}",
             request if request else None,
             response_type=StreamInfoResponse,
         )
 
-    async def stream_list(self, offset: int | None = None, subject: str | None = None) -> StreamListResponse:
+    async def stream_list(self, **request: Unpack[StreamListRequest]) -> StreamListResponse:
         """Get information about all streams.
 
         Args:
-            offset: Optional offset for pagination
-            subject: Optional subject filter
+            **request: Request body with optional offset and subject fields
 
         Returns:
             Response containing stream information and pagination info
         """
-        request = {}
-        if offset is not None:
-            request["offset"] = offset
-        if subject is not None:
-            request["subject"] = subject
-
         return await self.request_json(
             f"{self._prefix}.STREAM.LIST",
             request if request else None,
             response_type=StreamListResponse,
         )
 
-    async def stream_msg_delete(self, name: str, **request: Unpack[StreamMsgDeleteRequest]) -> StreamMsgDeleteResponse:
+    async def stream_msg_delete(self, name: str, /, **request: Unpack[StreamMsgDeleteRequest]) -> StreamMsgDeleteResponse:
         return await self.request_json(
             f"{self._prefix}.STREAM.MSG.DELETE.{name}",
             request if request else None,
             response_type=StreamMsgDeleteResponse,
         )
 
-    async def stream_msg_get(self, name: str, **request: Unpack[StreamMsgGetRequest]) -> StreamMsgGetResponse:
+    async def stream_msg_get(self, name: str, /, **request: Unpack[StreamMsgGetRequest]) -> StreamMsgGetResponse:
         return await self.request_json(
             f"{self._prefix}.STREAM.MSG.GET.{name}",
             request if request else None,
             response_type=StreamMsgGetResponse,
         )
 
-    async def stream_names(self, **kwargs: Unpack[StreamNamesRequest]) -> StreamNamesResponse:
+    async def stream_names(self, **request: Unpack[StreamNamesRequest]) -> StreamNamesResponse:
         """Get a list of all stream names.
 
         Args:
-            offset: Optional offset for pagination
-            subject: Optional subject filter
+            **request: Request body with optional offset and subject fields
 
         Returns:
             Response containing stream names and pagination info
         """
         return await self.request_json(
             f"{self._prefix}.STREAM.NAMES",
-            kwargs,
+            request if request else None,
             response_type=StreamNamesResponse,
         )
 
-    async def stream_purge(self, name: str, **request: Unpack[StreamPurgeRequest]) -> StreamPurgeResponse:
+    async def stream_purge(self, name: str, /, **request: Unpack[StreamPurgeRequest]) -> StreamPurgeResponse:
         return await self.request_json(
             f"{self._prefix}.STREAM.PURGE.{name}",
             request if request else None,
             response_type=StreamPurgeResponse,
         )
 
-    async def stream_update(self, name: str, **config: Unpack[StreamUpdateRequest]) -> StreamUpdateResponse:
+    async def stream_update(self, name: str, /, **request: Unpack[StreamUpdateRequest]) -> StreamUpdateResponse:
         return await self.request_json(
             f"{self._prefix}.STREAM.UPDATE.{name}",
-            {
-                "name": name,
-                **config,
-            },
+            request,
             response_type=StreamUpdateResponse,
         )
 

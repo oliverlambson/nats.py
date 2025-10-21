@@ -735,7 +735,7 @@ async def test_consumer_pause_invalid_stream(jetstream: JetStream):
 
     # Should raise an error for non-existent stream
     with pytest.raises(ApiError) as exc_info:
-        await api.consumer_pause("nonexistent_stream", "nonexistent_consumer", pause_until_str)
+        await api.consumer_pause("nonexistent_stream", "nonexistent_consumer", pause_until=pause_until_str)
 
     assert exc_info.value.code is not None
 
@@ -758,7 +758,7 @@ async def test_consumer_resume_invalid_stream(jetstream: JetStream):
 
     # Should raise an error for non-existent stream
     with pytest.raises(ApiError) as exc_info:
-        await api.consumer_pause("nonexistent_stream", "nonexistent_consumer", "1970-01-01T00:00:00Z")
+        await api.consumer_pause("nonexistent_stream", "nonexistent_consumer")
 
     assert exc_info.value.code is not None
 

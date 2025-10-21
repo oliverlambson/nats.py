@@ -319,7 +319,10 @@ class JetStream:
         offset = 0
         total = None
         while True:
-            response = await self._api.stream_list(offset=offset, subject=subject)
+            request = {"offset": offset}
+            if subject is not None:
+                request["subject"] = subject
+            response = await self._api.stream_list(**request)
             streams = response.get("streams", [])
             if streams is None:
                 streams = []
@@ -368,13 +371,16 @@ class JetStream:
 
         # Convert StreamConfig to API request format and create stream
         config_dict = config.to_request()
-        response = await self._api.stream_create(**config_dict)
+        response = await self._api.stream_create(config.name, **config_dict)
         info = StreamInfo.from_response(response, strict=self._strict)
         return Stream(self, config.name, info)
 
     async def update_stream(self, **config) -> StreamInfo:
         """Update an existing stream."""
-        response = await self._api.stream_update(**config)
+        name = config.get("name")
+        if name is None:
+            raise ValueError("Stream name is required for update")
+        response = await self._api.stream_update(name, **config)
         return StreamInfo.from_response(response, strict=self._strict)
 
     async def delete_stream(self, name: str) -> bool:
