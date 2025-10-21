@@ -690,6 +690,7 @@ async def test_consumer_pause_invalid_stream(jetstream: JetStream):
     Requires NATS server 2.11.0+
     """
     import time
+
     from nats.jetstream.api.client import Error as ApiError
 
     # Create a stream
@@ -734,7 +735,7 @@ async def test_consumer_info_not_paused_initially(jetstream: JetStream):
     stream = await jetstream.create_stream(name="test_initial_pause_state", subjects=["INITIAL.*"])
 
     # Create a consumer
-    consumer = await stream.create_consumer(
+    await stream.create_consumer(
         name="initial_consumer",
         durable_name="initial_consumer",
         filter_subject="INITIAL.*",
