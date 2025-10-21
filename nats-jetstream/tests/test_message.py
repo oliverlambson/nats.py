@@ -1,7 +1,7 @@
 """Tests for the nats.jetstream.message module."""
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from nats.client import Client
@@ -339,11 +339,11 @@ async def test_message_in_progress_resets_ack_timer(jetstream: JetStream):
         subjects=["test.wip"],
     )
 
-    # Create a consumer with ack wait (in nanoseconds)
+    # Create a consumer with ack wait
     consumer = await stream.create_consumer(
         name="test-wip-consumer",
         ack_policy="explicit",
-        ack_wait=2_000_000_000,  # 2 seconds in nanoseconds
+        ack_wait=timedelta(seconds=2),
     )
 
     # Publish a message
