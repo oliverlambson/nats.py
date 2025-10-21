@@ -144,3 +144,108 @@ def test_status_common_codes():
     # Server Error
     server_error = Status(code="500", description="Internal Server Error")
     assert str(server_error) == "500: Internal Server Error"
+
+
+def test_headers_set():
+    """Test Headers.set() method."""
+    # Set a new header
+    headers = Headers({})
+    headers.set("key1", "value1")
+    assert headers.get("key1") == "value1"
+    assert headers.get_all("key1") == ["value1"]
+
+    # Replace existing header
+    headers.set("key1", "new_value")
+    assert headers.get("key1") == "new_value"
+    assert headers.get_all("key1") == ["new_value"]
+
+    # Replace header with multiple values
+    headers = Headers({"key2": ["value1", "value2", "value3"]})
+    headers.set("key2", "single_value")
+    assert headers.get("key2") == "single_value"
+    assert headers.get_all("key2") == ["single_value"]
+
+    # Case-sensitive: different keys
+    headers = Headers({"key1": "lowercase", "Key1": "uppercase"})
+    assert headers.get("key1") == "lowercase"
+    assert headers.get("Key1") == "uppercase"
+    headers.set("key1", "new_lowercase")
+    assert headers.get("key1") == "new_lowercase"
+    assert headers.get("Key1") == "uppercase"
+
+
+def test_headers_delete():
+    """Test Headers.delete() method."""
+    # Delete existing header
+    headers = Headers({"key1": "value1", "key2": "value2"})
+    headers.delete("key1")
+    assert headers.get("key1") is None
+    assert headers.get("key2") == "value2"
+
+    # Delete non-existent header (should not raise error)
+    headers.delete("nonexistent")
+    assert headers.get("key2") == "value2"
+
+    # Delete header with multiple values
+    headers = Headers({"key3": ["value1", "value2", "value3"]})
+    headers.delete("key3")
+    assert headers.get("key3") is None
+    assert headers.get_all("key3") == []
+
+    # Case-sensitive: only deletes exact match
+    headers = Headers({"key1": "value1", "Key1": "value2"})
+    headers.delete("key1")
+    assert headers.get("key1") is None
+    assert headers.get("Key1") == "value2"
+
+
+def test_headers_append():
+    """Test Headers.append() method."""
+    # Append to non-existent header (creates new)
+    headers = Headers({})
+    headers.append("key1", "value1")
+    assert headers.get("key1") == "value1"
+    assert headers.get_all("key1") == ["value1"]
+
+    # Append to existing header
+    headers.append("key1", "value2")
+    assert headers.get("key1") == "value1"  # get returns first value
+    assert headers.get_all("key1") == ["value1", "value2"]
+
+    # Append multiple times
+    headers.append("key1", "value3")
+    assert headers.get_all("key1") == ["value1", "value2", "value3"]
+
+    # Case-sensitive: different keys
+    headers.append("Key1", "uppercase")
+    assert headers.get_all("Key1") == ["uppercase"]
+    assert headers.get_all("key1") == ["value1", "value2", "value3"]
+
+    # Append preserves case of existing key
+    headers = Headers({"Content-Type": "application/json"})
+    headers.append("Content-Type", "text/plain")
+    assert headers.get_all("Content-Type") == ["application/json", "text/plain"]
+
+
+def test_headers_operations_integration():
+    """Test combining set, delete, and append operations."""
+    headers = Headers({})
+
+    # Build headers using operations
+    headers.set("X-Custom", "value1")
+    headers.append("X-Custom", "value2")
+    headers.set("Authorization", "Bearer token")
+    headers.append("Accept", "application/json")
+    headers.append("Accept", "text/plain")
+
+    assert headers.get_all("X-Custom") == ["value1", "value2"]
+    assert headers.get("Authorization") == "Bearer token"
+    assert headers.get_all("Accept") == ["application/json", "text/plain"]
+
+    # Delete one header
+    headers.delete("Authorization")
+    assert headers.get("Authorization") is None
+
+    # Set replaces multi-value header
+    headers.set("Accept", "application/xml")
+    assert headers.get_all("Accept") == ["application/xml"]

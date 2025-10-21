@@ -50,6 +50,43 @@ class Headers:
         """
         return self._data.get(key, [])
 
+    def set(self, key: str, value: str) -> None:
+        """Set a header value, replacing any existing values.
+
+        This operation is case-sensitive and will remove any exact-match keys
+        before adding the new value.
+
+        Args:
+            key: The header name
+            value: The header value to set
+        """
+        self._data[key] = [value]
+
+    def delete(self, key: str) -> None:
+        """Delete a header by key.
+
+        This operation is case-sensitive and will only remove exact-match keys.
+
+        Args:
+            key: The header name to delete
+        """
+        self._data.pop(key, None)
+
+    def append(self, key: str, value: str) -> None:
+        """Append a value to a header, preserving existing values.
+
+        This operation is case-sensitive and case-preserving. If the key exists,
+        the value is added to it. If not, the key is created with the specified case.
+
+        Args:
+            key: The header name
+            value: The header value to append
+        """
+        if key in self._data:
+            self._data[key].append(value)
+        else:
+            self._data[key] = [value]
+
     def items(self):
         """Get all header items as key-value pairs.
 
