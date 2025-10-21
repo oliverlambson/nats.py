@@ -936,15 +936,12 @@ async def test_update_consumer_with_filter_subjects(jetstream: JetStream):
     )
 
     # Verify initial state - no filters
-    info = await stream.get_consumer_info(consumer.name)
-    assert info.config.filter_subject is None
-    assert info.config.filter_subjects is None or info.config.filter_subjects == []
+    assert consumer.info.config.filter_subject is None
+    assert consumer.info.config.filter_subjects is None or consumer.info.config.filter_subjects == []
 
-    # Update consumer to add filter_subjects
-    updated_consumer = await stream.update_consumer(
-        consumer.name,
-        filter_subjects=["BAR.A", "BAR.B"],
-    )
+    # Mutate the config and update consumer to add filter_subjects
+    consumer.info.config.filter_subjects = ["BAR.A", "BAR.B"]
+    updated_consumer = await stream.update_consumer(consumer.info.config)
 
     # Verify filter_subjects was set
     info = await stream.get_consumer_info(updated_consumer.name)

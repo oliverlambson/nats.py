@@ -466,7 +466,7 @@ class JetStream:
             The updated consumer
         """
         stream = await self.get_stream(stream_name)
-        return await stream.update_consumer(consumer_name, **config)
+        return await stream.update_consumer(name=consumer_name, **config)
 
     async def consumer_names(self, stream_name: str) -> AsyncIterator[str]:
         """Get an async iterator over all consumer names for a stream.

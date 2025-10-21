@@ -533,9 +533,11 @@ async def test_create_consumer(jetstream: JetStream):
 async def test_update_consumer(jetstream: JetStream):
     """Test updating a consumer's configuration."""
     stream = await jetstream.create_stream(name="test", subjects=["FOO.*"])
-    await stream.create_consumer(name="test_consumer", durable_name="test_consumer")
+    consumer = await stream.create_consumer(name="test_consumer", durable_name="test_consumer")
 
-    updated_consumer = await stream.update_consumer("test_consumer", max_deliver=20)
+    # Mutate the config and update
+    consumer.info.config.max_deliver = 20
+    updated_consumer = await stream.update_consumer(consumer.info.config)
     assert updated_consumer.info.config.max_deliver == 20
 
 

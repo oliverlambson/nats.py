@@ -1337,17 +1337,36 @@ class Stream:
         response = await api.consumer_delete(self._name, consumer_name)
         return response["success"]
 
-    async def update_consumer(self, consumer_name: str, **config) -> Consumer:
+    @overload
+    async def update_consumer(self, config: ConsumerConfig, /) -> Consumer:
+        """Update a consumer from a ConsumerConfig object."""
+        ...
+
+    @overload
+    async def update_consumer(self, *, name: str, **config) -> Consumer:
+        """Update a consumer with keyword arguments."""
+        ...
+
+    async def update_consumer(self, config: ConsumerConfig | None = None, /, **kwargs) -> Consumer:
         """Update a consumer.
 
         Args:
-            consumer_name: Name of the consumer to update
-            **config: New consumer configuration
+            config: A ConsumerConfig object to update the consumer from (positional-only)
+            **kwargs: Consumer configuration parameters as keyword arguments (must include 'name')
 
         Returns:
             The updated consumer
         """
-        return await self._upsert_consumer(action=CONSUMER_ACTION_UPDATE, name=consumer_name, **config)
+        if config is not None:
+            # Convert ConsumerConfig to API request format
+            kwargs = config.to_request()
+
+        # Validate consumer name
+        if "name" not in kwargs:
+            raise ValueError("update_consumer requires 'name' parameter")
+
+        # Delegate to _upsert_consumer with "update" action
+        return await self._upsert_consumer(action=CONSUMER_ACTION_UPDATE, **kwargs)
 
     async def pause_consumer(self, consumer_name: str, pause_until: float) -> None:
         """Pause a consumer until a specific time.
