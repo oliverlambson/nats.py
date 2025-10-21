@@ -557,3 +557,75 @@ async def test_delete_consumer(jetstream: JetStream):
     consumer = await stream.create_consumer(name="test_consumer", durable_name="test_consumer")
 
     assert await stream.delete_consumer(consumer.name) is True
+
+
+@pytest.mark.asyncio
+async def test_stream_republish(jetstream: JetStream):
+    """Test ADR-28: Creating a stream with republish configuration."""
+    from nats.jetstream.stream import Republish
+
+    # Create stream with republish config
+    # Note: dest must not overlap with stream subjects to avoid reingestion
+    stream = await jetstream.create_stream(
+        name="test_republish",
+        subjects=["orders.*"],
+        republish=Republish(
+            src=">",  # Republish all messages
+            dest="processed.>",  # Different subject space
+        ),
+    )
+
+    assert stream.info.config.republish is not None
+    assert stream.info.config.republish.src == ">"
+    assert stream.info.config.republish.dest == "processed.>"
+    assert stream.info.config.republish.headers_only is None
+
+
+@pytest.mark.asyncio
+async def test_stream_republish_headers_only(jetstream: JetStream):
+    """Test ADR-28: Creating a stream with republish headers_only option."""
+    from nats.jetstream.stream import Republish
+
+    # Create stream with headers_only republish
+    stream = await jetstream.create_stream(
+        name="test_republish_headers",
+        subjects=["events.*"],
+        republish=Republish(src=">", dest="headers.>", headers_only=True),
+    )
+
+    assert stream.info.config.republish is not None
+    assert stream.info.config.republish.headers_only is True
+
+
+@pytest.mark.asyncio
+async def test_stream_subject_transform(jetstream: JetStream):
+    """Test ADR-36: Creating a stream with subject transform configuration."""
+    from nats.jetstream.stream import SubjectTransform
+
+    # Create stream with subject transform
+    stream = await jetstream.create_stream(
+        name="test_transform",
+        subjects=["data.*"],
+        subject_transform=SubjectTransform(src="data.>", dest="transformed.>"),
+    )
+
+    assert stream.info.config.subject_transform is not None
+    assert stream.info.config.subject_transform.src == "data.>"
+    assert stream.info.config.subject_transform.dest == "transformed.>"
+
+
+@pytest.mark.asyncio
+async def test_consumer_metadata(jetstream: JetStream):
+    """Test ADR-33: Creating a consumer with metadata."""
+    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"])
+
+    # Create consumer with metadata
+    consumer = await stream.create_consumer(
+        name="test_consumer",
+        metadata={"env": "test", "version": "1.0"},
+    )
+
+    assert consumer.info.config.metadata is not None
+    # Check that metadata contains at least the expected fields (server may add additional fields starting with _)
+    assert consumer.info.config.metadata["env"] == "test"
+    assert consumer.info.config.metadata["version"] == "1.0"
