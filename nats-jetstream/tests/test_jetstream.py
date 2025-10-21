@@ -498,7 +498,9 @@ async def test_update_consumer_via_jetstream(jetstream: JetStream):
     )
 
     # Update the consumer via JetStream
-    updated_consumer = await jetstream.update_consumer(stream_name="test_stream", consumer_name="test_consumer", max_deliver=20)
+    updated_consumer = await jetstream.update_consumer(
+        stream_name="test_stream", consumer_name="test_consumer", max_deliver=20
+    )
 
     assert updated_consumer.info.config.max_deliver == 20
 

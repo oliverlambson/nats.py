@@ -217,7 +217,9 @@ class PublishAck:
 class JetStream:
     """JetStream context."""
 
-    def __init__(self, client: Client, prefix: str = "$JS.API", domain: str | None = None, strict: bool = False) -> None:
+    def __init__(
+        self, client: Client, prefix: str = "$JS.API", domain: str | None = None, strict: bool = False
+    ) -> None:
         """Initialize JetStream client.
 
         Args:

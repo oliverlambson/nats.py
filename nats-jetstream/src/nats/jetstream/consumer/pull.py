@@ -39,7 +39,14 @@ class PullMessageBatch(MessageBatch):
     _heartbeat: float | None
     _heartbeat_deadline: float | None
 
-    def __init__(self, subscription: Subscription, batch_size: int, jetstream, max_wait: float | None, heartbeat: float | None = None):
+    def __init__(
+        self,
+        subscription: Subscription,
+        batch_size: int,
+        jetstream,
+        max_wait: float | None,
+        heartbeat: float | None = None,
+    ):
         self._subscription = subscription
         self._pending_messages = batch_size
         self._jetstream = jetstream
@@ -112,6 +119,7 @@ class PullMessageBatch(MessageBatch):
                             # Terminal 409 errors
                             if "consumer deleted" in description_lower:
                                 from nats.jetstream.api.client import ConsumerDeletedError
+
                                 self._error = ConsumerDeletedError(description)
                                 raise StopAsyncIteration
                             elif "consumer is push based" in description_lower:
@@ -209,7 +217,11 @@ class PullMessageStream(MessageStream):
         self._priority = priority
         # Set thresholds with defaults to 50% if not specified
         self._threshold_messages = threshold_messages if threshold_messages is not None else batch // 2
-        self._threshold_bytes = threshold_bytes if threshold_bytes is not None and max_bytes is not None else (max_bytes // 2 if max_bytes is not None else None)
+        self._threshold_bytes = (
+            threshold_bytes
+            if threshold_bytes is not None and max_bytes is not None
+            else (max_bytes // 2 if max_bytes is not None else None)
+        )
         self._terminated = False
         self._pending_messages = 0
         self._pending_bytes = 0
@@ -733,4 +745,6 @@ class PullConsumer(Consumer):
 
         await jetstream.client.publish(subject, payload=payload, reply_to=inbox)
 
-        return PullMessageBatch(subscription=subscription, batch_size=batch, jetstream=jetstream, max_wait=max_wait, heartbeat=heartbeat)
+        return PullMessageBatch(
+            subscription=subscription, batch_size=batch, jetstream=jetstream, max_wait=max_wait, heartbeat=heartbeat
+        )

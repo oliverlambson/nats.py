@@ -1387,7 +1387,7 @@ class Stream:
 
         # Convert Unix timestamp to RFC3339 string (ISO 8601 format with timezone)
         dt = datetime.fromtimestamp(pause_until, tz=timezone.utc)
-        pause_until_str = dt.isoformat().replace('+00:00', 'Z')
+        pause_until_str = dt.isoformat().replace("+00:00", "Z")
 
         # Pause consumer via API
         await api.consumer_pause(self._name, consumer_name, pause_until=pause_until_str)

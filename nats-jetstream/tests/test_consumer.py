@@ -202,6 +202,7 @@ async def test_consumer_delete_during_fetch(jetstream: JetStream):
 
     # Check that the batch has the consumer deleted error
     from nats.jetstream.api import ConsumerDeletedError
+
     assert batch.error is not None
     assert isinstance(batch.error, ConsumerDeletedError)
     assert "consumer deleted" in str(batch.error).lower()
@@ -270,6 +271,7 @@ async def test_consumer_delete_during_next(jetstream: JetStream):
     # Try to get a next message with a longer timeout (should be interrupted by deletion)
     # since there are no messages, next() will wait until the consumer is deleted
     from nats.jetstream.api import ConsumerDeletedError
+
     with pytest.raises(ConsumerDeletedError) as excinfo:
         await consumer.next(max_wait=2.0)
 
@@ -441,14 +443,10 @@ async def test_consumer_prioritized_fetch(jetstream: JetStream):
     # Start both fetch requests BEFORE publishing messages
     # This ensures both requests are waiting when messages arrive
     # Lower priority consumer (priority=1) requests 100 messages
-    batch1_task = asyncio.create_task(
-        consumer.fetch(max_messages=100, max_wait=5.0, priority_group="A", priority=1)
-    )
+    batch1_task = asyncio.create_task(consumer.fetch(max_messages=100, max_wait=5.0, priority_group="A", priority=1))
 
     # Higher priority consumer (priority=0) requests 75 messages
-    batch2_task = asyncio.create_task(
-        consumer.fetch(max_messages=75, max_wait=5.0, priority_group="A", priority=0)
-    )
+    batch2_task = asyncio.create_task(consumer.fetch(max_messages=75, max_wait=5.0, priority_group="A", priority=0))
 
     # Give both requests time to be sent to the server
     await asyncio.sleep(0.1)
@@ -730,8 +728,9 @@ async def test_consumer_pause_invalid_stream(jetstream: JetStream):
 
     pause_until = time.time() + 60.0
     from datetime import datetime, timezone
+
     dt = datetime.fromtimestamp(pause_until, tz=timezone.utc)
-    pause_until_str = dt.isoformat().replace('+00:00', 'Z')
+    pause_until_str = dt.isoformat().replace("+00:00", "Z")
 
     # Should raise an error for non-existent stream
     with pytest.raises(ApiError) as exc_info:

@@ -83,6 +83,7 @@ class Error(Exception):
 
 class ConsumerDeletedError(Error):
     """Error raised when a consumer has been deleted."""
+
     pass
 
 
@@ -163,7 +164,9 @@ class Client:
             response_type=ConsumerListResponse,
         )
 
-    async def consumer_names(self, stream_name: str, /, **request: Unpack[ConsumerNamesRequest]) -> ConsumerNamesResponse:
+    async def consumer_names(
+        self, stream_name: str, /, **request: Unpack[ConsumerNamesRequest]
+    ) -> ConsumerNamesResponse:
         """Get a list of all consumer names in a stream."""
         return await self.request_json(
             f"{self._prefix}.CONSUMER.NAMES.{stream_name}",
@@ -225,7 +228,9 @@ class Client:
             response_type=StreamListResponse,
         )
 
-    async def stream_msg_delete(self, name: str, /, **request: Unpack[StreamMsgDeleteRequest]) -> StreamMsgDeleteResponse:
+    async def stream_msg_delete(
+        self, name: str, /, **request: Unpack[StreamMsgDeleteRequest]
+    ) -> StreamMsgDeleteResponse:
         return await self.request_json(
             f"{self._prefix}.STREAM.MSG.DELETE.{name}",
             request if request else None,
