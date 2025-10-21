@@ -1390,6 +1390,46 @@ class Stream:
         # Delegate to _upsert_consumer with "update" action
         return await self._upsert_consumer(action=CONSUMER_ACTION_UPDATE, **config_dict)
 
+    @overload
+    async def create_or_update_consumer(self, config: ConsumerConfig, /) -> Consumer:
+        """Create or update a consumer from a ConsumerConfig object."""
+        ...
+
+    @overload
+    async def create_or_update_consumer(self, *, name: str, **config) -> Consumer:
+        """Create or update a consumer with keyword arguments."""
+        ...
+
+    async def create_or_update_consumer(self, config: ConsumerConfig | None = None, /, **kwargs) -> Consumer:
+        """Create or update a consumer for this stream.
+
+        This method will either create a consumer if it does not exist or update
+        an existing consumer (if possible). This is an idempotent operation.
+
+        Note: Some consumer configuration fields cannot be updated after creation
+        (e.g., max_waiting must be set during creation).
+
+        Args:
+            config: A ConsumerConfig object (positional-only)
+            **kwargs: Consumer configuration parameters as keyword arguments
+
+        Returns:
+            The created or updated consumer
+        """
+        if config is None:
+            # Create ConsumerConfig from kwargs
+            config = ConsumerConfig.from_kwargs(**kwargs)
+
+        # Validate consumer name
+        if config.name is None:
+            raise ValueError("ConsumerConfig must have a name")
+
+        # Convert ConsumerConfig to API request format
+        config_dict = config.to_request()
+
+        # Delegate to _upsert_consumer with empty action (create-or-update)
+        return await self._upsert_consumer(action=CONSUMER_ACTION_CREATE_OR_UPDATE, **config_dict)
+
     async def pause_consumer(self, consumer_name: str, pause_until: float) -> None:
         """Pause a consumer until a specific time.
 

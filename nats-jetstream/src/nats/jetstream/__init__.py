@@ -535,6 +535,28 @@ class JetStream:
         stream = await self.get_stream(stream_name)
         return await stream.update_consumer(name=consumer_name, **config)
 
+    async def create_or_update_consumer(self, stream_name: str, **config) -> Consumer:
+        """Create or update a consumer.
+
+        This method will either create a consumer if it does not exist or update
+        an existing consumer (if possible). This is an idempotent operation.
+
+        Note: Some consumer configuration fields cannot be updated after creation
+        (e.g., max_waiting must be set during creation).
+
+        Args:
+            stream_name: Name of the stream
+            **config: Consumer configuration (must include 'name')
+
+        Returns:
+            The created or updated consumer
+
+        Raises:
+            ValueError: If 'name' is not provided in config
+        """
+        stream = await self.get_stream(stream_name)
+        return await stream.create_or_update_consumer(**config)
+
     async def consumer_names(self, stream_name: str) -> AsyncIterator[str]:
         """Get an async iterator over all consumer names for a stream.
 

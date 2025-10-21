@@ -520,6 +520,56 @@ async def test_update_nonexistent_consumer_fails(jetstream: JetStream):
 
 
 @pytest.mark.asyncio
+async def test_create_or_update_consumer_creates_new(jetstream: JetStream):
+    """Test that create_or_update_consumer creates a new consumer when it doesn't exist."""
+    # Create a stream
+    await jetstream.create_stream(name="test_stream", subjects=["FOO.*"])
+
+    # Create a consumer using create_or_update
+    consumer = await jetstream.create_or_update_consumer(
+        stream_name="test_stream", name="test_consumer", durable_name="test_consumer", max_deliver=10
+    )
+
+    assert consumer.info.config.name == "test_consumer"
+    assert consumer.info.config.max_deliver == 10
+
+
+@pytest.mark.asyncio
+async def test_create_or_update_consumer_updates_existing(jetstream: JetStream):
+    """Test that create_or_update_consumer updates an existing consumer."""
+    # Create a stream and consumer
+    await jetstream.create_stream(name="test_stream", subjects=["FOO.*"])
+    await jetstream.create_consumer(
+        stream_name="test_stream", name="test_consumer", durable_name="test_consumer", max_deliver=10
+    )
+
+    # Update the consumer using create_or_update
+    updated_consumer = await jetstream.create_or_update_consumer(
+        stream_name="test_stream", name="test_consumer", durable_name="test_consumer", max_deliver=20
+    )
+
+    assert updated_consumer.info.config.max_deliver == 20
+
+
+@pytest.mark.asyncio
+async def test_create_or_update_consumer_via_stream(jetstream: JetStream):
+    """Test create_or_update_consumer via Stream object."""
+    # Create a stream
+    stream = await jetstream.create_stream(name="test_stream", subjects=["FOO.*"])
+
+    # Create a consumer using create_or_update
+    consumer = await stream.create_or_update_consumer(name="test_consumer", max_deliver=10)
+
+    assert consumer.info.config.name == "test_consumer"
+    assert consumer.info.config.max_deliver == 10
+
+    # Update the same consumer
+    updated_consumer = await stream.create_or_update_consumer(name="test_consumer", max_deliver=20)
+
+    assert updated_consumer.info.config.max_deliver == 20
+
+
+@pytest.mark.asyncio
 async def test_delete_nonexistent_consumer_fails(jetstream: JetStream):
     """Test that deleting a non-existent consumer fails."""
     # Create a stream
