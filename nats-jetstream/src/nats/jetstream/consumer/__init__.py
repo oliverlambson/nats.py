@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -36,8 +36,8 @@ class ConsumerConfig:
     replay_policy: ReplayPolicy = "instant"
     """The rate at which messages will be pushed to a client."""
 
-    ack_wait: int | None = None
-    """How long (in nanoseconds) to allow messages to remain un-acknowledged before attempting redelivery."""
+    ack_wait: timedelta | None = None
+    """How long to allow messages to remain un-acknowledged before attempting redelivery."""
 
     backoff: list[int] | None = None
     """List of durations in Go format that represents a retry time scale for NaK'd messages."""
@@ -69,10 +69,10 @@ class ConsumerConfig:
     headers_only: bool | None = None
     """Delivers only the headers of messages in the stream and not the bodies. Additionally adds Nats-Msg-Size header to indicate the size of the removed payload."""
 
-    idle_heartbeat: int | None = None
-    """If the Consumer is idle for more than this many nano seconds a empty message with Status header 100 will be sent indicating the consumer is still alive."""
+    idle_heartbeat: timedelta | None = None
+    """If the Consumer is idle for more than this duration an empty message with Status header 100 will be sent indicating the consumer is still alive."""
 
-    inactive_threshold: int | None = None
+    inactive_threshold: timedelta | None = None
     """Duration that instructs the server to cleanup ephemeral consumers that are inactive for that long."""
 
     max_ack_pending: int | None = None
@@ -87,7 +87,7 @@ class ConsumerConfig:
     max_deliver: int | None = None
     """The number of times a message will be delivered to consumers if not acknowledged in time."""
 
-    max_expires: int | None = None
+    max_expires: timedelta | None = None
     """The maximum expires value that may be set when doing a pull on a Pull Consumer."""
 
     max_waiting: int | None = None
@@ -136,7 +136,11 @@ class ConsumerConfig:
         ack_policy = config.pop("ack_policy", "none")
         deliver_policy = config.pop("deliver_policy", "all")
         replay_policy = config.pop("replay_policy", "instant")
-        ack_wait = config.pop("ack_wait", None)
+
+        # Convert duration fields from nanoseconds to timedelta
+        ack_wait_ns = config.pop("ack_wait", None)
+        ack_wait = timedelta(microseconds=ack_wait_ns / 1000) if ack_wait_ns is not None else None
+
         backoff = config.pop("backoff", None)
         deliver_group = config.pop("deliver_group", None)
         deliver_subject = config.pop("deliver_subject", None)
@@ -147,13 +151,19 @@ class ConsumerConfig:
         filter_subjects = config.pop("filter_subjects", None)
         flow_control = config.pop("flow_control", None)
         headers_only = config.pop("headers_only", None)
-        idle_heartbeat = config.pop("idle_heartbeat", None)
-        inactive_threshold = config.pop("inactive_threshold", None)
+
+        idle_heartbeat_ns = config.pop("idle_heartbeat", None)
+        idle_heartbeat = timedelta(microseconds=idle_heartbeat_ns / 1000) if idle_heartbeat_ns is not None else None
+
+        inactive_threshold_ns = config.pop("inactive_threshold", None)
+        inactive_threshold = timedelta(microseconds=inactive_threshold_ns / 1000) if inactive_threshold_ns is not None else None
         max_ack_pending = config.pop("max_ack_pending", None)
         max_batch = config.pop("max_batch", None)
         max_bytes = config.pop("max_bytes", None)
         max_deliver = config.pop("max_deliver", None)
-        max_expires = config.pop("max_expires", None)
+
+        max_expires_ns = config.pop("max_expires", None)
+        max_expires = timedelta(microseconds=max_expires_ns / 1000) if max_expires_ns is not None else None
         max_waiting = config.pop("max_waiting", None)
         mem_storage = config.pop("mem_storage", None)
         metadata = config.pop("metadata", None)
@@ -221,7 +231,7 @@ class ConsumerConfig:
         if self.replay_policy != "instant":
             request["replay_policy"] = self.replay_policy
         if self.ack_wait is not None:
-            request["ack_wait"] = self.ack_wait
+            request["ack_wait"] = int(self.ack_wait.total_seconds() * 1_000_000_000)
         if self.backoff is not None:
             request["backoff"] = self.backoff
         if self.deliver_group is not None:
@@ -243,9 +253,9 @@ class ConsumerConfig:
         if self.headers_only is not None:
             request["headers_only"] = self.headers_only
         if self.idle_heartbeat is not None:
-            request["idle_heartbeat"] = self.idle_heartbeat
+            request["idle_heartbeat"] = int(self.idle_heartbeat.total_seconds() * 1_000_000_000)
         if self.inactive_threshold is not None:
-            request["inactive_threshold"] = self.inactive_threshold
+            request["inactive_threshold"] = int(self.inactive_threshold.total_seconds() * 1_000_000_000)
         if self.max_ack_pending is not None:
             request["max_ack_pending"] = self.max_ack_pending
         if self.max_batch is not None:
@@ -255,7 +265,7 @@ class ConsumerConfig:
         if self.max_deliver is not None:
             request["max_deliver"] = self.max_deliver
         if self.max_expires is not None:
-            request["max_expires"] = self.max_expires
+            request["max_expires"] = int(self.max_expires.total_seconds() * 1_000_000_000)
         if self.max_waiting is not None:
             request["max_waiting"] = self.max_waiting
         if self.mem_storage is not None:
@@ -318,8 +328,8 @@ class ConsumerInfo:
     """Current priority group state information."""
     paused: bool | None = None
     """Indicates if the consumer is currently in a paused state."""
-    pause_remaining: int | None = None
-    """When paused, the time remaining until unpause (in nanoseconds)."""
+    pause_remaining: timedelta | None = None
+    """When paused, the time remaining until unpause."""
 
     @classmethod
     def from_response(cls, data: api.ConsumerInfo, *, strict: bool = False) -> ConsumerInfo:
@@ -341,7 +351,8 @@ class ConsumerInfo:
         timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00")) if timestamp_str else None
         priority_groups = data.pop("priority_groups", None)
         paused = data.pop("paused", None)
-        pause_remaining = data.pop("pause_remaining", None)
+        pause_remaining_ns = data.pop("pause_remaining", None)
+        pause_remaining = timedelta(microseconds=pause_remaining_ns / 1000) if pause_remaining_ns is not None else None
 
         # Pop response envelope fields that aren't part of ConsumerInfo
         data.pop("type", None)  # Response type discriminator

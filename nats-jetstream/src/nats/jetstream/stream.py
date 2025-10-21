@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -313,7 +313,7 @@ class Republish:
 class StreamConsumerLimits:
     """Limits for consumers of this stream."""
 
-    inactive_threshold: int | None = None
+    inactive_threshold: timedelta | None = None
     """Maximum value for inactive_threshold for consumers of this stream. Acts as a default when consumers do not set this value."""
 
     max_ack_pending: int | None = None
@@ -321,7 +321,8 @@ class StreamConsumerLimits:
 
     @classmethod
     def from_response(cls, data: api.StreamConsumerLimits, *, strict: bool = False) -> StreamConsumerLimits:
-        inactive_threshold = data.pop("inactive_threshold", None)
+        inactive_threshold_ns = data.pop("inactive_threshold", None)
+        inactive_threshold = timedelta(microseconds=inactive_threshold_ns / 1000) if inactive_threshold_ns is not None else None
         max_ack_pending = data.pop("max_ack_pending", None)
 
         # Check for unconsumed fields
@@ -337,7 +338,7 @@ class StreamConsumerLimits:
         """Convert to API request format."""
         result: api.StreamConsumerLimits = {}
         if self.inactive_threshold is not None:
-            result["inactive_threshold"] = self.inactive_threshold
+            result["inactive_threshold"] = int(self.inactive_threshold.total_seconds() * 1_000_000_000)
         if self.max_ack_pending is not None:
             result["max_ack_pending"] = self.max_ack_pending
         return result
@@ -520,8 +521,8 @@ class StreamConfig:
     storage: StorageType = "file"
     """The storage backend to use for the Stream."""
 
-    max_age: int | None = None
-    """Maximum age of any message in the stream, expressed in nanoseconds. None for unlimited."""
+    max_age: timedelta | None = None
+    """Maximum age of any message in the stream. None for unlimited."""
 
     max_bytes: int | None = None
     """How big the Stream may be, when the combined stream size exceeds this old messages are removed. None for unlimited."""
@@ -559,8 +560,8 @@ class StreamConfig:
     discard_new_per_subject: bool | None = None
     """When discard policy is new and the stream is one with max messages per subject set, this will apply the new behavior to every subject. Essentially turning discard new from maximum number of subjects into maximum number of messages in a subject."""
 
-    duplicate_window: int | None = None
-    """The time window to track duplicate messages for, expressed in nanoseconds. 0 for default."""
+    duplicate_window: timedelta | None = None
+    """The time window to track duplicate messages for. None for default."""
 
     first_seq: int | None = None
     """A custom sequence to use for the first message in the stream."""
@@ -597,7 +598,7 @@ class StreamConfig:
     sources: list[StreamSource] | None = None
     """List of Stream names to replicate into this Stream."""
 
-    subject_delete_marker_ttl: int | None = None
+    subject_delete_marker_ttl: timedelta | None = None
     """Enables and sets a duration for adding server markers for delete, purge and max age limits."""
 
     subject_transform: SubjectTransform | None = None
@@ -660,8 +661,8 @@ class StreamConfig:
         # No need to copy - config comes from JSON and won't be reused
 
         # Convert API values to None for unlimited (-1 or 0)
-        max_age = config.pop("max_age", 0)
-        max_age = None if max_age == 0 else max_age
+        max_age_ns = config.pop("max_age", 0)
+        max_age = None if max_age_ns == 0 else timedelta(microseconds=max_age_ns / 1000)
 
         max_bytes = config.pop("max_bytes", -1)
         max_bytes = None if max_bytes == -1 else max_bytes
@@ -685,7 +686,10 @@ class StreamConfig:
         description = config.pop("description", None)
         discard = config.pop("discard", None)
         discard_new_per_subject = config.pop("discard_new_per_subject", None)
-        duplicate_window = config.pop("duplicate_window", None)
+
+        duplicate_window_ns = config.pop("duplicate_window", None)
+        duplicate_window = timedelta(microseconds=duplicate_window_ns / 1000) if duplicate_window_ns is not None else None
+
         first_seq = config.pop("first_seq", None)
 
         max_msg_size = config.pop("max_msg_size", -1)
@@ -698,7 +702,10 @@ class StreamConfig:
         no_ack = config.pop("no_ack", None)
         sealed = config.pop("sealed", None)
         subjects = config.pop("subjects", None)
-        subject_delete_marker_ttl = config.pop("subject_delete_marker_ttl", None)
+
+        subject_delete_marker_ttl_ns = config.pop("subject_delete_marker_ttl", None)
+        subject_delete_marker_ttl = timedelta(microseconds=subject_delete_marker_ttl_ns / 1000) if subject_delete_marker_ttl_ns is not None else None
+
         template_owner = config.pop("template_owner", None)
 
         mirror = None
@@ -775,7 +782,7 @@ class StreamConfig:
     def to_request(self) -> api.StreamConfig:
         """Convert StreamConfig to an API request dictionary."""
         result: api.StreamConfig = {
-            "max_age": self.max_age if self.max_age is not None else 0,
+            "max_age": int(self.max_age.total_seconds() * 1_000_000_000) if self.max_age is not None else 0,
             "max_bytes": self.max_bytes if self.max_bytes is not None else -1,
             "max_consumers": self.max_consumers if self.max_consumers is not None else -1,
             "max_msgs": self.max_msgs if self.max_msgs is not None else -1,
@@ -805,7 +812,7 @@ class StreamConfig:
         if self.discard_new_per_subject is not None:
             result["discard_new_per_subject"] = self.discard_new_per_subject
         if self.duplicate_window is not None:
-            result["duplicate_window"] = self.duplicate_window
+            result["duplicate_window"] = int(self.duplicate_window.total_seconds() * 1_000_000_000)
         if self.first_seq is not None:
             result["first_seq"] = self.first_seq
         if self.max_msgs_per_subject is not None:
@@ -829,7 +836,7 @@ class StreamConfig:
         if self.sources is not None:
             result["sources"] = [s.to_request() for s in self.sources]
         if self.subject_delete_marker_ttl is not None:
-            result["subject_delete_marker_ttl"] = self.subject_delete_marker_ttl
+            result["subject_delete_marker_ttl"] = int(self.subject_delete_marker_ttl.total_seconds() * 1_000_000_000)
         if self.subject_transform is not None:
             result["subject_transform"] = self.subject_transform.to_request()
         if self.subjects is not None:

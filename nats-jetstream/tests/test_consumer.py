@@ -632,7 +632,7 @@ async def test_consumer_pause_resume(jetstream: JetStream):
     info = await stream.get_consumer_info("pause_consumer")
     assert info.paused is True
     assert info.pause_remaining is not None
-    assert info.pause_remaining > 0
+    assert info.pause_remaining.total_seconds() > 0
 
     # Try to fetch messages while paused - should timeout/get no messages quickly
     batch = await consumer.fetch(max_messages=5, max_wait=0.5)
@@ -650,7 +650,7 @@ async def test_consumer_pause_resume(jetstream: JetStream):
     # Verify consumer is automatically unpaused
     # When unpaused, server may not return paused/pause_remaining fields at all
     info = await stream.get_consumer_info("pause_consumer")
-    assert info.paused is False or info.paused is None or info.pause_remaining == 0
+    assert info.paused is False or info.paused is None or (info.pause_remaining is not None and info.pause_remaining.total_seconds() == 0)
 
     # Should be able to fetch messages again
     batch = await consumer.fetch(max_messages=5, max_wait=1.0)
