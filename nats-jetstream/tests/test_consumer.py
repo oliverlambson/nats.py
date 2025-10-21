@@ -378,44 +378,14 @@ async def test_consumer_messages_as_iterator(jetstream: JetStream):
 
 
 @pytest.mark.asyncio
-async def test_consumer_messages_with_max_bytes_and_max_messages(jetstream: JetStream):
-    """Test messages() method with both max_messages and max_bytes specified."""
-    # Create a stream
-    stream = await jetstream.create_stream(name="test_messages_both", subjects=["MSGBOTH.*"])
+async def test_messages_rejects_both_max_messages_and_max_bytes(jetstream: JetStream):
+    """Test ADR-37: messages() cannot accept both max_messages and max_bytes simultaneously."""
+    stream = await jetstream.create_stream(name="test", subjects=["FOO.*"])
+    consumer = await stream.create_consumer(name="test_consumer")
 
-    # Create a pull consumer
-    consumer = await stream.create_consumer(
-        name="messages_both_consumer",
-        durable_name="messages_both_consumer",
-        filter_subject="MSGBOTH.*",
-        deliver_policy="all",
-        ack_policy="explicit",
-    )
-
-    # Publish a few messages
-    for i in range(3):
-        await jetstream.publish(f"MSGBOTH.{i}", f"message {i}".encode())
-
-    # Test messages() with both limits
-    message_stream = await consumer.messages(
-        max_messages=5,  # Allow up to 5 messages
-        max_bytes=100,  # Limit to 100 bytes per batch
-        max_wait=1.0,
-    )
-
-    try:
-        received = []
-        async for msg in message_stream:
-            received.append((msg.subject, msg.data))
-            await msg.ack()
-            if len(received) >= 3:  # Got all published messages
-                break
-
-        # Should have received all 3 messages
-        assert len(received) == 3
-
-    finally:
-        await message_stream.stop()
+    # Should raise ValueError when both are specified
+    with pytest.raises(ValueError, match="Cannot specify both max_messages and max_bytes simultaneously"):
+        await consumer.messages(max_messages=10, max_bytes=1024)
 
 
 @pytest.mark.asyncio
@@ -1022,12 +992,11 @@ async def test_messages_with_threshold_bytes(jetstream: JetStream):
     for i in range(10):
         await jetstream.publish("TBYTES.test", b"x" * 100)
 
-    # Create message stream with byte thresholds
-    # Request up to 500 bytes, refill when < 400 bytes remain (80% threshold)
+    # Create message stream with byte thresholds (ADR-37: only max_bytes, not max_messages)
+    # Request up to 1000 bytes, refill when < 800 bytes remain (80% threshold)
     message_stream = await consumer.messages(
-        max_messages=10,
-        max_bytes=500,
-        threshold_bytes=400,  # Refill when less than 400 bytes buffered
+        max_bytes=1000,
+        threshold_bytes=800,  # Refill when less than 800 bytes buffered
         max_wait=2.0,
     )
 
