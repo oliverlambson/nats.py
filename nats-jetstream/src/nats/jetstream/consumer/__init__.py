@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -310,8 +311,8 @@ class ConsumerInfo:
     num_pending: int
     cluster: dict[str, Any] | None = None
     push_bound: bool | None = None
-    ts: str | None = None
-    """The server time the consumer info was created (RFC3339 format)."""
+    ts: datetime | None = None
+    """The server time the consumer info was created."""
     priority_groups: list[dict[str, Any]] | None = None
     """Current priority group state information."""
     paused: bool | None = None
@@ -334,7 +335,8 @@ class ConsumerInfo:
         num_pending = data.pop("num_pending")
         cluster = data.pop("cluster", None)
         push_bound = data.pop("push_bound", None)
-        ts = data.pop("ts", None)
+        ts_str = data.pop("ts", None)
+        ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00")) if ts_str else None
         priority_groups = data.pop("priority_groups", None)
         paused = data.pop("paused", None)
         pause_remaining = data.pop("pause_remaining", None)

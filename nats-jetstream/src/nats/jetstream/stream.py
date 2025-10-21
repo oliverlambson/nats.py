@@ -860,15 +860,16 @@ class StreamInfo:
     sources: list[StreamSourceInfo] | None = None
     """Streams being sourced into this Stream."""
 
-    ts: str | None = None
-    """The server time the stream info was created (RFC3339 format)."""
+    ts: datetime | None = None
+    """The server time the stream info was created."""
 
     @classmethod
     def from_response(cls, data: api.StreamInfo, *, strict: bool = False) -> StreamInfo:
         config = StreamConfig.from_response(data.pop("config"), strict=strict)
         created = data.pop("created")
         state = StreamState.from_response(data.pop("state"), strict=strict)
-        ts = data.pop("ts", None)
+        ts_str = data.pop("ts", None)
+        ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00")) if ts_str else None
 
         cluster = None
         cluster_data = data.pop("cluster", None)
