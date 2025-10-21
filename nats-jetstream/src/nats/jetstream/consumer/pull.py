@@ -262,59 +262,32 @@ class PullMessageStream(MessageStream):
                         # Immediately request more messages
                         await self._send_request()
                         continue
-                    case "408":  # Timeout - continue requesting
+                    case "408" | "409":  # Timeout or request terminated
+                        # Read pending headers (ADR-37) - server tells us how many messages/bytes
+                        # from our request were NOT delivered
+                        if raw_msg.headers:
+                            if pending := raw_msg.headers.get("Nats-Pending-Messages"):
+                                self._pending_messages = max(0, self._pending_messages - int(pending))
+                            if pending := raw_msg.headers.get("Nats-Pending-Bytes"):
+                                self._pending_bytes = max(0, self._pending_bytes - int(pending))
+
+                        # For 409, check if this is a terminal error
+                        if raw_msg.status.code == "409":
+                            description = raw_msg.status.description or ""
+                            description_lower = description.lower()
+
+                            # Terminal 409 errors
+                            if "consumer deleted" in description_lower or "consumer is push based" in description_lower:
+                                await self._cleanup()
+                                raise StopAsyncIteration
+
+                        # Non-terminal - request more messages
+                        await self._send_request()
                         continue
                     case "400":  # Bad Request - terminal error
                         await self._cleanup()
                         raise StopAsyncIteration
-                    case "409":  # Multiple meanings - need to parse description
-                        description = raw_msg.status.description or ""
-                        description_lower = description.lower()
-
-                        # Terminal 409 errors
-                        if "consumer deleted" in description_lower:
-                            await self._cleanup()
-                            raise StopAsyncIteration
-                        elif "consumer is push based" in description_lower:
-                            await self._cleanup()
-                            raise StopAsyncIteration
-
-                        # Non-terminal 409 errors (continue with warning/handling)
-                        elif "message size exceeds maxbytes" in description_lower:
-                            # Single message too large - reset and request more
-                            self._pending_messages = 0
-                            self._pending_bytes = 0
-                            await self._send_request()
-                            continue
-                        elif "exceeded maxrequestbatch" in description_lower:
-                            # Batch size too large - reset and request more
-                            self._pending_messages = 0
-                            self._pending_bytes = 0
-                            await self._send_request()
-                            continue
-                        elif "exceeded maxrequestexpires" in description_lower:
-                            # Expiration too long - reset and request more
-                            self._pending_messages = 0
-                            self._pending_bytes = 0
-                            await self._send_request()
-                            continue
-                        elif "exceeded maxrequestmaxbytes" in description_lower:
-                            # Byte limit too large - reset and request more
-                            self._pending_messages = 0
-                            self._pending_bytes = 0
-                            await self._send_request()
-                            continue
-                        elif "exceeded maxwaiting" in description_lower:
-                            # Too many pending requests - reset and request more
-                            self._pending_messages = 0
-                            self._pending_bytes = 0
-                            await self._send_request()
-                            continue
-                        else:
-                            # Unknown 409 error - treat as terminal
-                            await self._cleanup()
-                            raise StopAsyncIteration
-                    case _:  # Unknown error - terminal
+                    case _:  # Unknown status - terminal
                         await self._cleanup()
                         raise StopAsyncIteration
 
