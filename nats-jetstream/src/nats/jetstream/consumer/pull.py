@@ -293,7 +293,8 @@ class PullMessageStream(MessageStream):
 
             # Track that we consumed a message
             self._pending_messages = max(0, self._pending_messages - 1)
-            self._pending_bytes = max(0, self._pending_bytes - len(raw_msg.data))
+            # Calculate full message size: subject + reply + headers + payload (ADR-37)
+            self._pending_bytes = max(0, self._pending_bytes - len(raw_msg))
 
             # Convert to JetStream message
             return Message(

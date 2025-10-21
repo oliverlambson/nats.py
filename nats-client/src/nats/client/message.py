@@ -135,3 +135,29 @@ class Message:
             True if the message has a non-200 status code
         """
         return self.status is not None and self.status.is_error
+
+    def __len__(self) -> int:
+        """Calculate the total size of the message in bytes.
+
+        Includes: subject + reply + headers + payload
+        This matches nats.go's msg.Size() calculation.
+
+        Returns:
+            Total message size in bytes
+        """
+        size = len(self.subject.encode('utf-8'))  # Subject
+        size += len(self.data)  # Payload
+
+        if self.reply_to:
+            size += len(self.reply_to.encode('utf-8'))  # Reply subject
+
+        if self.headers:
+            # Calculate serialized header size
+            # Headers are sent as HTTP-style headers: "Key: Value\r\n"
+            for key, values in self.headers.items():
+                key_bytes = key.encode('utf-8')
+                for value in values:
+                    # "Key: Value\r\n"
+                    size += len(key_bytes) + 2 + len(value.encode('utf-8')) + 2
+
+        return size
