@@ -66,22 +66,16 @@ class TcpConnection:
     Implements the Connection protocol for TCP connections.
     """
 
-    host: str
-    port: int
     _reader: asyncio.StreamReader | None
     _writer: asyncio.StreamWriter | None
 
-    def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, host: str, port: int):
+    def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         """Initialize TCP connection.
 
         Args:
             reader: Stream reader for the connection
             writer: Stream writer for the connection
-            host: Server hostname or IP address
-            port: Server port number
         """
-        self.host = host
-        self.port = port
         self._reader = reader
         self._writer = writer
 
@@ -92,7 +86,7 @@ class TcpConnection:
             await self._writer.wait_closed()
             self._writer = None
             self._reader = None
-            logger.debug("TCP connection closed to %s:%s", self.host, self.port)
+            logger.debug("TCP connection closed")
 
     async def read(self, n: int) -> bytes:
         """Read n bytes from TCP connection."""
@@ -162,7 +156,7 @@ async def open_tcp_connection(host: str, port: int, ssl_context: ssl.SSLContext 
     """
     try:
         reader, writer = await asyncio.open_connection(host, port, ssl=ssl_context)
-        return TcpConnection(reader, writer, host, port)
+        return TcpConnection(reader, writer)
     except Exception as e:
         msg = f"Failed to connect: {e}"
         raise ConnectionError(msg)
