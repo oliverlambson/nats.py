@@ -1357,16 +1357,19 @@ class Stream:
         Returns:
             The updated consumer
         """
-        if config is not None:
-            # Convert ConsumerConfig to API request format
-            kwargs = config.to_request()
+        if config is None:
+            # Create ConsumerConfig from kwargs
+            config = ConsumerConfig.from_kwargs(**kwargs)
 
         # Validate consumer name
-        if "name" not in kwargs:
-            raise ValueError("update_consumer requires 'name' parameter")
+        if config.name is None:
+            raise ValueError("ConsumerConfig must have a name")
+
+        # Convert ConsumerConfig to API request format and update consumer
+        config_dict = config.to_request()
 
         # Delegate to _upsert_consumer with "update" action
-        return await self._upsert_consumer(action=CONSUMER_ACTION_UPDATE, **kwargs)
+        return await self._upsert_consumer(action=CONSUMER_ACTION_UPDATE, **config_dict)
 
     async def pause_consumer(self, consumer_name: str, pause_until: float) -> None:
         """Pause a consumer until a specific time.
