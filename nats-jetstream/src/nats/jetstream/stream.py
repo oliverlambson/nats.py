@@ -1192,6 +1192,10 @@ class Stream:
 
         Returns:
             The stream message including subject, data, headers, etc.
+
+        Raises:
+            MessageNotFoundError: If the message does not exist
+            JetStreamError: For other JetStream API errors
         """
         return await self._get_message(sequence=sequence)
 
@@ -1323,7 +1327,18 @@ class Stream:
         return await self._upsert_consumer(action=CONSUMER_ACTION_CREATE, **config_dict)
 
     async def get_consumer_info(self, consumer_name: str) -> ConsumerInfo:
-        """Get consumer info."""
+        """Get consumer info.
+
+        Args:
+            consumer_name: Name of the consumer
+
+        Returns:
+            Consumer information
+
+        Raises:
+            ConsumerNotFoundError: If the consumer does not exist
+            JetStreamError: For other JetStream API errors
+        """
         # Get API client from jetstream
         api = getattr(self._jetstream, "_api", None)
         if api is None:
@@ -1334,7 +1349,19 @@ class Stream:
         return ConsumerInfo.from_response(response, strict=self._jetstream.strict)
 
     async def get_consumer(self, consumer_name: str) -> Consumer:
-        """Get a consumer by name."""
+        """Get a consumer by name.
+
+        Args:
+            consumer_name: Name of the consumer
+
+        Returns:
+            Consumer instance (currently only PullConsumer is supported)
+
+        Raises:
+            ConsumerNotFoundError: If the consumer does not exist
+            NotImplementedError: If the consumer is a push consumer
+            JetStreamError: For other JetStream API errors
+        """
         # Get consumer info
         consumer_info = await self.get_consumer_info(consumer_name)
 
@@ -1346,7 +1373,18 @@ class Stream:
         return PullConsumer(self, consumer_info)
 
     async def delete_consumer(self, consumer_name: str) -> bool:
-        """Delete a consumer."""
+        """Delete a consumer.
+
+        Args:
+            consumer_name: Name of the consumer to delete
+
+        Returns:
+            True if the consumer was deleted
+
+        Raises:
+            ConsumerNotFoundError: If the consumer does not exist
+            JetStreamError: For other JetStream API errors
+        """
         # Get API client from jetstream
         api = getattr(self._jetstream, "_api", None)
         if api is None:
@@ -1436,6 +1474,10 @@ class Stream:
         Args:
             consumer_name: Name of the consumer to pause
             pause_until: Unix timestamp (in seconds) to pause until
+
+        Raises:
+            ConsumerNotFoundError: If the consumer does not exist
+            JetStreamError: For other JetStream API errors
         """
         from datetime import datetime, timezone
 

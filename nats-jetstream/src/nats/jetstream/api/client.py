@@ -13,6 +13,19 @@ from typing import (
     overload,
 )
 
+from nats.client.errors import NoRespondersError
+
+from ..errors import (
+    ConsumerNotFoundError,
+    ErrorCode,
+    JetStreamError,
+    JetStreamNotEnabledError,
+    JetStreamNotEnabledForAccountError,
+    MaximumConsumersLimitError,
+    MessageNotFoundError,
+    StreamNameAlreadyInUseError,
+    StreamNotFoundError,
+)
 from .types import (
     AccountInfoResponse,
     ConsumerCreateRequest,
@@ -54,37 +67,22 @@ if TYPE_CHECKING:
 logger = logging.getLogger("nats.jetstream.api")
 
 
-class Error(Exception):
-    def __init__(self, message: str, code: int | None = None, description: str | None = None):
-        super().__init__(message)
-        self.code = code
-        self.description = description
+def _error_from_response(error: ApiError, *, strict: bool = False) -> JetStreamError:
+    """Parse an error response and return a JetStreamError instance."""
+    description = error.pop("description", "Unknown error")
+    status_code = error.pop("code", None)  # API status code (400, 404, 503)
+    err_code = error.pop("err_code", None)  # JetStream error code (10003, 10014, 10059)
 
-    @classmethod
-    def from_response(cls, error: ApiError, *, strict: bool = False) -> Error:
-        description = error.pop("description", "Unknown error")
-        code = error.pop("code", None)
-        err_code = error.pop("err_code", None)
+    # Check for unconsumed fields
+    if strict and error:
+        raise ValueError(f"Error.from_response() has unconsumed fields: {list(error.keys())}")
 
-        # Use err_code if code is not set
-        if code is None and err_code is not None:
-            code = err_code
-
-        # Check for unconsumed fields
-        if strict and error:
-            raise ValueError(f"Error.from_response() has unconsumed fields: {list(error.keys())}")
-
-        return cls(
-            message=description,
-            code=code,
-            description=description,
-        )
-
-
-class ConsumerDeletedError(Error):
-    """Error raised when a consumer has been deleted."""
-
-    pass
+    return JetStreamError(
+        message=description,
+        code=status_code,
+        error_code=err_code,
+        description=description,
+    )
 
 
 def is_error_response(data: Any) -> TypeGuard[ErrorResponse]:
@@ -130,31 +128,72 @@ class Client:
         self._raise_on_unknown_keys = raise_on_unknown_keys
 
     async def account_info(self) -> AccountInfoResponse:
-        return await self.request_json(
-            f"{self._prefix}.INFO",
-            response_type=AccountInfoResponse,
-        )
+        try:
+            return await self.request_json(
+                f"{self._prefix}.INFO",
+                response_type=AccountInfoResponse,
+            )
+        except NoRespondersError as e:
+            # If no responders, JetStream is not enabled on the server
+            raise JetStreamNotEnabledError(
+                "JetStream not enabled", code=503, error_code=ErrorCode.JETSTREAM_NOT_ENABLED
+            ) from e
+        except JetStreamError as e:
+            if e.error_code == ErrorCode.JETSTREAM_NOT_ENABLED_FOR_ACCOUNT:
+                raise JetStreamNotEnabledForAccountError(
+                    e.description, code=e.code, error_code=e.error_code, description=e.description
+                ) from e
+            if e.error_code == ErrorCode.JETSTREAM_NOT_ENABLED:
+                raise JetStreamNotEnabledError(
+                    e.description, code=e.code, error_code=e.error_code, description=e.description
+                ) from e
+            raise
 
     async def consumer_create(
         self, stream_name: str, consumer_name: str, /, **request: Unpack[ConsumerCreateRequest]
     ) -> ConsumerCreateResponse:
-        return await self.request_json(
-            f"{self._prefix}.CONSUMER.CREATE.{stream_name}.{consumer_name}",
-            request,
-            response_type=ConsumerCreateResponse,
-        )
+        try:
+            return await self.request_json(
+                f"{self._prefix}.CONSUMER.CREATE.{stream_name}.{consumer_name}",
+                request,
+                response_type=ConsumerCreateResponse,
+            )
+        except JetStreamError as e:
+            if e.error_code == ErrorCode.STREAM_NOT_FOUND:
+                raise StreamNotFoundError(
+                    e.description, code=e.code, error_code=e.error_code, description=e.description
+                ) from e
+            if e.error_code == ErrorCode.MAXIMUM_CONSUMERS_LIMIT:
+                raise MaximumConsumersLimitError(
+                    e.description, code=e.code, error_code=e.error_code, description=e.description
+                ) from e
+            raise
 
     async def consumer_delete(self, stream_name: str, consumer_name: str, /) -> ConsumerDeleteResponse:
-        return await self.request_json(
-            f"{self._prefix}.CONSUMER.DELETE.{stream_name}.{consumer_name}",
-            response_type=ConsumerDeleteResponse,
-        )
+        try:
+            return await self.request_json(
+                f"{self._prefix}.CONSUMER.DELETE.{stream_name}.{consumer_name}",
+                response_type=ConsumerDeleteResponse,
+            )
+        except JetStreamError as e:
+            if e.error_code == ErrorCode.CONSUMER_NOT_FOUND:
+                raise ConsumerNotFoundError(
+                    e.description, code=e.code, error_code=e.error_code, description=e.description
+                ) from e
+            raise
 
     async def consumer_info(self, stream_name: str, consumer_name: str, /) -> ConsumerInfoResponse:
-        return await self.request_json(
-            f"{self._prefix}.CONSUMER.INFO.{stream_name}.{consumer_name}",
-            response_type=ConsumerInfoResponse,
-        )
+        try:
+            return await self.request_json(
+                f"{self._prefix}.CONSUMER.INFO.{stream_name}.{consumer_name}",
+                response_type=ConsumerInfoResponse,
+            )
+        except JetStreamError as e:
+            if e.error_code == ErrorCode.CONSUMER_NOT_FOUND:
+                raise ConsumerNotFoundError(
+                    e.description, code=e.code, error_code=e.error_code, description=e.description
+                ) from e
+            raise
 
     async def consumer_list(self, stream_name: str, /, **request: Unpack[ConsumerListRequest]) -> ConsumerListResponse:
         """Get information about all consumers in a stream."""
@@ -187,31 +226,61 @@ class Client:
         Returns:
             ConsumerPauseResponse with pause state
         """
-        return await self.request_json(
-            f"{self._prefix}.CONSUMER.PAUSE.{stream_name}.{consumer_name}",
-            request if request else None,
-            response_type=ConsumerPauseResponse,
-        )
+        try:
+            return await self.request_json(
+                f"{self._prefix}.CONSUMER.PAUSE.{stream_name}.{consumer_name}",
+                request if request else None,
+                response_type=ConsumerPauseResponse,
+            )
+        except JetStreamError as e:
+            if e.error_code == ErrorCode.CONSUMER_NOT_FOUND:
+                raise ConsumerNotFoundError(
+                    e.description, code=e.code, error_code=e.error_code, description=e.description
+                ) from e
+            raise
 
     async def stream_create(self, name: str, /, **request: Unpack[StreamCreateRequest]) -> StreamCreateResponse:
-        return await self.request_json(
-            f"{self._prefix}.STREAM.CREATE.{name}",
-            request,
-            response_type=StreamCreateResponse,
-        )
+        try:
+            return await self.request_json(
+                f"{self._prefix}.STREAM.CREATE.{name}",
+                request,
+                response_type=StreamCreateResponse,
+            )
+        except JetStreamError as e:
+            # Re-raise specific errors (matching Go's error handling)
+            if e.error_code == ErrorCode.STREAM_NAME_IN_USE:
+                raise StreamNameAlreadyInUseError(
+                    e.description, code=e.code, error_code=e.error_code, description=e.description
+                ) from e
+            # Unknown errors pass through as generic JetStreamError
+            raise
 
     async def stream_delete(self, name: str, /) -> StreamDeleteResponse:
-        return await self.request_json(
-            f"{self._prefix}.STREAM.DELETE.{name}",
-            response_type=StreamDeleteResponse,
-        )
+        try:
+            return await self.request_json(
+                f"{self._prefix}.STREAM.DELETE.{name}",
+                response_type=StreamDeleteResponse,
+            )
+        except JetStreamError as e:
+            if e.error_code == ErrorCode.STREAM_NOT_FOUND:
+                raise StreamNotFoundError(
+                    e.description, code=e.code, error_code=e.error_code, description=e.description
+                ) from e
+            raise
 
     async def stream_info(self, name: str, /, **request: Unpack[StreamInfoRequest]) -> StreamInfoResponse:
-        return await self.request_json(
-            f"{self._prefix}.STREAM.INFO.{name}",
-            request if request else None,
-            response_type=StreamInfoResponse,
-        )
+        try:
+            return await self.request_json(
+                f"{self._prefix}.STREAM.INFO.{name}",
+                request if request else None,
+                response_type=StreamInfoResponse,
+            )
+        except JetStreamError as e:
+            if e.error_code == ErrorCode.STREAM_NOT_FOUND:
+                raise StreamNotFoundError(
+                    e.description, code=e.code, error_code=e.error_code, description=e.description
+                ) from e
+            raise
 
     async def stream_list(self, **request: Unpack[StreamListRequest]) -> StreamListResponse:
         """Get information about all streams.
@@ -238,11 +307,18 @@ class Client:
         )
 
     async def stream_msg_get(self, name: str, /, **request: Unpack[StreamMsgGetRequest]) -> StreamMsgGetResponse:
-        return await self.request_json(
-            f"{self._prefix}.STREAM.MSG.GET.{name}",
-            request if request else None,
-            response_type=StreamMsgGetResponse,
-        )
+        try:
+            return await self.request_json(
+                f"{self._prefix}.STREAM.MSG.GET.{name}",
+                request if request else None,
+                response_type=StreamMsgGetResponse,
+            )
+        except JetStreamError as e:
+            if e.error_code == ErrorCode.MESSAGE_NOT_FOUND:
+                raise MessageNotFoundError(
+                    e.description, code=e.code, error_code=e.error_code, description=e.description
+                ) from e
+            raise
 
     async def stream_names(self, **request: Unpack[StreamNamesRequest]) -> StreamNamesResponse:
         """Get a list of all stream names.
@@ -267,11 +343,18 @@ class Client:
         )
 
     async def stream_update(self, name: str, /, **request: Unpack[StreamUpdateRequest]) -> StreamUpdateResponse:
-        return await self.request_json(
-            f"{self._prefix}.STREAM.UPDATE.{name}",
-            request,
-            response_type=StreamUpdateResponse,
-        )
+        try:
+            return await self.request_json(
+                f"{self._prefix}.STREAM.UPDATE.{name}",
+                request,
+                response_type=StreamUpdateResponse,
+            )
+        except JetStreamError as e:
+            if e.error_code == ErrorCode.STREAM_NOT_FOUND:
+                raise StreamNotFoundError(
+                    e.description, code=e.code, error_code=e.error_code, description=e.description
+                ) from e
+            raise
 
     @overload
     async def request_json[ResponseT](
@@ -307,33 +390,27 @@ class Client:
         logger.debug("[%s] request: %s %r", request_id, subject, encoded_payload)
         response = await self._client.request(subject, encoded_payload, timeout=timeout)
 
-        try:
-            data = json.loads(response.data.decode())
-            logger.debug("[%s] response: %r", request_id, data)
+        data = json.loads(response.data.decode())
+        logger.debug("[%s] response: %r", request_id, data)
 
-            if raise_on_error and is_error_response(data):
-                raise Error.from_response(data["error"])
+        if raise_on_error and is_error_response(data):
+            raise _error_from_response(data["error"])
 
-            if self._validate_response:
-                is_valid, unknown_keys, missing_keys = check_response(data, response_type)
-                if not is_valid:
-                    if missing_keys:
-                        msg = f"Missing required keys in response: {missing_keys}"
-                        if self._raise_on_missing_keys:
-                            raise ValueError(msg)
-                        logger.warning("[%s] %s", request_id, msg)
-                    if not missing_keys and not unknown_keys:
-                        logger.warning(
-                            "[%s] Expected %s, got %s", request_id, response_type.__name__, type(data).__name__
-                        )
-
-                if unknown_keys:
-                    msg = f"Unknown keys in response: {unknown_keys}"
-                    if self._raise_on_unknown_keys:
+        if self._validate_response:
+            is_valid, unknown_keys, missing_keys = check_response(data, response_type)
+            if not is_valid:
+                if missing_keys:
+                    msg = f"Missing required keys in response: {missing_keys}"
+                    if self._raise_on_missing_keys:
                         raise ValueError(msg)
                     logger.warning("[%s] %s", request_id, msg)
+                if not missing_keys and not unknown_keys:
+                    logger.warning("[%s] Expected %s, got %s", request_id, response_type.__name__, type(data).__name__)
 
-            return cast(ResponseT, data)
-        except json.JSONDecodeError as e:
-            logger.exception("[%s] failed to decode response", request_id)
-            raise Error("failed to decode response") from e
+            if unknown_keys:
+                msg = f"Unknown keys in response: {unknown_keys}"
+                if self._raise_on_unknown_keys:
+                    raise ValueError(msg)
+                logger.warning("[%s] %s", request_id, msg)
+
+        return cast(ResponseT, data)

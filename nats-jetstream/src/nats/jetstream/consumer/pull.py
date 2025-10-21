@@ -141,7 +141,7 @@ class PullMessageBatch(MessageBatch):
 
                             # Terminal 409 errors
                             if "consumer deleted" in description_lower:
-                                from nats.jetstream.api.client import ConsumerDeletedError
+                                from nats.jetstream.errors import ConsumerDeletedError
 
                                 self._error = ConsumerDeletedError(description)
                                 raise StopAsyncIteration

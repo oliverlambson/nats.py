@@ -4,8 +4,15 @@ import asyncio
 
 import pytest
 from nats.client.errors import NoRespondersError
-from nats.jetstream import JetStream, StreamInfo
-from nats.jetstream.api.client import Error
+from nats.jetstream import (
+    ConsumerNotFoundError,
+    JetStream,
+    JetStreamError,
+    MessageNotFoundError,
+    StreamInfo,
+    StreamNameAlreadyInUseError,
+    StreamNotFoundError,
+)
 
 
 @pytest.mark.asyncio
@@ -180,9 +187,11 @@ async def test_create_stream_with_empty_name_fails(jetstream: JetStream):
 @pytest.mark.asyncio
 async def test_create_stream_with_duplicate_name_fails(jetstream: JetStream):
     """Test that creating a stream with a duplicate name fails."""
+    from nats.jetstream import StreamNameAlreadyInUseError
+
     await jetstream.create_stream(name="test", subjects=["FOO.*"])
 
-    with pytest.raises(Exception):  # TODO: Define specific error type
+    with pytest.raises(StreamNameAlreadyInUseError):
         await jetstream.create_stream(name="test", subjects=["BAR.*"])
 
 
@@ -485,7 +494,7 @@ async def test_create_consumer_with_duplicate_name_fails(jetstream: JetStream):
     )
 
     # Try to create a consumer with the same name but different config
-    with pytest.raises(Error, match="consumer already exists"):
+    with pytest.raises(JetStreamError, match="consumer already exists"):
         await jetstream.create_consumer(
             stream_name="test_stream", name="test_consumer", durable_name="test_consumer", max_deliver=20
         )
@@ -515,7 +524,7 @@ async def test_update_nonexistent_consumer_fails(jetstream: JetStream):
     await jetstream.create_stream(name="test_stream", subjects=["FOO.*"])
 
     # Try to update a non-existent consumer
-    with pytest.raises(Error, match="consumer does not exist"):
+    with pytest.raises(JetStreamError, match="consumer does not exist"):
         await jetstream.update_consumer(stream_name="test_stream", consumer_name="nonexistent", max_deliver=20)
 
 
@@ -883,3 +892,112 @@ async def test_publish_respects_total_timeout(jetstream: JetStream):
     assert elapsed < 0.8, f"Operation took {elapsed}s, should be close to 0.5s timeout"
     # Should have tried at least once
     assert elapsed >= 0.0, "Operation should have taken some time"
+
+
+# Error mapping tests - verify specific error types are raised
+
+
+@pytest.mark.asyncio
+async def test_stream_not_found_on_delete(jetstream: JetStream):
+    """Test that deleting a non-existent stream raises StreamNotFoundError."""
+    with pytest.raises(StreamNotFoundError) as exc_info:
+        await jetstream.delete_stream("nonexistent_stream")
+    assert exc_info.value.error_code == 10059
+
+
+@pytest.mark.asyncio
+async def test_stream_not_found_on_info(jetstream: JetStream):
+    """Test that getting info for a non-existent stream raises StreamNotFoundError."""
+    with pytest.raises(StreamNotFoundError) as exc_info:
+        await jetstream.get_stream_info("nonexistent_stream")
+    assert exc_info.value.error_code == 10059
+
+
+@pytest.mark.asyncio
+async def test_stream_not_found_on_update(jetstream: JetStream):
+    """Test that updating a non-existent stream raises StreamNotFoundError."""
+    with pytest.raises(StreamNotFoundError) as exc_info:
+        await jetstream.update_stream(name="nonexistent_stream", subjects=["FOO.*"])
+    assert exc_info.value.error_code == 10059
+
+
+@pytest.mark.asyncio
+async def test_stream_name_already_in_use(jetstream: JetStream):
+    """Test that creating a stream with duplicate name raises StreamNameAlreadyInUseError."""
+    await jetstream.create_stream(name="duplicate_stream", subjects=["FOO.*"])
+    with pytest.raises(StreamNameAlreadyInUseError) as exc_info:
+        await jetstream.create_stream(name="duplicate_stream", subjects=["BAR.*"])
+    assert exc_info.value.error_code == 10058
+
+
+@pytest.mark.asyncio
+async def test_consumer_not_found_on_delete(jetstream: JetStream):
+    """Test that deleting a non-existent consumer raises ConsumerNotFoundError."""
+    await jetstream.create_stream(name="test_stream", subjects=["FOO.*"])
+    with pytest.raises(ConsumerNotFoundError) as exc_info:
+        await jetstream.delete_consumer("test_stream", "nonexistent_consumer")
+    assert exc_info.value.error_code == 10014
+
+
+@pytest.mark.asyncio
+async def test_consumer_not_found_on_info(jetstream: JetStream):
+    """Test that getting info for a non-existent consumer raises ConsumerNotFoundError."""
+    await jetstream.create_stream(name="test_stream", subjects=["FOO.*"])
+    with pytest.raises(ConsumerNotFoundError) as exc_info:
+        stream = await jetstream.get_stream("test_stream")
+        await stream.get_consumer_info("nonexistent_consumer")
+    assert exc_info.value.error_code == 10014
+
+
+@pytest.mark.asyncio
+async def test_consumer_not_found_on_pause(jetstream: JetStream):
+    """Test that pausing a non-existent consumer raises ConsumerNotFoundError."""
+    await jetstream.create_stream(name="test_stream", subjects=["FOO.*"])
+    with pytest.raises(ConsumerNotFoundError) as exc_info:
+        stream = await jetstream.get_stream("test_stream")
+        # pause_until is a timestamp; using 0 to resume immediately (or pause for a moment)
+        await stream.pause_consumer("nonexistent_consumer", pause_until=0)
+    assert exc_info.value.error_code == 10014
+
+
+@pytest.mark.asyncio
+async def test_stream_not_found_on_consumer_create(jetstream: JetStream):
+    """Test that creating a consumer on non-existent stream raises StreamNotFoundError."""
+    with pytest.raises(StreamNotFoundError) as exc_info:
+        await jetstream.create_consumer(stream_name="nonexistent_stream", name="test_consumer")
+    assert exc_info.value.error_code == 10059
+
+
+@pytest.mark.asyncio
+async def test_message_not_found(jetstream: JetStream):
+    """Test that getting a non-existent message raises MessageNotFoundError."""
+    stream = await jetstream.create_stream(name="test_stream", subjects=["FOO.*"])
+    with pytest.raises(MessageNotFoundError) as exc_info:
+        await stream.get_message(99999)
+    assert exc_info.value.error_code == 10037
+
+
+@pytest.mark.asyncio
+async def test_account_info_jetstream_not_enabled():
+    """Test that account_info raises JetStreamNotEnabledError when JetStream is not enabled.
+
+    This test starts a NATS server WITHOUT JetStream to verify the error conversion.
+    """
+    from nats.client import connect
+    from nats.jetstream import JetStreamNotEnabledError
+    from nats.jetstream import new as new_jetstream
+    from nats.server import run
+
+    # Start a NATS server WITHOUT JetStream
+    async with await run(port=0, jetstream=False) as server:
+        client = await connect(server.client_url)
+        try:
+            js = new_jetstream(client)
+
+            # Should convert NoRespondersError to JetStreamNotEnabledError
+            with pytest.raises(JetStreamNotEnabledError) as exc_info:
+                await js.account_info()
+
+            assert exc_info.value.error_code == 10076  # JETSTREAM_NOT_ENABLED
+        finally:
+            await client.close()

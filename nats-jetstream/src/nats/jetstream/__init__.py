@@ -12,6 +12,18 @@ from nats.client.message import Headers
 from nats.client.protocol.message import parse_headers
 from nats.jetstream import api
 from nats.jetstream.consumer import Consumer, ConsumerInfo
+from nats.jetstream.errors import (
+    ConsumerDeletedError,
+    ConsumerNotFoundError,
+    ErrorCode,
+    JetStreamError,
+    JetStreamNotEnabledError,
+    JetStreamNotEnabledForAccountError,
+    MaximumConsumersLimitError,
+    MessageNotFoundError,
+    StreamNameAlreadyInUseError,
+    StreamNotFoundError,
+)
 from nats.jetstream.stream import (
     ClusterInfo,
     ExternalStreamSource,
@@ -421,6 +433,11 @@ class JetStream:
 
         Returns:
             The created Stream object
+
+        Raises:
+            ValueError: If stream name is not provided
+            StreamNameAlreadyInUseError: If a stream with this name already exists
+            JetStreamError: For other JetStream API errors
         """
         if config is None:
             # Create StreamConfig from kwargs with dict-to-dataclass conversion
@@ -437,7 +454,19 @@ class JetStream:
         return Stream(self, config.name, info)
 
     async def update_stream(self, **config) -> StreamInfo:
-        """Update an existing stream."""
+        """Update an existing stream.
+
+        Args:
+            **config: Stream configuration parameters (must include 'name')
+
+        Returns:
+            Updated StreamInfo
+
+        Raises:
+            ValueError: If 'name' is not provided in config
+            StreamNotFoundError: If the stream does not exist
+            JetStreamError: For other JetStream API errors
+        """
         name = config.get("name")
         if name is None:
             raise ValueError("Stream name is required for update")
@@ -445,7 +474,18 @@ class JetStream:
         return StreamInfo.from_response(response, strict=self._strict)
 
     async def delete_stream(self, name: str) -> bool:
-        """Delete a stream."""
+        """Delete a stream.
+
+        Args:
+            name: Name of the stream to delete
+
+        Returns:
+            True if the stream was deleted
+
+        Raises:
+            StreamNotFoundError: If the stream does not exist
+            JetStreamError: For other JetStream API errors
+        """
         response = await self._api.stream_delete(name)
         return response["success"]
 
@@ -467,7 +507,18 @@ class JetStream:
         return StreamInfo.from_response(response, strict=self._strict)
 
     async def get_stream(self, name: str) -> Stream:
-        """Get a stream by name."""
+        """Get a stream by name.
+
+        Args:
+            name: Name of the stream to get
+
+        Returns:
+            The Stream object
+
+        Raises:
+            StreamNotFoundError: If the stream does not exist
+            JetStreamError: For other JetStream API errors
+        """
         info = await self.get_stream_info(name)
         return Stream(self, name, info)
 
@@ -482,6 +533,11 @@ class JetStream:
 
         Returns:
             The created consumer
+
+        Raises:
+            StreamNotFoundError: If the stream does not exist
+            MaximumConsumersLimitError: If maximum consumers limit is reached
+            JetStreamError: For other JetStream API errors
         """
         # Get the stream first
         stream = await self.get_stream(stream_name)
@@ -504,6 +560,11 @@ class JetStream:
 
         Returns:
             The consumer
+
+        Raises:
+            StreamNotFoundError: If the stream does not exist
+            ConsumerNotFoundError: If the consumer does not exist
+            JetStreamError: For other JetStream API errors
         """
         stream = await self.get_stream(stream_name)
         return await stream.get_consumer(consumer_name)
@@ -517,6 +578,11 @@ class JetStream:
 
         Returns:
             True if the consumer was deleted
+
+        Raises:
+            StreamNotFoundError: If the stream does not exist
+            ConsumerNotFoundError: If the consumer does not exist
+            JetStreamError: For other JetStream API errors
         """
         stream = await self.get_stream(stream_name)
         return await stream.delete_consumer(consumer_name)
@@ -531,6 +597,11 @@ class JetStream:
 
         Returns:
             The updated consumer
+
+        Raises:
+            StreamNotFoundError: If the stream does not exist
+            ConsumerNotFoundError: If the consumer does not exist
+            JetStreamError: For other JetStream API errors
         """
         stream = await self.get_stream(stream_name)
         return await stream.update_consumer(name=consumer_name, **config)
@@ -553,6 +624,9 @@ class JetStream:
 
         Raises:
             ValueError: If 'name' is not provided in config
+            StreamNotFoundError: If the stream does not exist
+            MaximumConsumersLimitError: If maximum consumers limit is reached
+            JetStreamError: For other JetStream API errors
         """
         stream = await self.get_stream(stream_name)
         return await stream.create_or_update_consumer(**config)
@@ -637,7 +711,16 @@ class JetStream:
         return ConsumerInfo.from_response(response, strict=self._strict)
 
     async def account_info(self) -> AccountInfo:
-        """Get account information."""
+        """Get account information.
+
+        Returns:
+            Account information including limits and usage
+
+        Raises:
+            JetStreamNotEnabledError: If JetStream is not enabled on the server
+            JetStreamNotEnabledForAccountError: If JetStream is not enabled for this account
+            JetStreamError: For other JetStream API errors
+        """
         response = await self._api.account_info()
         return AccountInfo.from_response(response, strict=self._strict)
 
@@ -653,6 +736,10 @@ class JetStream:
 
         Returns:
             The stream message including subject, data, headers, etc.
+
+        Raises:
+            MessageNotFoundError: If the message does not exist
+            JetStreamError: For other JetStream API errors
         """
         response = await self._api.stream_msg_get(stream, seq=sequence)
         message = response["message"]
@@ -742,6 +829,7 @@ def new(client: Client, prefix: str = "$JS.API", domain: str | None = None, stri
 
 
 __all__ = [
+    # Core classes
     "JetStream",
     "Consumer",
     "ConsumerInfo",
@@ -764,4 +852,15 @@ __all__ = [
     "Tier",
     "APIStats",
     "PublishAck",
+    # Errors
+    "ErrorCode",
+    "JetStreamError",
+    "ConsumerDeletedError",
+    "ConsumerNotFoundError",
+    "JetStreamNotEnabledError",
+    "JetStreamNotEnabledForAccountError",
+    "MaximumConsumersLimitError",
+    "MessageNotFoundError",
+    "StreamNameAlreadyInUseError",
+    "StreamNotFoundError",
 ]

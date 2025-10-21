@@ -1,4 +1,4 @@
-from .client import Client, ConsumerDeletedError, Error
+from .client import Client
 
 # Only the non-request/response types are exported
 from .types import (
@@ -26,8 +26,6 @@ from .types import (
 
 __all__ = [
     "Client",
-    "ConsumerDeletedError",
-    "Error",
     "AccountInfo",
     "AccountLimits",
     "ApiStats",

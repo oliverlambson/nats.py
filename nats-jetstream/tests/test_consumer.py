@@ -201,7 +201,7 @@ async def test_consumer_delete_during_fetch(jetstream: JetStream):
     assert len(received) == 5
 
     # Check that the batch has the consumer deleted error
-    from nats.jetstream.api import ConsumerDeletedError
+    from nats.jetstream import ConsumerDeletedError
 
     assert batch.error is not None
     assert isinstance(batch.error, ConsumerDeletedError)
@@ -270,7 +270,7 @@ async def test_consumer_delete_during_next(jetstream: JetStream):
 
     # Try to get a next message with a longer timeout (should be interrupted by deletion)
     # since there are no messages, next() will wait until the consumer is deleted
-    from nats.jetstream.api import ConsumerDeletedError
+    from nats.jetstream import ConsumerDeletedError
 
     with pytest.raises(ConsumerDeletedError) as excinfo:
         await consumer.next(max_wait=2.0)
@@ -691,7 +691,7 @@ async def test_consumer_pause_invalid_stream(jetstream: JetStream):
     """
     import time
 
-    from nats.jetstream.api.client import Error as ApiError
+    from nats.jetstream import JetStreamError as ApiError
 
     # Create a stream
     stream = await jetstream.create_stream(name="test_pause_error", subjects=["ERROR.*"])
@@ -712,7 +712,7 @@ async def test_consumer_resume_invalid_stream(jetstream: JetStream):
 
     Requires NATS server 2.11.0+
     """
-    from nats.jetstream.api.client import Error as ApiError
+    from nats.jetstream import JetStreamError as ApiError
 
     # Create a stream
     stream = await jetstream.create_stream(name="test_resume_error", subjects=["RERROR.*"])
@@ -807,7 +807,7 @@ async def test_create_consumer_with_overlapping_filter_subjects(jetstream: JetSt
     Based on Go test: TestCreateConsumer - "with multiple filter subjects, overlapping subjects"
     Server should reject overlapping subjects with error code 10136.
     """
-    from nats.jetstream.api.client import Error as ApiError
+    from nats.jetstream import JetStreamError as ApiError
 
     # Create a stream with wildcard subject
     stream = await jetstream.create_stream(name="test_overlap_filter", subjects=["FOO.*"])
@@ -834,7 +834,7 @@ async def test_create_consumer_with_both_filter_subject_and_filter_subjects(jets
     Based on Go test: TestCreateConsumer - "with multiple filter subjects and filter subject provided"
     Server should reject with error code 10134 (duplicate filter subjects).
     """
-    from nats.jetstream.api.client import Error as ApiError
+    from nats.jetstream import JetStreamError as ApiError
 
     # Create a stream with wildcard subject
     stream = await jetstream.create_stream(name="test_both_filters", subjects=["FOO.*"])
@@ -862,7 +862,7 @@ async def test_create_consumer_with_empty_filter_in_filter_subjects(jetstream: J
     Based on Go test: TestCreateConsumer - "with empty subject in FilterSubjects"
     Server should reject with error about empty filter.
     """
-    from nats.jetstream.api.client import Error as ApiError
+    from nats.jetstream import JetStreamError as ApiError
 
     # Create a stream with wildcard subject
     stream = await jetstream.create_stream(name="test_empty_filter", subjects=["FOO.*"])
