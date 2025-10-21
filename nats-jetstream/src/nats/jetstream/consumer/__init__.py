@@ -302,7 +302,8 @@ class ConsumerInfo:
     stream_name: str
     name: str
     config: ConsumerConfig
-    created: int
+    created: datetime
+    """Timestamp when the consumer was created."""
     delivered: dict[str, int]
     ack_floor: dict[str, int]
     num_ack_pending: int
@@ -311,7 +312,7 @@ class ConsumerInfo:
     num_pending: int
     cluster: dict[str, Any] | None = None
     push_bound: bool | None = None
-    ts: datetime | None = None
+    timestamp: datetime | None = None
     """The server time the consumer info was created."""
     priority_groups: list[dict[str, Any]] | None = None
     """Current priority group state information."""
@@ -326,7 +327,8 @@ class ConsumerInfo:
         name = data.pop("name")
         config_data = data.pop("config")
         config = ConsumerConfig.from_response(config_data, strict=strict)
-        created = data.pop("created")
+        created_str = data.pop("created")
+        created = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
         delivered = data.pop("delivered")
         ack_floor = data.pop("ack_floor")
         num_ack_pending = data.pop("num_ack_pending")
@@ -335,8 +337,8 @@ class ConsumerInfo:
         num_pending = data.pop("num_pending")
         cluster = data.pop("cluster", None)
         push_bound = data.pop("push_bound", None)
-        ts_str = data.pop("ts", None)
-        ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00")) if ts_str else None
+        timestamp_str = data.pop("ts", None)
+        timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00")) if timestamp_str else None
         priority_groups = data.pop("priority_groups", None)
         paused = data.pop("paused", None)
         pause_remaining = data.pop("pause_remaining", None)
@@ -361,7 +363,7 @@ class ConsumerInfo:
             num_pending=num_pending,
             cluster=cluster,
             push_bound=push_bound,
-            ts=ts,
+            timestamp=timestamp,
             priority_groups=priority_groups,
             paused=paused,
             pause_remaining=pause_remaining,

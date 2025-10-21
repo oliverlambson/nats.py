@@ -446,10 +446,10 @@ class StreamState:
     consumer_count: int
     """Number of Consumers attached to the Stream."""
 
-    first_ts: str | None = None
+    first_ts: datetime | None = None
     """The timestamp of the first message in the Stream."""
 
-    last_ts: str | None = None
+    last_ts: datetime | None = None
     """The timestamp of the last message in the Stream."""
 
     deleted: list[int] | None = None
@@ -473,8 +473,10 @@ class StreamState:
         first_sequence = data.pop("first_seq")
         last_sequence = data.pop("last_seq")
         consumer_count = data.pop("consumer_count")
-        first_ts = data.pop("first_ts", None)
-        last_ts = data.pop("last_ts", None)
+        first_ts_str = data.pop("first_ts", None)
+        first_ts = datetime.fromisoformat(first_ts_str.replace("Z", "+00:00")) if first_ts_str else None
+        last_ts_str = data.pop("last_ts", None)
+        last_ts = datetime.fromisoformat(last_ts_str.replace("Z", "+00:00")) if last_ts_str else None
         deleted = data.pop("deleted", None)
         num_deleted = data.pop("num_deleted", None)
         subjects = data.pop("subjects", None)
@@ -847,7 +849,7 @@ class StreamInfo:
     config: StreamConfig
     """The active configuration for the Stream."""
 
-    created: int
+    created: datetime
     """Timestamp when the stream was created."""
 
     state: StreamState
@@ -860,16 +862,17 @@ class StreamInfo:
     sources: list[StreamSourceInfo] | None = None
     """Streams being sourced into this Stream."""
 
-    ts: datetime | None = None
+    timestamp: datetime | None = None
     """The server time the stream info was created."""
 
     @classmethod
     def from_response(cls, data: api.StreamInfo, *, strict: bool = False) -> StreamInfo:
         config = StreamConfig.from_response(data.pop("config"), strict=strict)
-        created = data.pop("created")
+        created_str = data.pop("created")
+        created = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
         state = StreamState.from_response(data.pop("state"), strict=strict)
-        ts_str = data.pop("ts", None)
-        ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00")) if ts_str else None
+        timestamp_str = data.pop("ts", None)
+        timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00")) if timestamp_str else None
 
         cluster = None
         cluster_data = data.pop("cluster", None)
@@ -902,7 +905,7 @@ class StreamInfo:
             config=config,
             created=created,
             state=state,
-            ts=ts,
+            timestamp=timestamp,
             cluster=cluster,
             mirror=mirror,
             sources=sources,
