@@ -709,3 +709,28 @@ async def test_inbox_prefix_cannot_end_with_dot(server):
     """Test that inbox prefix ending with '.' is rejected."""
     with pytest.raises(ValueError, match="inbox_prefix cannot end with '.'"):
         await connect(server.client_url, inbox_prefix="test.", timeout=1.0)
+
+
+@pytest.mark.asyncio
+async def test_server_initiated_ping_pong():
+    """Test that client properly handles PING from server and responds with PONG."""
+    import os
+
+    # Start server with very short ping interval
+    config_path = os.path.join(os.path.dirname(__file__), "configs", "server_ping.conf")
+    server = await run(config_path=config_path, port=0, timeout=5.0)
+
+    try:
+        client = await connect(server.client_url, timeout=1.0, allow_reconnect=False)
+
+        try:
+            # Wait long enough for server to send at least one PING
+            # Server is configured to ping every 100ms
+            await asyncio.sleep(0.3)
+
+            # If ping/pong handling didn't work, client would be disconnected
+            assert client.status == ClientStatus.CONNECTED, "Client should still be connected after server PINGs"
+        finally:
+            await client.close()
+    finally:
+        await server.shutdown()
