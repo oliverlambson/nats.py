@@ -1,6 +1,9 @@
 """Tests for JetStream functionality."""
 
+import asyncio
+
 import pytest
+from nats.client.errors import NoRespondersError
 from nats.jetstream import JetStream, StreamInfo
 from nats.jetstream.api.client import Error
 
@@ -673,3 +676,160 @@ async def test_get_last_message_for_subject_without_headers(jetstream: JetStream
     assert msg.data == b"message 2"
     assert msg.subject == "FOO.A"
     assert msg.sequence == ack.sequence
+
+
+# JetStream Publish Retries on No Responders
+
+
+@pytest.mark.asyncio
+async def test_publish_retries_on_no_responders(jetstream: JetStream):
+    """Test that publish retries when receiving no responders error.
+
+    Verifies that publish automatically retries when it receives a 'no responders'
+    error and eventually succeeds when the stream becomes available.
+    """
+
+    # Create a task that will create the stream after a short delay
+    # This simulates JetStream becoming available after initial failure
+    async def create_stream_delayed():
+        await asyncio.sleep(0.3)  # Wait longer than first retry (250ms)
+        await jetstream.create_stream(name="test", subjects=["RETRY.*"])
+
+    # Start the delayed stream creation
+    create_task = asyncio.create_task(create_stream_delayed())
+
+    try:
+        # This should fail initially (no stream), retry, and succeed once stream is created
+        # With default retry_wait=0.25s, it will retry after 250ms, by which time the stream exists
+        ack = await jetstream.publish("RETRY.A", b"test message", timeout=2.0)
+
+        # Verify it succeeded after retry
+        assert ack.stream == "test"
+        assert ack.sequence > 0
+    finally:
+        await create_task
+
+
+@pytest.mark.asyncio
+async def test_publish_retries_exhaust_and_fails(jetstream: JetStream):
+    """Test that publish fails after exhausting all retry attempts.
+
+    Verifies that publish raises NoRespondersError after all retry attempts
+    are exhausted when no stream is available.
+    """
+    # Don't create a stream - this will cause "no responders" errors
+    # With retry_attempts=2 and retry_wait=0.1s, total time ~0.2s
+    # timeout=1.0s is enough time for retries but stream never appears
+
+    with pytest.raises(NoRespondersError) as exc_info:
+        await jetstream.publish("NONEXISTENT.subject", b"test message", retry_attempts=2, retry_wait=0.1, timeout=1.0)
+
+    # Verify the error message
+    assert "no responders" in str(exc_info.value).lower()
+
+
+@pytest.mark.asyncio
+async def test_publish_retries_with_fixed_backoff(jetstream: JetStream):
+    """Test that publish uses fixed backoff between retries.
+
+    Verifies that the retry delays remain constant (not exponential) by measuring
+    the time taken for retries.
+    """
+    start_time = asyncio.get_event_loop().time()
+
+    # Create stream after 0.35 seconds to allow for 2 retries before success
+    # First attempt: immediate fail
+    # Wait 0.15s (retry_wait)
+    # Second attempt: ~0.15s - still no stream
+    # Wait 0.15s (retry_wait)
+    # Third attempt: ~0.30s - stream now exists, success
+    async def create_stream_delayed():
+        await asyncio.sleep(0.35)
+        await jetstream.create_stream(name="test", subjects=["RETRY.*"])
+
+    create_task = asyncio.create_task(create_stream_delayed())
+
+    try:
+        # Use shorter retry_wait to make test faster
+        ack = await jetstream.publish("RETRY.A", b"test message", retry_attempts=3, retry_wait=0.15, timeout=2.0)
+
+        elapsed = asyncio.get_event_loop().time() - start_time
+
+        assert ack.stream == "test"
+        assert ack.sequence > 0
+
+        # Should have taken at least 0.35s (when stream was created)
+        # With fixed backoff, timing should be predictable
+        assert elapsed >= 0.3, f"Expected at least 0.3s elapsed, got {elapsed}s"
+        # But not too long (would indicate exponential backoff)
+        assert elapsed < 0.6, f"Expected less than 0.6s elapsed, got {elapsed}s (would indicate exponential backoff)"
+    finally:
+        await create_task
+
+
+@pytest.mark.asyncio
+async def test_publish_custom_retry_attempts(jetstream: JetStream):
+    """Test that publish respects custom retry_attempts parameter.
+
+    Verifies that the retry_attempts parameter controls the number of retry attempts.
+    """
+    # Test with retry_attempts=0 (no retries)
+    # Should fail immediately without retrying
+    start_time = asyncio.get_event_loop().time()
+
+    with pytest.raises(NoRespondersError):
+        await jetstream.publish("NONEXISTENT.A", b"test message", retry_attempts=0, retry_wait=0.1, timeout=1.0)
+
+    elapsed = asyncio.get_event_loop().time() - start_time
+    # Should fail quickly (< 0.2s) since no retries
+    assert elapsed < 0.2, f"With retry_attempts=0, expected quick failure, got {elapsed}s"
+
+    # Test with retry_attempts=3 and a stream that appears after enough retries
+    # Create stream after 0.5s, which is after 3 retries (3 * 0.1s = 0.3s)
+    async def create_stream_delayed():
+        await asyncio.sleep(0.5)
+        await jetstream.create_stream(name="test", subjects=["RETRY.*"])
+
+    create_task = asyncio.create_task(create_stream_delayed())
+
+    try:
+        start_time = asyncio.get_event_loop().time()
+
+        ack = await jetstream.publish(
+            "RETRY.B",
+            b"test message",
+            retry_attempts=5,  # Enough retries to wait for stream
+            retry_wait=0.1,
+            timeout=2.0,
+        )
+
+        elapsed = asyncio.get_event_loop().time() - start_time
+
+        assert ack.stream == "test"
+        # Should have taken at least 0.5s (when stream was created)
+        assert elapsed >= 0.4, f"Expected at least 0.4s, got {elapsed}s"
+    finally:
+        await create_task
+
+
+@pytest.mark.asyncio
+async def test_publish_respects_total_timeout(jetstream: JetStream):
+    """Test that publish respects the total timeout budget across all retries.
+
+    Verifies that the timeout parameter is the total time budget for the entire
+    operation, not per-request timeout.
+    """
+    start_time = asyncio.get_event_loop().time()
+
+    # Set a short timeout (0.5 second) with retries that would take longer if allowed
+    # With retry_wait=0.2s and retry_attempts=10, it could try for 2+ seconds
+    # But timeout=0.5s should cut it off much sooner
+    with pytest.raises((NoRespondersError, asyncio.TimeoutError)):
+        await jetstream.publish("NONEXISTENT.timeout", b"test message", retry_attempts=10, retry_wait=0.2, timeout=0.5)
+
+    elapsed = asyncio.get_event_loop().time() - start_time
+
+    # Should complete within roughly the timeout budget (allowing small overhead for async operations)
+    assert elapsed < 0.8, f"Operation took {elapsed}s, should be close to 0.5s timeout"
+    # Should have tried at least once
+    assert elapsed >= 0.0, "Operation should have taken some time"

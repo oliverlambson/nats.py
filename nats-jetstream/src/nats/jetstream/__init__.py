@@ -256,27 +256,86 @@ class JetStream:
         payload: bytes,
         *,
         headers: dict[str, str] | None = None,
+        retry_attempts: int = 2,
+        retry_wait: float = 0.25,
+        timeout: float = 5.0,
     ) -> PublishAck:
         """Publish a message to JetStream.
+
+        Automatically retries publish attempts when receiving a 'no responders' error,
+        which typically indicates that JetStream is temporarily unavailable (e.g., during
+        cluster leadership transitions). Uses a fixed backoff wait time between retry attempts.
 
         Args:
             subject: Subject to publish to
             payload: Message payload
             headers: Optional message headers
+            retry_attempts: Number of retry attempts for no responders errors (default: 2)
+            retry_wait: Fixed wait time between retries in seconds (default: 0.25)
+            timeout: Total timeout for the entire publish operation in seconds, including
+                    all retry attempts and backoff delays (default: 5.0)
 
         Returns:
             Acknowledgement of the published message
+
+        Raises:
+            NoRespondersError: If no responders are available after all retry attempts
+            TimeoutError: If the total timeout is exceeded
+            StatusError: For other status errors from the server
         """
-        response = await self._client.request(
-            subject,
-            payload,
-            headers=headers,
-            timeout=5.0,
-        )
+        import asyncio
 
-        publish_ack = PublishAck.from_response(json.loads(response.data), strict=self._strict)
+        from nats.client.errors import NoRespondersError
 
-        return publish_ack
+        # Track overall deadline
+        start_time = asyncio.get_event_loop().time()
+        deadline = start_time + timeout
+
+        # Try initial attempt + retry_attempts (e.g., retry_attempts=2 means 3 total tries)
+        for attempt in range(retry_attempts + 1):
+            try:
+                # Calculate remaining time for this attempt
+                remaining_time = deadline - asyncio.get_event_loop().time()
+
+                if remaining_time <= 0:
+                    # Total timeout exceeded
+                    raise asyncio.TimeoutError("Publish operation exceeded total timeout")
+
+                # Use remaining time for this request attempt
+                response = await self._client.request(
+                    subject,
+                    payload,
+                    headers=headers,
+                    timeout=remaining_time,
+                    return_on_error=True,
+                )
+
+                # Check for no responders status in response
+                if response.is_error_status and response.status.code in ("503", "No Responders"):
+                    # Raise to trigger retry logic
+                    raise NoRespondersError(
+                        response.status.code,
+                        response.status.description or "No responders available for request",
+                        subject=subject,
+                    )
+
+                publish_ack = PublishAck.from_response(json.loads(response.data), strict=self._strict)
+                return publish_ack
+
+            except NoRespondersError:
+                # Check if this was the last attempt
+                if attempt >= retry_attempts:
+                    # Exhausted all retries, re-raise the error
+                    raise
+
+                # Check if we have time left for backoff and another attempt
+                remaining_time = deadline - asyncio.get_event_loop().time()
+                if remaining_time <= retry_wait:
+                    # Not enough time for backoff, raise timeout
+                    raise asyncio.TimeoutError("Publish operation exceeded total timeout before retry")
+
+                # Wait before retrying with fixed backoff
+                await asyncio.sleep(retry_wait)
 
     async def stream_names(self, subject: str | None = None) -> AsyncIterator[str]:
         """Get an async iterator over all stream names.
