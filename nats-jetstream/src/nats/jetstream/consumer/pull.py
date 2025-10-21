@@ -38,6 +38,8 @@ class PullMessageBatch(MessageBatch):
     _deadline: float | None
     _heartbeat: float | None
     _heartbeat_deadline: float | None
+    _heartbeat_paused: bool
+    _heartbeat_remaining: float | None
 
     def __init__(
         self,
@@ -55,6 +57,27 @@ class PullMessageBatch(MessageBatch):
         self._deadline = time.time() + max_wait if max_wait is not None else None
         self._heartbeat = heartbeat
         self._heartbeat_deadline = time.time() + (heartbeat * 2) if heartbeat is not None else None
+        self._heartbeat_paused = False
+        self._heartbeat_remaining = None
+
+        # Register disconnect/reconnect callbacks for heartbeat timer (ADR-37)
+        if heartbeat is not None:
+            client = jetstream._client
+            client.add_disconnected_callback(self._pause_heartbeat_timer)
+            client.add_reconnected_callback(self._resume_heartbeat_timer)
+
+    def _pause_heartbeat_timer(self) -> None:
+        """Pause the heartbeat timer on disconnect (ADR-37)."""
+        if self._heartbeat_deadline is not None and not self._heartbeat_paused:
+            self._heartbeat_remaining = self._heartbeat_deadline - time.time()
+            self._heartbeat_paused = True
+
+    def _resume_heartbeat_timer(self) -> None:
+        """Resume the heartbeat timer on reconnect (ADR-37)."""
+        if self._heartbeat_paused and self._heartbeat_remaining is not None:
+            self._heartbeat_deadline = time.time() + self._heartbeat_remaining
+            self._heartbeat_paused = False
+            self._heartbeat_remaining = None
 
     @property
     def error(self) -> Exception | None:
@@ -189,6 +212,8 @@ class PullMessageStream(MessageStream):
     _heartbeat_task: asyncio.Task[None] | None
     _started: bool
     _heartbeat_deadline: float | None
+    _heartbeat_paused: bool
+    _heartbeat_remaining: float | None
 
     def __init__(
         self,
@@ -215,6 +240,8 @@ class PullMessageStream(MessageStream):
         self._min_pending = min_pending
         self._priority_group = priority_group
         self._priority = priority
+        self._heartbeat_paused = False
+        self._heartbeat_remaining = None
         # Set thresholds with defaults to 50% if not specified
         self._threshold_messages = threshold_messages if threshold_messages is not None else batch // 2
         self._threshold_bytes = (
@@ -229,6 +256,25 @@ class PullMessageStream(MessageStream):
         self._heartbeat_task: asyncio.Task | None = None
         self._started = False
         self._heartbeat_deadline = time.time() + (heartbeat * 2) if heartbeat is not None else None
+
+        # Register disconnect/reconnect callbacks for heartbeat timer (ADR-37)
+        if heartbeat is not None:
+            client = consumer._stream._jetstream._client
+            client.add_disconnected_callback(self._pause_heartbeat_timer)
+            client.add_reconnected_callback(self._resume_heartbeat_timer)
+
+    def _pause_heartbeat_timer(self) -> None:
+        """Pause the heartbeat timer on disconnect (ADR-37)."""
+        if self._heartbeat_deadline is not None and not self._heartbeat_paused:
+            self._heartbeat_remaining = self._heartbeat_deadline - time.time()
+            self._heartbeat_paused = True
+
+    def _resume_heartbeat_timer(self) -> None:
+        """Resume the heartbeat timer on reconnect (ADR-37)."""
+        if self._heartbeat_paused and self._heartbeat_remaining is not None:
+            self._heartbeat_deadline = time.time() + self._heartbeat_remaining
+            self._heartbeat_paused = False
+            self._heartbeat_remaining = None
 
     @property
     def is_active(self) -> bool:
@@ -535,15 +581,21 @@ class PullConsumer(Consumer):
         Returns:
             MessageStream for manual message consumption
         """
+        # ADR-37: Users cannot specify both max_messages and max_bytes simultaneously
+        if max_messages is not None and max_bytes is not None:
+            raise ValueError("Cannot specify both max_messages and max_bytes simultaneously")
 
         jetstream = self._stream._jetstream
         inbox = new_inbox()
         subscription = await jetstream.client.subscribe(inbox)
 
+        # ADR-37: When using max_bytes, set batch to large value (1,000,000) for better throughput
+        batch = max_messages if max_messages is not None else (1_000_000 if max_bytes is not None else 100)
+
         stream = PullMessageStream(
             consumer=self,
             subscription=subscription,
-            batch=max_messages or 100,  # Default to 100 if max_messages is None
+            batch=batch,
             max_bytes=max_bytes,
             heartbeat=heartbeat,
             expires=max_wait,
@@ -617,8 +669,8 @@ class PullConsumer(Consumer):
         if (max_messages is None) == (max_bytes is None):
             raise ValueError("Must specify exactly one of max_messages or max_bytes")
 
-        # Use max_messages as batch size, or 1 if only max_bytes is specified
-        batch_size = max_messages if max_messages is not None else 1
+        # ADR-37: When using max_bytes, set batch to large value (1,000,000) for better throughput
+        batch_size = max_messages if max_messages is not None else 1_000_000
 
         return await self._fetch(
             batch=batch_size,
