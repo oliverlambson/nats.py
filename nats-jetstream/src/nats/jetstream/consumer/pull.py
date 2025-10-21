@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 from typing import (
     TYPE_CHECKING,
@@ -25,6 +26,9 @@ if TYPE_CHECKING:
     from nats.jetstream.stream import Stream
 
 
+logger = logging.getLogger(__name__)
+
+
 class PullMessageBatch(MessageBatch):
     _subscription: Subscription
     _pending_messages: int
@@ -32,14 +36,18 @@ class PullMessageBatch(MessageBatch):
     _terminated: bool
     _error: Exception | None
     _deadline: float | None
+    _heartbeat: float | None
+    _heartbeat_deadline: float | None
 
-    def __init__(self, subscription: Subscription, batch_size: int, jetstream, max_wait: float | None):
+    def __init__(self, subscription: Subscription, batch_size: int, jetstream, max_wait: float | None, heartbeat: float | None = None):
         self._subscription = subscription
         self._pending_messages = batch_size
         self._jetstream = jetstream
         self._terminated = False
         self._error = None
         self._deadline = time.time() + max_wait if max_wait is not None else None
+        self._heartbeat = heartbeat
+        self._heartbeat_deadline = time.time() + (heartbeat * 2) if heartbeat is not None else None
 
     @property
     def error(self) -> Exception | None:
@@ -57,6 +65,16 @@ class PullMessageBatch(MessageBatch):
 
         try:
             while True:
+                # Check heartbeat timeout (ADR-37: warn at 2x idle_heartbeat)
+                if self._heartbeat_deadline is not None and time.time() > self._heartbeat_deadline:
+                    logger.warning(
+                        "Heartbeat timeout: no message received within %.2fs (2x idle_heartbeat of %.2fs)",
+                        self._heartbeat * 2,
+                        self._heartbeat,
+                    )
+                    # Reset deadline to avoid repeated warnings
+                    self._heartbeat_deadline = None
+
                 # Calculate remaining timeout
                 timeout = None
                 if self._deadline is not None:
@@ -69,6 +87,10 @@ class PullMessageBatch(MessageBatch):
                 except (TimeoutError, asyncio.TimeoutError):
                     # If no more messages after timeout, we're done
                     raise StopAsyncIteration
+
+                # Reset heartbeat timer on any message (ADR-37)
+                if self._heartbeat is not None:
+                    self._heartbeat_deadline = time.time() + (self._heartbeat * 2)
 
                 # Check for status messages
                 if raw_msg.status is not None:
@@ -156,7 +178,9 @@ class PullMessageStream(MessageStream):
     _pending_messages: int
     _pending_bytes: int
     _request_task: asyncio.Task[None] | None
+    _heartbeat_task: asyncio.Task[None] | None
     _started: bool
+    _heartbeat_deadline: float | None
 
     def __init__(
         self,
@@ -190,7 +214,9 @@ class PullMessageStream(MessageStream):
         self._pending_messages = 0
         self._pending_bytes = 0
         self._request_task: asyncio.Task | None = None
+        self._heartbeat_task: asyncio.Task | None = None
         self._started = False
+        self._heartbeat_deadline = time.time() + (heartbeat * 2) if heartbeat is not None else None
 
     @property
     def is_active(self) -> bool:
@@ -208,6 +234,9 @@ class PullMessageStream(MessageStream):
         if not self._started:
             self._started = True
             self._request_task = asyncio.create_task(self._request_loop())
+            # Start heartbeat monitoring if configured
+            if self._heartbeat is not None:
+                self._heartbeat_task = asyncio.create_task(self._heartbeat_monitor())
 
         # Get next message from subscription
         while True:
@@ -216,6 +245,10 @@ class PullMessageStream(MessageStream):
             except Exception:
                 await self._cleanup()
                 raise StopAsyncIteration
+
+            # Reset heartbeat timer on any message (ADR-37)
+            if self._heartbeat is not None:
+                self._heartbeat_deadline = time.time() + (self._heartbeat * 2)
 
             # Handle status messages
             if raw_msg.status is not None:
@@ -363,6 +396,31 @@ class PullMessageStream(MessageStream):
             # If request loop fails, terminate the stream
             self._terminated = True
 
+    async def _heartbeat_monitor(self):
+        """Background task that monitors for heartbeat timeouts (ADR-37)."""
+        try:
+            while not self._terminated:
+                await asyncio.sleep(0.1)  # Check every 100ms
+
+                # Check if heartbeat timeout has been reached (2x idle_heartbeat)
+                if self._heartbeat_deadline is not None and time.time() > self._heartbeat_deadline:
+                    logger.warning(
+                        "Heartbeat timeout: no message received within %.2fs (2x idle_heartbeat of %.2fs)",
+                        self._heartbeat * 2,
+                        self._heartbeat,
+                    )
+                    # Reset pending counts and request more messages (non-terminal)
+                    self._pending_messages = 0
+                    self._pending_bytes = 0
+                    await self._send_request()
+                    # Reset deadline after warning to avoid repeated warnings
+                    self._heartbeat_deadline = time.time() + (self._heartbeat * 2)
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            # If heartbeat monitor fails, don't terminate the stream
+            pass
+
     async def stop(self):
         """Stop the message stream and clean up resources."""
         await self._cleanup()
@@ -377,6 +435,14 @@ class PullMessageStream(MessageStream):
             except asyncio.CancelledError:
                 pass
             self._request_task = None
+
+        if self._heartbeat_task:
+            self._heartbeat_task.cancel()
+            try:
+                await self._heartbeat_task
+            except asyncio.CancelledError:
+                pass
+            self._heartbeat_task = None
 
         await self._subscription.unsubscribe()
 
@@ -693,4 +759,4 @@ class PullConsumer(Consumer):
 
         await jetstream.client.publish(subject, payload=payload, reply_to=inbox)
 
-        return PullMessageBatch(subscription=subscription, batch_size=batch, jetstream=jetstream, max_wait=max_wait)
+        return PullMessageBatch(subscription=subscription, batch_size=batch, jetstream=jetstream, max_wait=max_wait, heartbeat=heartbeat)
