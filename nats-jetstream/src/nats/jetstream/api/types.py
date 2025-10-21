@@ -264,7 +264,8 @@ class ErrorResponse(TypedDict):
     error: Error
 
 
-PriorityPolicy = Literal['none', 'overflow', 'pinned_client']
+PriorityPolicy = Literal["none", "overflow", "pinned_client"]
+
 
 class LastPerSubjectDeliverPolicy(TypedDict):
     deliver_policy: Literal["last_per_subject"]
@@ -322,7 +323,15 @@ class DeliverPolicy_LastPerSubjectDeliverPolicy(TypedDict):
     deliver_policy: Literal["last_per_subject"]
 
 
-DeliverPolicy = Union[DeliverPolicy_AllDeliverPolicy, DeliverPolicy_LastDeliverPolicy, DeliverPolicy_NewDeliverPolicy, DeliverPolicy_StartSequenceDeliverPolicy, DeliverPolicy_StartTimeDeliverPolicy, DeliverPolicy_LastPerSubjectDeliverPolicy]
+DeliverPolicy = Union[
+    DeliverPolicy_AllDeliverPolicy,
+    DeliverPolicy_LastDeliverPolicy,
+    DeliverPolicy_NewDeliverPolicy,
+    DeliverPolicy_StartSequenceDeliverPolicy,
+    DeliverPolicy_StartTimeDeliverPolicy,
+    DeliverPolicy_LastPerSubjectDeliverPolicy,
+]
+
 
 class StreamConsumerLimits(TypedDict):
     inactive_threshold: NotRequired[int]
@@ -1634,4 +1643,3 @@ class StreamTemplateNamesRequest(TypedDict):
     """A request to the JetStream $JS.API.CONSUMER.LIST API"""
 
     offset: int
-

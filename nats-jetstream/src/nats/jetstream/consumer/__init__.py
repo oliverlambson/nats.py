@@ -156,7 +156,9 @@ class ConsumerConfig:
         idle_heartbeat = timedelta(microseconds=idle_heartbeat_ns / 1000) if idle_heartbeat_ns is not None else None
 
         inactive_threshold_ns = config.pop("inactive_threshold", None)
-        inactive_threshold = timedelta(microseconds=inactive_threshold_ns / 1000) if inactive_threshold_ns is not None else None
+        inactive_threshold = (
+            timedelta(microseconds=inactive_threshold_ns / 1000) if inactive_threshold_ns is not None else None
+        )
         max_ack_pending = config.pop("max_ack_pending", None)
         max_batch = config.pop("max_batch", None)
         max_bytes = config.pop("max_bytes", None)

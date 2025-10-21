@@ -322,7 +322,9 @@ class StreamConsumerLimits:
     @classmethod
     def from_response(cls, data: api.StreamConsumerLimits, *, strict: bool = False) -> StreamConsumerLimits:
         inactive_threshold_ns = data.pop("inactive_threshold", None)
-        inactive_threshold = timedelta(microseconds=inactive_threshold_ns / 1000) if inactive_threshold_ns is not None else None
+        inactive_threshold = (
+            timedelta(microseconds=inactive_threshold_ns / 1000) if inactive_threshold_ns is not None else None
+        )
         max_ack_pending = data.pop("max_ack_pending", None)
 
         # Check for unconsumed fields
@@ -688,7 +690,9 @@ class StreamConfig:
         discard_new_per_subject = config.pop("discard_new_per_subject", None)
 
         duplicate_window_ns = config.pop("duplicate_window", None)
-        duplicate_window = timedelta(microseconds=duplicate_window_ns / 1000) if duplicate_window_ns is not None else None
+        duplicate_window = (
+            timedelta(microseconds=duplicate_window_ns / 1000) if duplicate_window_ns is not None else None
+        )
 
         first_seq = config.pop("first_seq", None)
 
@@ -704,7 +708,11 @@ class StreamConfig:
         subjects = config.pop("subjects", None)
 
         subject_delete_marker_ttl_ns = config.pop("subject_delete_marker_ttl", None)
-        subject_delete_marker_ttl = timedelta(microseconds=subject_delete_marker_ttl_ns / 1000) if subject_delete_marker_ttl_ns is not None else None
+        subject_delete_marker_ttl = (
+            timedelta(microseconds=subject_delete_marker_ttl_ns / 1000)
+            if subject_delete_marker_ttl_ns is not None
+            else None
+        )
 
         template_owner = config.pop("template_owner", None)
 
