@@ -29,7 +29,7 @@ TYPE_NAME_MAPPINGS = {
     "golang_uint64": "int",
     "golang_int32": "int",
     "golang_int64": "int",
-    "golang_time": "int",
+    "golang_time": "str",  # RFC3339 timestamp string
     "basic_name": "str",
     "api_error": "Error",
     "stream_configuration": "StreamConfig",

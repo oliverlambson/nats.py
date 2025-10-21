@@ -860,8 +860,8 @@ class StreamInfo:
     sources: list[StreamSourceInfo] | None = None
     """Streams being sourced into this Stream."""
 
-    ts: int | None = None
-    """The server time the stream info was created."""
+    ts: str | None = None
+    """The server time the stream info was created (RFC3339 format)."""
 
     @classmethod
     def from_response(cls, data: api.StreamInfo, *, strict: bool = False) -> StreamInfo:

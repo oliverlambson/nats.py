@@ -310,8 +310,8 @@ class ConsumerInfo:
     num_pending: int
     cluster: dict[str, Any] | None = None
     push_bound: bool | None = None
-    ts: int | None = None
-    """The server time the consumer info was created."""
+    ts: str | None = None
+    """The server time the consumer info was created (RFC3339 format)."""
     priority_groups: list[dict[str, Any]] | None = None
     """Current priority group state information."""
     paused: bool | None = None

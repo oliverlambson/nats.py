@@ -35,7 +35,7 @@ class StreamSource(TypedDict):
     opt_start_seq: NotRequired[int]
     """Sequence to start replicating from"""
 
-    opt_start_time: NotRequired[int]
+    opt_start_time: NotRequired[str]
     """Time stamp to start replicating from"""
 
     subject_transforms: NotRequired[Any]
@@ -51,7 +51,7 @@ class PriorityGroupState(TypedDict):
     pinned_client_id: NotRequired[str]
     """The generated ID of the pinned client"""
 
-    pinned_ts: NotRequired[int]
+    pinned_ts: NotRequired[str]
     """The timestamp when the client was pinned"""
 
 
@@ -264,35 +264,34 @@ class ErrorResponse(TypedDict):
     error: Error
 
 
-PriorityPolicy = Literal["none", "overflow", "pinned_client", "prioritized"]
+PriorityPolicy = Literal['none', 'overflow', 'pinned_client']
 
-
-class StartSequenceDeliverPolicy(TypedDict):
-    deliver_policy: Literal["by_start_sequence"]
-
-    opt_start_seq: int
+class LastPerSubjectDeliverPolicy(TypedDict):
+    deliver_policy: Literal["last_per_subject"]
 
 
 class AllDeliverPolicy(TypedDict):
     deliver_policy: Literal["all"]
 
 
-class NewDeliverPolicy(TypedDict):
-    deliver_policy: Literal["new"]
+class StartTimeDeliverPolicy(TypedDict):
+    deliver_policy: Literal["by_start_time"]
+
+    opt_start_time: str
 
 
 class LastDeliverPolicy(TypedDict):
     deliver_policy: Literal["last"]
 
 
-class StartTimeDeliverPolicy(TypedDict):
-    deliver_policy: Literal["by_start_time"]
-
-    opt_start_time: int
+class NewDeliverPolicy(TypedDict):
+    deliver_policy: Literal["new"]
 
 
-class LastPerSubjectDeliverPolicy(TypedDict):
-    deliver_policy: Literal["last_per_subject"]
+class StartSequenceDeliverPolicy(TypedDict):
+    deliver_policy: Literal["by_start_sequence"]
+
+    opt_start_seq: int
 
 
 class DeliverPolicy_AllDeliverPolicy(TypedDict):
@@ -316,22 +315,14 @@ class DeliverPolicy_StartSequenceDeliverPolicy(TypedDict):
 class DeliverPolicy_StartTimeDeliverPolicy(TypedDict):
     deliver_policy: Literal["by_start_time"]
 
-    opt_start_time: int
+    opt_start_time: str
 
 
 class DeliverPolicy_LastPerSubjectDeliverPolicy(TypedDict):
     deliver_policy: Literal["last_per_subject"]
 
 
-DeliverPolicy = Union[
-    DeliverPolicy_AllDeliverPolicy,
-    DeliverPolicy_LastDeliverPolicy,
-    DeliverPolicy_NewDeliverPolicy,
-    DeliverPolicy_StartSequenceDeliverPolicy,
-    DeliverPolicy_StartTimeDeliverPolicy,
-    DeliverPolicy_LastPerSubjectDeliverPolicy,
-]
-
+DeliverPolicy = Union[DeliverPolicy_AllDeliverPolicy, DeliverPolicy_LastDeliverPolicy, DeliverPolicy_NewDeliverPolicy, DeliverPolicy_StartSequenceDeliverPolicy, DeliverPolicy_StartTimeDeliverPolicy, DeliverPolicy_LastPerSubjectDeliverPolicy]
 
 class StreamConsumerLimits(TypedDict):
     inactive_threshold: NotRequired[int]
@@ -345,7 +336,7 @@ class SequenceInfo(TypedDict):
     consumer_seq: int
     """The sequence number of the Consumer"""
 
-    last_active: NotRequired[int]
+    last_active: NotRequired[str]
     """The last time a message was delivered or acknowledged (for ack_floor)"""
 
     stream_seq: int
@@ -439,10 +430,10 @@ class ConsumerConfig(TypedDict):
     opt_start_seq: NotRequired[int]
     """Start sequence used with the DeliverByStartSequence deliver policy."""
 
-    opt_start_time: NotRequired[int]
+    opt_start_time: NotRequired[str]
     """Start time used with the DeliverByStartSequence deliver policy"""
 
-    pause_until: NotRequired[int]
+    pause_until: NotRequired[str]
     """When creating a consumer supplying a time in the future will act as a deadline for when the consumer will be paused till"""
 
     priority_groups: NotRequired[list[str]]
@@ -472,7 +463,7 @@ class ConsumerInfo(TypedDict):
 
     config: ConsumerConfig
 
-    created: int
+    created: str
     """The time the Consumer was created"""
 
     delivered: SequenceInfo
@@ -508,7 +499,7 @@ class ConsumerInfo(TypedDict):
     stream_name: str
     """The Stream the consumer belongs to"""
 
-    ts: NotRequired[int]
+    ts: NotRequired[str]
     """The server time the consumer info was created"""
 
 
@@ -547,7 +538,7 @@ class StreamInfo(TypedDict):
     config: Any
     """The active configuration for the Stream"""
 
-    created: int
+    created: str
     """Timestamp when the stream was created"""
 
     mirror: NotRequired[StreamSourceInfo]
@@ -558,7 +549,7 @@ class StreamInfo(TypedDict):
     state: Any
     """Detail about the current State of the Stream"""
 
-    ts: NotRequired[int]
+    ts: NotRequired[str]
     """The server time the stream info was created"""
 
 
@@ -730,7 +721,7 @@ class ConsumerInfoResponse(TypedDict):
 
     config: ConsumerConfig
 
-    created: int
+    created: str
     """The time the Consumer was created"""
 
     delivered: SequenceInfo
@@ -766,7 +757,7 @@ class ConsumerInfoResponse(TypedDict):
     stream_name: str
     """The Stream the consumer belongs to"""
 
-    ts: NotRequired[int]
+    ts: NotRequired[str]
     """The server time the consumer info was created"""
 
     type: Literal["io.nats.jetstream.api.v1.consumer_info_response"]
@@ -950,7 +941,7 @@ class StreamCreateResponse(TypedDict):
     config: Any
     """The active configuration for the Stream"""
 
-    created: int
+    created: str
     """Timestamp when the stream was created"""
 
     mirror: NotRequired[StreamSourceInfo]
@@ -961,7 +952,7 @@ class StreamCreateResponse(TypedDict):
     state: Any
     """Detail about the current State of the Stream"""
 
-    ts: NotRequired[int]
+    ts: NotRequired[str]
     """The server time the stream info was created"""
 
     type: Literal["io.nats.jetstream.api.v1.stream_create_response"]
@@ -1180,7 +1171,7 @@ class ConsumerPauseResponse(TypedDict):
     pause_remaining: NotRequired[int]
     """When paused the time remaining until unpause"""
 
-    pause_until: NotRequired[int]
+    pause_until: NotRequired[str]
     """The deadline till the consumer will be unpaused, only usable if 'paused' is true"""
 
     paused: NotRequired[bool]
@@ -1232,7 +1223,7 @@ class StreamInfoResponse(TypedDict):
     config: Any
     """The active configuration for the Stream"""
 
-    created: int
+    created: str
     """Timestamp when the stream was created"""
 
     limit: NotRequired[int]
@@ -1249,7 +1240,7 @@ class StreamInfoResponse(TypedDict):
 
     total: NotRequired[int]
 
-    ts: NotRequired[int]
+    ts: NotRequired[str]
     """The server time the stream info was created"""
 
     type: Literal["io.nats.jetstream.api.v1.stream_info_response"]
@@ -1265,7 +1256,7 @@ class ConsumerCreateResponse(TypedDict):
 
     config: ConsumerConfig
 
-    created: int
+    created: str
     """The time the Consumer was created"""
 
     delivered: SequenceInfo
@@ -1301,7 +1292,7 @@ class ConsumerCreateResponse(TypedDict):
     stream_name: str
     """The Stream the consumer belongs to"""
 
-    ts: NotRequired[int]
+    ts: NotRequired[str]
     """The server time the consumer info was created"""
 
     type: Literal["io.nats.jetstream.api.v1.consumer_create_response"]
@@ -1492,7 +1483,7 @@ class StreamUpdateResponse(TypedDict):
     config: Any
     """The active configuration for the Stream"""
 
-    created: int
+    created: str
     """Timestamp when the stream was created"""
 
     mirror: NotRequired[StreamSourceInfo]
@@ -1503,7 +1494,7 @@ class StreamUpdateResponse(TypedDict):
     state: Any
     """Detail about the current State of the Stream"""
 
-    ts: NotRequired[int]
+    ts: NotRequired[str]
     """The server time the stream info was created"""
 
     type: Literal["io.nats.jetstream.api.v1.stream_update_response"]
@@ -1544,7 +1535,7 @@ class MetaLeaderStepdownRequest(TypedDict):
 class ConsumerPauseRequest(TypedDict):
     """A request to the JetStream $JS.API.CONSUMER.PAUSE API"""
 
-    pause_until: NotRequired[int]
+    pause_until: NotRequired[str]
     """Time to pause until, when empty or a time in the past will unpause the consumer"""
 
 
@@ -1586,13 +1577,13 @@ class StreamMsgGetRequest(TypedDict):
     seq: NotRequired[int]
     """Stream sequence number of the message to retrieve, cannot be combined with last_by_subj"""
 
-    start_time: NotRequired[int]
+    start_time: NotRequired[str]
     """Start the batch at a certain point in time rather than sequence"""
 
     up_to_seq: NotRequired[int]
     """Returns messages up to this sequence otherwise last sequence for the stream"""
 
-    up_to_time: NotRequired[int]
+    up_to_time: NotRequired[str]
     """Only return messages up to a point in time"""
 
 
@@ -1643,3 +1634,4 @@ class StreamTemplateNamesRequest(TypedDict):
     """A request to the JetStream $JS.API.CONSUMER.LIST API"""
 
     offset: int
+
