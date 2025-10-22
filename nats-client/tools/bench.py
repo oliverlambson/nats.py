@@ -19,25 +19,29 @@ class BenchmarkResults:
     msg_bytes: int
     duration: float
     throughput: float
-    avg_latency: float
-    min_latency: float
-    max_latency: float
-    std_latency: float
+    avg_latency: float | None
+    min_latency: float | None
+    max_latency: float | None
+    std_latency: float | None
     bytes_per_sec: float
     mb_per_sec: float
 
     def __str__(self) -> str:
-        return (
+        result = (
             f"\nTest completed: {self.msg_count:,} messages, "
             f"{self.msg_bytes:,} bytes, {self.duration:.2f} seconds\n"
             f"  Throughput: {self.throughput:,.0f} msgs/sec, "
-            f"{self.mb_per_sec:.2f} MB/sec\n"
-            f"  Latency: (min/avg/max/std) = "
-            f"{self.min_latency * 1000:.2f}/"
-            f"{self.avg_latency * 1000:.2f}/"
-            f"{self.max_latency * 1000:.2f}/"
-            f"{self.std_latency * 1000:.2f} ms"
+            f"{self.mb_per_sec:.2f} MB/sec"
         )
+        if self.avg_latency is not None:
+            result += (
+                f"\n  Latency: (min/avg/max/std) = "
+                f"{self.min_latency * 1000:.2f}/"  # type: ignore[operator]
+                f"{self.avg_latency * 1000:.2f}/"
+                f"{self.max_latency * 1000:.2f}/"  # type: ignore[operator]
+                f"{self.std_latency * 1000:.2f} ms"  # type: ignore[operator]
+            )
+        return result
 
 
 async def run_pub_benchmark(
@@ -48,6 +52,7 @@ async def run_pub_benchmark(
     msg_size: int = 128,
     pub_subject: str = "test",
     headers: dict[str, str | list[str]] | Any | None = None,
+    track_latency: bool = True,
 ) -> BenchmarkResults:
     """Run publisher benchmark."""
 
@@ -65,16 +70,21 @@ async def run_pub_benchmark(
         # Prepare payload
         payload = b"x" * msg_size
 
-        # Track latencies
-        latencies = []
+        # Track latencies if requested
+        latencies = [] if track_latency else None
         start_time = time.perf_counter()
 
         # Publish messages
-        for _ in range(msg_count):
-            msg_start = time.perf_counter()
-            # Type checker sees nc as a union of both client types, so we need to ignore
-            await nc.publish(pub_subject, payload, headers=headers)  # type: ignore[arg-type]
-            latencies.append(time.perf_counter() - msg_start)
+        if track_latency:
+            for _ in range(msg_count):
+                msg_start = time.perf_counter()
+                # Type checker sees nc as a union of both client types, so we need to ignore
+                await nc.publish(pub_subject, payload, headers=headers)  # type: ignore[arg-type]
+                latencies.append(time.perf_counter() - msg_start)  # type: ignore[union-attr]
+        else:
+            for _ in range(msg_count):
+                # Type checker sees nc as a union of both client types, so we need to ignore
+                await nc.publish(pub_subject, payload, headers=headers)  # type: ignore[arg-type]
 
         await nc.flush()
 
@@ -86,12 +96,18 @@ async def run_pub_benchmark(
         bytes_per_sec = total_bytes / duration
         mb_per_sec = bytes_per_sec / (1024 * 1024)
 
-        # Calculate latency stats
-        min_latency = min(latencies)
-        max_latency = max(latencies)
-        avg_latency = sum(latencies) / len(latencies)
-        variance = sum((latency - avg_latency) ** 2 for latency in latencies) / len(latencies)
-        std_latency = variance**0.5
+        # Calculate latency stats if tracked
+        if track_latency and latencies:
+            min_latency = min(latencies)
+            max_latency = max(latencies)
+            avg_latency = sum(latencies) / len(latencies)
+            variance = sum((latency - avg_latency) ** 2 for latency in latencies) / len(latencies)
+            std_latency = variance**0.5
+        else:
+            min_latency = None
+            max_latency = None
+            avg_latency = None
+            std_latency = None
 
         return BenchmarkResults(
             msg_count=msg_count,
@@ -116,6 +132,7 @@ async def run_sub_benchmark(
     url: str = "nats://localhost:4222",
     msg_count: int = 100_000,
     sub_subject: str = "test",
+    track_latency: bool = True,
 ) -> BenchmarkResults:
     """Run subscriber benchmark."""
 
@@ -132,7 +149,7 @@ async def run_sub_benchmark(
     first_msg_time = 0.0
     last_msg_time = 0.0
     total_bytes = 0
-    latencies = []
+    latencies = [] if track_latency else None
 
     try:
         # Create subscription
@@ -148,7 +165,8 @@ async def run_sub_benchmark(
 
             received += 1
             total_bytes += len(msg.data)
-            latencies.append(msg_time - start_time)
+            if track_latency:
+                latencies.append(msg_time - start_time)  # type: ignore[union-attr]
 
             if received >= msg_count:
                 last_msg_time = msg_time
@@ -164,12 +182,18 @@ async def run_sub_benchmark(
         bytes_per_sec = total_bytes / duration
         mb_per_sec = bytes_per_sec / (1024 * 1024)
 
-        # Calculate latency stats
-        min_latency = min(latencies)
-        max_latency = max(latencies)
-        avg_latency = sum(latencies) / len(latencies)
-        variance = sum((latency - avg_latency) ** 2 for latency in latencies) / len(latencies)
-        std_latency = variance**0.5
+        # Calculate latency stats if tracked
+        if track_latency and latencies:
+            min_latency = min(latencies)
+            max_latency = max(latencies)
+            avg_latency = sum(latencies) / len(latencies)
+            variance = sum((latency - avg_latency) ** 2 for latency in latencies) / len(latencies)
+            std_latency = variance**0.5
+        else:
+            min_latency = None
+            max_latency = None
+            avg_latency = None
+            std_latency = None
 
         return BenchmarkResults(
             msg_count=received,
@@ -196,12 +220,15 @@ async def run_pubsub_benchmark(
     msg_size: int = 128,
     subject: str = "test",
     headers: dict[str, str | list[str]] | Any | None = None,
+    track_latency: bool = True,
 ) -> tuple[BenchmarkResults, BenchmarkResults]:
     """Run combined publisher/subscriber benchmark."""
 
     # Start subscriber first
     sub_task = asyncio.create_task(
-        run_sub_benchmark(client_type=client_type, url=url, msg_count=msg_count, sub_subject=subject)
+        run_sub_benchmark(
+            client_type=client_type, url=url, msg_count=msg_count, sub_subject=subject, track_latency=track_latency
+        )
     )
 
     # Small delay to ensure subscriber is ready
@@ -209,7 +236,13 @@ async def run_pubsub_benchmark(
 
     # Run publisher
     pub_results = await run_pub_benchmark(
-        client_type=client_type, url=url, msg_count=msg_count, msg_size=msg_size, pub_subject=subject, headers=headers
+        client_type=client_type,
+        url=url,
+        msg_count=msg_count,
+        msg_size=msg_size,
+        pub_subject=subject,
+        headers=headers,
+        track_latency=track_latency,
     )
 
     # Wait for subscriber to finish
@@ -234,6 +267,9 @@ def main():
     parser.add_argument("--pub", action="store_true", help="Run publisher benchmark")
     parser.add_argument("--sub", action="store_true", help="Run subscriber benchmark")
     parser.add_argument("--headers", type=int, help="Number of headers to add to messages")
+    parser.add_argument(
+        "--latency", action="store_true", help="Track per-message latency (may impact performance)"
+    )
 
     args = parser.parse_args()
 
@@ -265,6 +301,7 @@ def main():
                 msg_size=args.size,
                 subject=args.subject,
                 headers=headers,
+                track_latency=args.latency,
             )
             sys.stdout.write(f"\nPublisher results: {pub_results}\n")
             sys.stdout.write(f"\nSubscriber results: {sub_results}\n")
@@ -280,13 +317,18 @@ def main():
                 msg_size=args.size,
                 pub_subject=args.subject,
                 headers=headers,
+                track_latency=args.latency,
             )
             sys.stdout.write(f"\nResults: {results}\n")
 
         elif args.sub:
             sys.stdout.write(f"\nStarting subscriber benchmark with {client_name} [msgs={args.msgs:,}]\n")
             results = await run_sub_benchmark(
-                client_type=args.client, url=args.url, msg_count=args.msgs, sub_subject=args.subject
+                client_type=args.client,
+                url=args.url,
+                msg_count=args.msgs,
+                sub_subject=args.subject,
+                track_latency=args.latency,
             )
             sys.stdout.write(f"\nResults: {results}\n")
 
