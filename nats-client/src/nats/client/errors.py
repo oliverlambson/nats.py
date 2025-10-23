@@ -85,8 +85,7 @@ class SlowConsumerError(Exception):
         self.pending_messages = pending_messages
         self.pending_bytes = pending_bytes
         super().__init__(
-            f"Slow consumer on subject '{subject}': "
-            f"{pending_messages} pending messages, {pending_bytes} pending bytes"
+            f"Slow consumer on subject '{subject}': {pending_messages} pending messages, {pending_bytes} pending bytes"
         )
 
 

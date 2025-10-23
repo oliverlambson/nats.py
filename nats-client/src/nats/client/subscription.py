@@ -74,6 +74,7 @@ class MessageQueue:
             except Exception as e:
                 # Log callback errors but don't disrupt message flow
                 import logging
+
                 logger = logging.getLogger(__name__)
                 logger.exception("Error in message callback: %s", e)
 

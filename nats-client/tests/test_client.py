@@ -1992,3 +1992,338 @@ async def test_statistics_reconnect_counter(server):
 
         stats = client.stats()
         assert stats.reconnects >= 1
+
+
+@pytest.mark.asyncio
+async def test_subscription_pending_messages_limit(client):
+    """Test that messages are dropped when pending_msgs_limit is exceeded."""
+    from nats.client import SlowConsumerError
+
+    test_subject = f"test.slow_consumer.msgs.{uuid.uuid4()}"
+
+    # Track slow consumer errors
+    slow_consumer_errors = []
+
+    def on_error(error):
+        if isinstance(error, SlowConsumerError):
+            slow_consumer_errors.append(error)
+
+    client.add_error_callback(on_error)
+
+    # Create subscription with low message limit
+    subscription = await client.subscribe(test_subject, max_pending_messages=5)
+    await client.flush()
+
+    # Publish more messages than the limit without consuming
+    num_messages = 20
+    for i in range(num_messages):
+        await client.publish(test_subject, f"message-{i}".encode())
+    await client.flush()
+
+    # Wait for messages to arrive and trigger slow consumer
+    await asyncio.sleep(0.2)
+
+    # Verify slow consumer error was triggered
+    assert len(slow_consumer_errors) == 1, "Should have received exactly one slow consumer error"
+    error = slow_consumer_errors[0]
+    assert error.subject == test_subject
+    assert error.pending_messages >= 5
+
+    # Verify pending count
+    pending_msgs, pending_bytes = subscription.pending()
+    assert pending_msgs <= 5, f"Should not exceed limit of 5, got {pending_msgs}"
+
+    # Consume available messages (should be approximately the limit)
+    consumed = 0
+    while True:
+        try:
+            await asyncio.wait_for(subscription.next(), timeout=0.1)
+            consumed += 1
+        except asyncio.TimeoutError:
+            break
+
+    # Should have consumed around the limit, not all messages
+    assert consumed <= 6, f"Should have consumed around the limit, got {consumed}"
+    assert consumed < num_messages, "Should not have received all messages (some dropped)"
+
+
+@pytest.mark.asyncio
+async def test_subscription_pending_bytes_limit(client):
+    """Test that messages are dropped when pending_bytes_limit is exceeded."""
+    from nats.client import SlowConsumerError
+
+    test_subject = f"test.slow_consumer.bytes.{uuid.uuid4()}"
+
+    # Track slow consumer errors
+    slow_consumer_errors = []
+
+    def on_error(error):
+        if isinstance(error, SlowConsumerError):
+            slow_consumer_errors.append(error)
+
+    client.add_error_callback(on_error)
+
+    # Create subscription with low byte limit (100 bytes)
+    subscription = await client.subscribe(test_subject, max_pending_bytes=100)
+    await client.flush()
+
+    # Publish messages that will exceed the byte limit
+    # Each message is 50 bytes, so 3 messages = 150 bytes > 100 byte limit
+    large_message = b"x" * 50
+    num_messages = 10
+    for i in range(num_messages):
+        await client.publish(test_subject, large_message)
+    await client.flush()
+
+    # Wait for messages to arrive and trigger slow consumer
+    await asyncio.sleep(0.2)
+
+    # Verify slow consumer error was triggered
+    assert len(slow_consumer_errors) == 1, "Should have received exactly one slow consumer error"
+    error = slow_consumer_errors[0]
+    assert error.subject == test_subject
+    assert error.pending_bytes <= 150, "Pending bytes should be near limit"
+
+    # Verify pending count
+    pending_msgs, pending_bytes = subscription.pending()
+    assert pending_bytes <= 150, f"Should not far exceed limit, got {pending_bytes}"
+
+    # Consume available messages
+    consumed = 0
+    while True:
+        try:
+            await asyncio.wait_for(subscription.next(), timeout=0.1)
+            consumed += 1
+        except asyncio.TimeoutError:
+            break
+
+    # Should have consumed only a few messages, not all
+    assert consumed < num_messages, "Should not have received all messages (some dropped)"
+
+
+@pytest.mark.asyncio
+async def test_slow_consumer_error_only_once(client):
+    """Test that slow consumer error is only reported once per slow event."""
+    from nats.client import SlowConsumerError
+
+    test_subject = f"test.slow_consumer.once.{uuid.uuid4()}"
+
+    # Track slow consumer errors
+    slow_consumer_errors = []
+
+    def on_error(error):
+        if isinstance(error, SlowConsumerError):
+            slow_consumer_errors.append(error)
+
+    client.add_error_callback(on_error)
+
+    # Create subscription with low limit
+    await client.subscribe(test_subject, max_pending_messages=5)
+    await client.flush()
+
+    # Publish many messages to trigger slow consumer multiple times
+    for i in range(50):
+        await client.publish(test_subject, f"message-{i}".encode())
+        await client.flush()
+        await asyncio.sleep(0.01)  # Small delay to ensure messages are processed
+
+    # Wait for processing
+    await asyncio.sleep(0.2)
+
+    # Should only get ONE slow consumer error, not multiple
+    assert len(slow_consumer_errors) == 1, (
+        f"Should have received exactly one slow consumer error, got {len(slow_consumer_errors)}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_slow_consumer_flag_resets_when_under_limit(client):
+    """Test that slow consumer flag resets when pending count drops below limit."""
+    from nats.client import SlowConsumerError
+
+    test_subject = f"test.slow_consumer.reset.{uuid.uuid4()}"
+
+    # Track slow consumer errors
+    slow_consumer_errors = []
+
+    def on_error(error):
+        if isinstance(error, SlowConsumerError):
+            slow_consumer_errors.append(error)
+
+    client.add_error_callback(on_error)
+
+    # Create subscription with low limit
+    subscription = await client.subscribe(test_subject, max_pending_messages=3)
+    await client.flush()
+
+    # Publish messages to trigger slow consumer
+    for i in range(10):
+        await client.publish(test_subject, f"message-{i}".encode())
+    await client.flush()
+    await asyncio.sleep(0.1)
+
+    # Should have triggered slow consumer
+    assert len(slow_consumer_errors) == 1
+
+    # Consume messages to get below limit
+    for _ in range(3):
+        try:
+            await asyncio.wait_for(subscription.next(), timeout=0.5)
+        except asyncio.TimeoutError:
+            break
+
+    # Wait a bit
+    await asyncio.sleep(0.1)
+
+    # Publish more messages to trigger slow consumer again
+    for i in range(10):
+        await client.publish(test_subject, f"message2-{i}".encode())
+    await client.flush()
+    await asyncio.sleep(0.1)
+
+    # Should have triggered slow consumer a SECOND time (flag was reset)
+    assert len(slow_consumer_errors) == 2, (
+        f"Expected 2 slow consumer errors after reset, got {len(slow_consumer_errors)}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_unlimited_pending_with_none_limit(client):
+    """Test that None limit means unlimited pending messages."""
+    test_subject = f"test.unlimited.{uuid.uuid4()}"
+
+    # Create subscription with unlimited limits (None)
+    subscription = await client.subscribe(test_subject, max_pending_messages=None, max_pending_bytes=None)
+    await client.flush()
+
+    # Publish many messages
+    num_messages = 100
+    for i in range(num_messages):
+        await client.publish(test_subject, f"message-{i}".encode())
+    await client.flush()
+
+    # Wait for all messages to arrive
+    await asyncio.sleep(0.3)
+
+    # Consume all messages
+    consumed = 0
+    while consumed < num_messages:
+        try:
+            await asyncio.wait_for(subscription.next(), timeout=1.0)
+            consumed += 1
+        except asyncio.TimeoutError:
+            break
+
+    # Should have received ALL messages (no limit)
+    assert consumed == num_messages, f"Expected {num_messages} messages, got {consumed}"
+
+
+@pytest.mark.asyncio
+async def test_subscription_pending_method(client):
+    """Test that pending() method returns correct counts."""
+    test_subject = f"test.pending_method.{uuid.uuid4()}"
+
+    subscription = await client.subscribe(test_subject)
+    await client.flush()
+
+    # Initial pending should be zero
+    pending_msgs, pending_bytes = subscription.pending()
+    assert pending_msgs == 0
+    assert pending_bytes == 0
+
+    # Publish messages
+    messages = [b"message1", b"message22", b"message333"]
+    for msg in messages:
+        await client.publish(test_subject, msg)
+    await client.flush()
+
+    # Wait for messages to arrive
+    await asyncio.sleep(0.1)
+
+    # Check pending
+    pending_msgs, pending_bytes = subscription.pending()
+    assert pending_msgs == len(messages)
+    expected_bytes = sum(len(m) for m in messages)
+    assert pending_bytes == expected_bytes
+
+    # Consume one message
+    await subscription.next(timeout=1.0)
+
+    # Check pending decreased
+    pending_msgs, pending_bytes = subscription.pending()
+    assert pending_msgs == len(messages) - 1
+    assert pending_bytes == expected_bytes - len(messages[0])
+
+    # Consume remaining
+    await subscription.next(timeout=1.0)
+    await subscription.next(timeout=1.0)
+
+    # Check pending is zero again
+    pending_msgs, pending_bytes = subscription.pending()
+    assert pending_msgs == 0
+    assert pending_bytes == 0
+
+
+@pytest.mark.asyncio
+async def test_slow_consumer_with_headers(client):
+    """Test that slow consumer correctly counts bytes for messages with headers."""
+    from nats.client import SlowConsumerError
+
+    test_subject = f"test.slow_consumer.headers.{uuid.uuid4()}"
+
+    slow_consumer_errors = []
+
+    def on_error(error):
+        if isinstance(error, SlowConsumerError):
+            slow_consumer_errors.append(error)
+
+    client.add_error_callback(on_error)
+
+    # Create subscription with low byte limit
+    # Note: byte limit counts ONLY payload, not headers
+    subscription = await client.subscribe(test_subject, max_pending_bytes=100)
+    await client.flush()
+
+    # Publish messages with headers
+    # Payload is 50 bytes, so 3 messages = 150 bytes > 100 byte limit
+    payload = b"x" * 50
+    headers = {"X-Test": "value"}
+
+    for i in range(10):
+        await client.publish(test_subject, payload, headers=headers)
+    await client.flush()
+
+    # Wait for processing
+    await asyncio.sleep(0.2)
+
+    # Should trigger slow consumer (counts payload bytes only)
+    assert len(slow_consumer_errors) == 1
+
+    # Consume available messages
+    consumed = 0
+    while True:
+        try:
+            msg = await asyncio.wait_for(subscription.next(), timeout=0.1)
+            # Verify message has headers
+            assert msg.headers is not None
+            consumed += 1
+        except asyncio.TimeoutError:
+            break
+
+    # Should have dropped some messages
+    assert consumed < 10
+
+
+@pytest.mark.asyncio
+async def test_subscription_default_limits(client):
+    """Test that default pending limits are applied."""
+    test_subject = f"test.default_limits.{uuid.uuid4()}"
+
+    # Create subscription with default limits
+    subscription = await client.subscribe(test_subject)
+    await client.flush()
+
+    # Verify internal limits are set to defaults
+    # Default: 65536 messages, 64 MB
+    assert subscription._pending_queue._max_messages == 65536
+    assert subscription._pending_queue._max_bytes == 67108864  # 64 * 1024 * 1024

@@ -506,7 +506,11 @@ class Client(AbstractAsyncContextManager["Client"]):
                 logger.warning(
                     "Slow consumer on subject %s (sid %s): %s limit exceeded, dropping message, "
                     "%d pending messages, %d pending bytes",
-                    subject, sid, e.limit_type, pending_msgs, pending_bytes
+                    subject,
+                    sid,
+                    e.limit_type,
+                    pending_msgs,
+                    pending_bytes,
                 )
 
                 # Only report once per slow consumer event to avoid noise
@@ -564,7 +568,11 @@ class Client(AbstractAsyncContextManager["Client"]):
                 logger.warning(
                     "Slow consumer on subject %s (sid %s): %s limit exceeded, dropping message, "
                     "%d pending messages, %d pending bytes",
-                    subject, sid, e.limit_type, pending_msgs, pending_bytes
+                    subject,
+                    sid,
+                    e.limit_type,
+                    pending_msgs,
+                    pending_bytes,
                 )
 
                 # Only report once per slow consumer event to avoid noise
