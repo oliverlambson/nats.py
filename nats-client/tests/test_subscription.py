@@ -824,6 +824,349 @@ async def test_subscription_drain_processes_pending_messages(client):
 
 
 @pytest.mark.asyncio
+async def test_many_subscriptions_on_same_subject():
+    """Test that client can handle many concurrent subscriptions on the same subject.
+
+    This stress test verifies that the client can manage a large number of
+    subscriptions all listening to the same subject, with each receiving all messages.
+    """
+    server = await run(port=0)
+
+    try:
+        client = await connect(server.client_url, timeout=1.0)
+
+        try:
+            num_subscriptions = 100
+            test_subject = f"test.many.same.{uuid.uuid4()}"
+            subscriptions = []
+
+            # Create many subscriptions on the same subject
+            for i in range(num_subscriptions):
+                sub = await client.subscribe(test_subject)
+                subscriptions.append(sub)
+
+            await client.flush()
+
+            # Publish a single message
+            test_message = b"shared_message"
+            await client.publish(test_subject, test_message)
+            await client.flush()
+
+            # Verify all subscriptions receive the message
+            for i, sub in enumerate(subscriptions):
+                msg = await sub.next(timeout=2.0)
+                assert msg.data == test_message, f"Subscription {i} received wrong message"
+                assert msg.subject == test_subject, f"Subscription {i} received wrong subject"
+
+        finally:
+            await client.close()
+
+    finally:
+        await server.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_many_subscriptions_on_unique_subjects():
+    """Test that client can handle many concurrent subscriptions on unique subjects.
+
+    This stress test verifies that the client can manage a large number of
+    subscriptions simultaneously, each on a unique subject and receiving its own messages.
+    """
+    server = await run(port=0)
+
+    try:
+        client = await connect(server.client_url, timeout=1.0)
+
+        try:
+            num_subscriptions = 100
+            subscriptions = []
+            subjects = []
+
+            # Create many subscriptions on unique subjects
+            for i in range(num_subscriptions):
+                subject = f"test.many.unique.{uuid.uuid4()}.{i}"
+                subjects.append(subject)
+                sub = await client.subscribe(subject)
+                subscriptions.append(sub)
+
+            await client.flush()
+
+            # Publish a message to each unique subject
+            for i, subject in enumerate(subjects):
+                await client.publish(subject, f"msg_{i}".encode())
+
+            await client.flush()
+
+            # Verify each subscription receives its specific message
+            for i, sub in enumerate(subscriptions):
+                msg = await sub.next(timeout=2.0)
+                assert msg.data == f"msg_{i}".encode(), f"Subscription {i} received wrong message"
+                assert msg.subject == subjects[i], f"Subscription {i} received wrong subject"
+
+        finally:
+            await client.close()
+
+    finally:
+        await server.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_multiple_concurrent_consumers_using_next(client):
+    """Test multiple tasks consuming from the same subscription using .next().
+
+    This verifies that multiple concurrent consumers can safely read from the
+    same subscription, with each message being delivered to exactly one consumer.
+    This simulates real-world scenarios like worker pools processing messages.
+    """
+    test_subject = f"test.concurrent.next.{uuid.uuid4()}"
+    message_count = 50
+
+    # Create subscription
+    subscription = await client.subscribe(test_subject)
+    await client.flush()
+
+    # Track messages received by each consumer
+    consumer_messages = {0: [], 1: [], 2: []}
+
+    async def consumer_task(consumer_id: int):
+        """Consumer task that processes messages using .next().
+
+        Simulates a worker that continuously processes messages from a queue.
+        """
+        while True:
+            try:
+                msg = await subscription.next(timeout=0.5)
+                # Simulate some processing work
+                await asyncio.sleep(0.01)
+                consumer_messages[consumer_id].append(msg.data.decode())
+            except asyncio.TimeoutError:
+                # No more messages available - worker is done
+                break
+            except RuntimeError:
+                # Subscription closed
+                break
+
+    # Start multiple concurrent consumer tasks (simulating a worker pool)
+    num_consumers = 3
+    consumer_tasks = [asyncio.create_task(consumer_task(i)) for i in range(num_consumers)]
+
+    try:
+        # Give consumers time to start waiting for work
+        await asyncio.sleep(0.1)
+
+        # Publish messages slowly to allow fair distribution across workers
+        for i in range(message_count):
+            await client.publish(test_subject, f"message_{i}".encode())
+            if i % 10 == 0:
+                await asyncio.sleep(0.01)  # Small delay to allow distribution
+        await client.flush()
+
+        # Wait for all consumer tasks to finish processing
+        await asyncio.gather(*consumer_tasks, return_exceptions=True)
+
+        # Verify all messages were received exactly once
+        all_messages = []
+        for messages in consumer_messages.values():
+            all_messages.extend(messages)
+
+        assert len(all_messages) == message_count, f"Expected {message_count} messages, got {len(all_messages)}"
+
+        # Verify no duplicate messages
+        assert len(set(all_messages)) == message_count, "Some messages were received multiple times"
+
+    finally:
+        # Ensure tasks are complete
+        for task in consumer_tasks:
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+
+@pytest.mark.asyncio
+async def test_multiple_concurrent_consumers_using_async_for(client):
+    """Test multiple tasks consuming from the same subscription using async for.
+
+    This verifies that multiple concurrent consumers using async iteration
+    can safely read from the same subscription.
+    This simulates real-world scenarios like event processors using async iteration.
+    """
+    test_subject = f"test.concurrent.iter.{uuid.uuid4()}"
+    message_count = 50
+
+    # Create subscription
+    subscription = await client.subscribe(test_subject)
+    await client.flush()
+
+    # Track messages received by each consumer
+    consumer_messages = {0: [], 1: [], 2: []}
+    stop_event = asyncio.Event()
+
+    async def consumer_task(consumer_id: int):
+        """Consumer task that processes messages using async for iteration.
+
+        Simulates an event processor that uses async iteration to handle messages.
+        """
+        async for msg in subscription:
+            # Simulate some processing work
+            await asyncio.sleep(0.01)
+            consumer_messages[consumer_id].append(msg.data.decode())
+
+            # Stop when we've received all expected messages across all consumers
+            total = sum(len(msgs) for msgs in consumer_messages.values())
+            if total >= message_count:
+                break
+            if stop_event.is_set():
+                break
+
+    # Start multiple concurrent consumer tasks (simulating event processors)
+    num_consumers = 3
+    consumer_tasks = [asyncio.create_task(consumer_task(i)) for i in range(num_consumers)]
+
+    try:
+        # Give consumers time to start their event loops
+        await asyncio.sleep(0.1)
+
+        # Publish messages slowly to allow fair distribution across processors
+        for i in range(message_count):
+            await client.publish(test_subject, f"message_{i}".encode())
+            if i % 10 == 0:
+                await asyncio.sleep(0.01)  # Small delay to allow distribution
+        await client.flush()
+
+        # Wait for all messages to be consumed (with timeout)
+        max_wait = 5.0
+        start = asyncio.get_event_loop().time()
+        while sum(len(msgs) for msgs in consumer_messages.values()) < message_count:
+            if asyncio.get_event_loop().time() - start > max_wait:
+                break
+            await asyncio.sleep(0.1)
+
+        # Signal consumers to stop
+        stop_event.set()
+        await subscription.unsubscribe()
+
+        # Wait for consumer tasks to finish
+        await asyncio.wait_for(asyncio.gather(*consumer_tasks, return_exceptions=True), timeout=2.0)
+
+        # Verify all messages were received
+        all_messages = []
+        for messages in consumer_messages.values():
+            all_messages.extend(messages)
+
+        assert len(all_messages) == message_count, f"Expected {message_count} messages, got {len(all_messages)}"
+
+        # Verify no duplicate messages
+        assert len(set(all_messages)) == message_count, "Some messages were received multiple times"
+
+    finally:
+        stop_event.set()
+        for task in consumer_tasks:
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+
+@pytest.mark.asyncio
+async def test_async_iteration_with_concurrent_publishers(client):
+    """Test async iteration while multiple tasks are publishing concurrently.
+
+    This verifies that async for iteration works correctly when messages are
+    being published continuously by multiple publishers.
+    This simulates real-world scenarios with multiple producers and a single consumer.
+    """
+    test_subject = f"test.iter.concurrent.pub.{uuid.uuid4()}"
+    messages_per_publisher = 20
+    num_publishers = 3
+
+    # Create subscription
+    subscription = await client.subscribe(test_subject)
+    await client.flush()
+
+    received_messages = []
+    stop_iteration = asyncio.Event()
+
+    async def consumer_task():
+        """Consumer task using async for iteration.
+
+        Simulates a single consumer processing events from multiple producers.
+        """
+        async for msg in subscription:
+            # Simulate some processing work
+            await asyncio.sleep(0.005)
+            received_messages.append(msg.data.decode())
+            if stop_iteration.is_set():
+                break
+
+    async def publisher_task(publisher_id: int):
+        """Publisher task that continuously produces messages.
+
+        Simulates a producer generating events.
+        """
+        for i in range(messages_per_publisher):
+            await client.publish(test_subject, f"pub{publisher_id}_msg{i}".encode())
+            await asyncio.sleep(0.01)  # Small delay to simulate realistic publishing
+
+    # Start consumer task
+    consumer = asyncio.create_task(consumer_task())
+
+    # Start multiple publisher tasks
+    publisher_tasks = [asyncio.create_task(publisher_task(i)) for i in range(num_publishers)]
+
+    try:
+        # Wait for all publishers to finish
+        await asyncio.gather(*publisher_tasks)
+        await client.flush()
+
+        # Wait for consumer to receive all messages
+        expected_count = messages_per_publisher * num_publishers
+        max_wait = 5.0
+        start = asyncio.get_event_loop().time()
+        while len(received_messages) < expected_count:
+            if asyncio.get_event_loop().time() - start > max_wait:
+                break
+            await asyncio.sleep(0.1)
+
+        # Stop consumer task
+        stop_iteration.set()
+        await subscription.unsubscribe()
+        await asyncio.wait_for(consumer, timeout=2.0)
+
+        # Verify all messages received
+        assert len(received_messages) == expected_count, (
+            f"Expected {expected_count} messages, got {len(received_messages)}"
+        )
+
+        # Verify messages from all publishers
+        for pub_id in range(num_publishers):
+            pub_messages = [msg for msg in received_messages if msg.startswith(f"pub{pub_id}_")]
+            assert len(pub_messages) == messages_per_publisher, (
+                f"Publisher {pub_id} messages: expected {messages_per_publisher}, got {len(pub_messages)}"
+            )
+
+    finally:
+        stop_iteration.set()
+        for task in publisher_tasks:
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+        if not consumer.done():
+            consumer.cancel()
+            try:
+                await consumer
+            except asyncio.CancelledError:
+                pass
+
+
+@pytest.mark.asyncio
 async def test_reconnect_preserves_subscription_during_publishing():
     """Test that subscriptions remain active after reconnection during active publishing.
 
