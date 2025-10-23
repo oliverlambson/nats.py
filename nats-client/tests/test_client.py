@@ -2,7 +2,7 @@ import asyncio
 import uuid
 
 import pytest
-from nats.client import ClientStatus, NoRespondersError, connect
+from nats.client import ClientStatistics, ClientStatus, NoRespondersError, connect
 from nats.client.message import Headers
 from nats.server import run, run_cluster
 
@@ -1627,7 +1627,9 @@ async def test_client_drain_flushes_pending_publishes(server):
             except asyncio.TimeoutError:
                 break
 
-        assert len(messages_received) == message_count, f"Expected {message_count} messages, got {len(messages_received)}"
+        assert len(messages_received) == message_count, (
+            f"Expected {message_count} messages, got {len(messages_received)}"
+        )
         for i in range(message_count):
             assert f"message-{i}" in messages_received
 
@@ -1850,3 +1852,143 @@ async def test_client_drain_preferred_over_close(server):
     assert client.status == ClientStatus.CLOSED
 
     # Note: No need to call close() after drain() - drain handles it
+
+
+@pytest.mark.asyncio
+async def test_statistics_initial_values(client):
+    """Test that statistics start at zero."""
+    stats = client.stats()
+
+    assert isinstance(stats, ClientStatistics)
+    assert stats.in_msgs == 0
+    assert stats.out_msgs == 0
+    assert stats.in_bytes == 0
+    assert stats.out_bytes == 0
+    assert stats.reconnects == 0
+
+
+@pytest.mark.asyncio
+async def test_statistics_publish_counts(client):
+    """Test that publishing messages increments out_msgs and out_bytes."""
+    await client.publish("test.subject", b"Hello")
+    await client.publish("test.subject", b"World!")
+    await client.flush()
+
+    stats = client.stats()
+    assert stats.out_msgs == 2
+    assert stats.out_bytes == len(b"Hello") + len(b"World!")
+
+
+@pytest.mark.asyncio
+async def test_statistics_subscribe_counts(client):
+    """Test that receiving messages increments in_msgs and in_bytes."""
+    sub = await client.subscribe("test.stats")
+
+    await client.publish("test.stats", b"Test message")
+    await client.flush()
+
+    msg = await sub.next(timeout=1.0)
+    assert msg.data == b"Test message"
+
+    stats = client.stats()
+    assert stats.in_msgs == 1
+    assert stats.in_bytes == len(b"Test message")
+    assert stats.out_msgs == 1
+
+
+@pytest.mark.asyncio
+async def test_statistics_multiple_messages(client):
+    """Test statistics with multiple messages."""
+    sub = await client.subscribe("test.multiple")
+
+    messages = [b"Message 1", b"Message 2", b"Message 3"]
+    for msg_data in messages:
+        await client.publish("test.multiple", msg_data)
+    await client.flush()
+
+    received = []
+    for _ in range(len(messages)):
+        msg = await sub.next(timeout=1.0)
+        received.append(msg.data)
+
+    assert received == messages
+
+    stats = client.stats()
+    assert stats.in_msgs == 3
+    assert stats.out_msgs == 3
+
+    total_bytes = sum(len(m) for m in messages)
+    assert stats.in_bytes == total_bytes
+    assert stats.out_bytes == total_bytes
+
+
+@pytest.mark.asyncio
+async def test_statistics_with_headers(client):
+    """Test that statistics count payload bytes, not protocol overhead."""
+    sub = await client.subscribe("test.headers")
+
+    payload = b"Test payload"
+    headers = {"X-Custom": "value"}
+
+    await client.publish("test.headers", payload, headers=headers)
+    await client.flush()
+
+    msg = await sub.next(timeout=1.0)
+    assert msg.data == payload
+
+    stats = client.stats()
+    assert stats.out_bytes == len(payload)
+    assert stats.in_bytes == len(payload)
+
+
+@pytest.mark.asyncio
+async def test_statistics_request_reply(client):
+    """Test statistics with request/reply pattern."""
+    sub = await client.subscribe("test.request")
+
+    async def handle_request():
+        msg = await sub.next(timeout=2.0)
+        await client.publish(msg.reply_to, b"Response")
+
+    request_task = asyncio.create_task(handle_request())
+    await asyncio.sleep(0.1)
+
+    response = await client.request("test.request", b"Request", timeout=1.0)
+    assert response.data == b"Response"
+
+    await request_task
+
+    stats = client.stats()
+    assert stats.out_msgs == 2
+    assert stats.in_msgs == 2
+    assert stats.out_bytes == len(b"Request") + len(b"Response")
+
+
+@pytest.mark.asyncio
+async def test_statistics_snapshot(client):
+    """Test that stats() returns a snapshot, not a reference."""
+    stats1 = client.stats()
+
+    await client.publish("test.snapshot", b"Data")
+    await client.flush()
+
+    stats2 = client.stats()
+
+    assert stats1.out_msgs == 0
+    assert stats1.out_bytes == 0
+    assert stats2.out_msgs == 1
+    assert stats2.out_bytes == len(b"Data")
+
+
+@pytest.mark.asyncio
+async def test_statistics_reconnect_counter(server):
+    """Test that reconnects are counted."""
+    async with await connect(server.client_url, reconnect_time_wait=0.1) as client:
+        initial_stats = client.stats()
+        assert initial_stats.reconnects == 0
+
+        await client._connection.close()
+        await asyncio.sleep(0.5)
+
+        stats = client.stats()
+        assert stats.reconnects >= 1

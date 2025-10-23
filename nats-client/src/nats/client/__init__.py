@@ -70,7 +70,7 @@ class ClientStatus(Enum):
     CONNECTED = "connected"
     RECONNECTING = "reconnecting"
     DRAINING = "draining"  # Draining subscribers
-    DRAINED = "drained"    # Subscribers drained, flushing publishes
+    DRAINED = "drained"  # Subscribers drained, flushing publishes
     CLOSING = "closing"
     CLOSED = "closed"
 
@@ -115,6 +115,30 @@ class ServerInfo:
             jetstream=info.get("jetstream"),
             nonce=info.get("nonce"),
         )
+
+
+@dataclass(slots=True)
+class ClientStatistics:
+    """Statistics for messages and bytes sent/received on the connection.
+
+    This is a snapshot of the connection statistics at a point in time.
+    All fields are monotonically increasing counters.
+    """
+
+    in_msgs: int = 0
+    """Number of incoming messages received."""
+
+    out_msgs: int = 0
+    """Number of outgoing messages published."""
+
+    in_bytes: int = 0
+    """Number of bytes received."""
+
+    out_bytes: int = 0
+    """Number of bytes sent."""
+
+    reconnects: int = 0
+    """Number of successful reconnection attempts."""
 
 
 class Client(AbstractAsyncContextManager["Client"]):
@@ -179,6 +203,13 @@ class Client(AbstractAsyncContextManager["Client"]):
     _user: str | None
     _password: str | None
     _nkey_seed: str | None
+
+    # Statistics
+    _stats_in_msgs: int
+    _stats_out_msgs: int
+    _stats_in_bytes: int
+    _stats_out_bytes: int
+    _stats_reconnects: int
 
     # Background tasks
     _read_task: asyncio.Task[None]
@@ -288,6 +319,13 @@ class Client(AbstractAsyncContextManager["Client"]):
         self._reconnected_callbacks = []
         self._error_callbacks = []
 
+        # Statistics
+        self._stats_in_msgs = 0
+        self._stats_out_msgs = 0
+        self._stats_in_bytes = 0
+        self._stats_out_bytes = 0
+        self._stats_reconnects = 0
+
         # Start background tasks
         self._read_task = asyncio.create_task(self._read_loop())
         self._write_task = asyncio.create_task(self._write_loop())
@@ -306,6 +344,25 @@ class Client(AbstractAsyncContextManager["Client"]):
     def last_error(self) -> str | None:
         """Get the last protocol error received from the server."""
         return self._last_error
+
+    def stats(self) -> ClientStatistics:
+        """Return a snapshot of the current connection statistics.
+
+        Returns a copy of the statistics at the current point in time.
+        All counters are monotonically increasing and represent totals
+        since the connection was established.
+
+        Returns:
+            ClientStatistics: Snapshot of messages and bytes sent/received,
+                and number of reconnections.
+        """
+        return ClientStatistics(
+            in_msgs=self._stats_in_msgs,
+            out_msgs=self._stats_out_msgs,
+            in_bytes=self._stats_in_bytes,
+            out_bytes=self._stats_out_bytes,
+            reconnects=self._stats_reconnects,
+        )
 
     async def _read_loop(self) -> None:
         """Background task that reads and processes incoming protocol messages."""
@@ -425,6 +482,10 @@ class Client(AbstractAsyncContextManager["Client"]):
 
     async def _handle_msg(self, subject: str, sid: str, reply_to: str | None, payload: bytes) -> None:
         """Handle MSG from server."""
+        # Update statistics
+        self._stats_in_msgs += 1
+        self._stats_in_bytes += len(payload)
+
         if sid in self._subscriptions:
             subscription = self._subscriptions[sid]
             msg = Message(subject=subject, data=payload, reply_to=reply_to)
@@ -451,6 +512,10 @@ class Client(AbstractAsyncContextManager["Client"]):
         status_description: str | None = None,
     ) -> None:
         """Handle HMSG from server."""
+        # Update statistics
+        self._stats_in_msgs += 1
+        self._stats_in_bytes += len(payload)
+
         if sid in self._subscriptions:
             subscription = self._subscriptions[sid]
             status = None
@@ -679,6 +744,9 @@ class Client(AbstractAsyncContextManager["Client"]):
                                 self._reconnect_attempts = 0
                                 self._reconnect_time = self._reconnect_time_wait
 
+                                # Update statistics
+                                self._stats_reconnects += 1
+
                                 if self._reconnected_callbacks:
                                     for callback in self._reconnected_callbacks:
                                         try:
@@ -779,6 +847,10 @@ class Client(AbstractAsyncContextManager["Client"]):
 
         self._pending_messages.append(message_data)
         self._pending_bytes += message_size
+
+        # Update statistics
+        self._stats_out_msgs += 1
+        self._stats_out_bytes += len(payload)
 
         self._flush_waker.set()
 
@@ -1312,6 +1384,7 @@ __all__ = [
     "Client",
     "ServerInfo",
     "ClientStatus",
+    "ClientStatistics",
     "StatusError",
     "NoRespondersError",
 ]
