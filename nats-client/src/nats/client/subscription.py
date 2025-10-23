@@ -51,6 +51,8 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
     _max_pending_bytes: int | None
     _pending_messages: int
     _pending_bytes: int
+    _dropped_messages: int
+    _dropped_bytes: int
     _callbacks: list[Callable[[Message], None]]
     _closed: bool
     _slow_consumer_reported: bool
@@ -76,6 +78,8 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
         self._max_pending_bytes = max_pending_bytes
         self._pending_messages = 0
         self._pending_bytes = 0
+        self._dropped_messages = 0
+        self._dropped_bytes = 0
         self._callbacks = []
 
         self._closed = False
@@ -96,6 +100,7 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
         """Get whether the subscription is closed."""
         return self._closed
 
+    @property
     def pending(self) -> tuple[int, int]:
         """Get the number of pending messages and bytes.
 
@@ -103,6 +108,18 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
             Tuple of (pending_messages, pending_bytes)
         """
         return (self._pending_messages, self._pending_bytes)
+
+    @property
+    def dropped(self) -> tuple[int, int]:
+        """Get the number of dropped messages and bytes.
+
+        Messages are dropped when the subscription cannot keep up with
+        the message flow and exceeds its pending limits.
+
+        Returns:
+            Tuple of (dropped_messages, dropped_bytes)
+        """
+        return (self._dropped_messages, self._dropped_bytes)
 
     def add_callback(self, callback: Callable[[Message], None]) -> None:
         """Add a callback to be invoked when a message is received.

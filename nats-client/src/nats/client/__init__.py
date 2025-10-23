@@ -501,6 +501,10 @@ class Client(AbstractAsyncContextManager["Client"]):
 
             except (asyncio.QueueFull, ValueError):
                 # Drop message due to limit exceeded
+                msg_size = len(payload)
+                subscription._dropped_messages += 1
+                subscription._dropped_bytes += msg_size
+
                 pending_msgs, pending_bytes = subscription.pending
 
                 logger.warning(
@@ -561,6 +565,10 @@ class Client(AbstractAsyncContextManager["Client"]):
 
             except (asyncio.QueueFull, ValueError):
                 # Drop message due to limit exceeded
+                msg_size = len(payload)
+                subscription._dropped_messages += 1
+                subscription._dropped_bytes += msg_size
+
                 pending_msgs, pending_bytes = subscription.pending
 
                 logger.warning(

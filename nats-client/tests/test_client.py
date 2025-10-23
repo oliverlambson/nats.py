@@ -2327,3 +2327,45 @@ async def test_subscription_default_limits(client):
     # Default: 65536 messages, 64 MB
     assert subscription._max_pending_messages == 65536
     assert subscription._max_pending_bytes == 67108864  # 64 * 1024 * 1024
+
+
+@pytest.mark.asyncio
+async def test_subscription_dropped_counters(client):
+    """Test that dropped message counters are updated when messages are dropped."""
+    test_subject = f"test.dropped.{uuid.uuid4()}"
+
+    # Create subscription with very low limits
+    subscription = await client.subscribe(test_subject, max_pending_messages=2, max_pending_bytes=100)
+    await client.flush()
+
+    # Verify dropped counters start at zero
+    dropped_msgs, dropped_bytes = subscription.dropped
+    assert dropped_msgs == 0
+    assert dropped_bytes == 0
+
+    # Publish enough messages to exceed limits
+    for i in range(10):
+        await client.publish(test_subject, b"test message")
+    await client.flush()
+
+    # Wait for messages to arrive
+    await asyncio.sleep(0.1)
+
+    # Verify some messages were dropped
+    dropped_msgs, dropped_bytes = subscription.dropped
+    assert dropped_msgs > 0, "Should have dropped some messages"
+    assert dropped_bytes > 0, "Should have dropped some bytes"
+
+    # Verify pending is at or near limit
+    pending_msgs, pending_bytes = subscription.pending
+    assert pending_msgs <= 2, "Pending should not exceed limit"
+
+    # Verify dropped count increases as we publish more
+    initial_dropped = dropped_msgs
+    for i in range(5):
+        await client.publish(test_subject, b"more messages")
+    await client.flush()
+    await asyncio.sleep(0.1)
+
+    dropped_msgs, dropped_bytes = subscription.dropped
+    assert dropped_msgs > initial_dropped, "Dropped count should increase"
