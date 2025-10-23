@@ -501,7 +501,7 @@ class Client(AbstractAsyncContextManager["Client"]):
 
             except (asyncio.QueueFull, ValueError):
                 # Drop message due to limit exceeded
-                pending_msgs, pending_bytes = subscription.pending()
+                pending_msgs, pending_bytes = subscription.pending
 
                 logger.warning(
                     "Slow consumer on subject %s (sid %s): dropping message, %d pending messages, %d pending bytes",
@@ -561,7 +561,7 @@ class Client(AbstractAsyncContextManager["Client"]):
 
             except (asyncio.QueueFull, ValueError):
                 # Drop message due to limit exceeded
-                pending_msgs, pending_bytes = subscription.pending()
+                pending_msgs, pending_bytes = subscription.pending
 
                 logger.warning(
                     "Slow consumer on subject %s (sid %s): dropping message, %d pending messages, %d pending bytes",

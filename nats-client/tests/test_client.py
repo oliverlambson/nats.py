@@ -2030,7 +2030,7 @@ async def test_subscription_pending_messages_limit(client):
     assert error.pending_messages >= 5
 
     # Verify pending count
-    pending_msgs, pending_bytes = subscription.pending()
+    pending_msgs, pending_bytes = subscription.pending
     assert pending_msgs <= 5, f"Should not exceed limit of 5, got {pending_msgs}"
 
     # Consume available messages (should be approximately the limit)
@@ -2085,7 +2085,7 @@ async def test_subscription_pending_bytes_limit(client):
     assert error.pending_bytes <= 150, "Pending bytes should be near limit"
 
     # Verify pending count
-    pending_msgs, pending_bytes = subscription.pending()
+    pending_msgs, pending_bytes = subscription.pending
     assert pending_bytes <= 150, f"Should not far exceed limit, got {pending_bytes}"
 
     # Consume available messages
@@ -2227,7 +2227,7 @@ async def test_subscription_pending_method(client):
     await client.flush()
 
     # Initial pending should be zero
-    pending_msgs, pending_bytes = subscription.pending()
+    pending_msgs, pending_bytes = subscription.pending
     assert pending_msgs == 0
     assert pending_bytes == 0
 
@@ -2241,7 +2241,7 @@ async def test_subscription_pending_method(client):
     await asyncio.sleep(0.1)
 
     # Check pending
-    pending_msgs, pending_bytes = subscription.pending()
+    pending_msgs, pending_bytes = subscription.pending
     assert pending_msgs == len(messages)
     expected_bytes = sum(len(m) for m in messages)
     assert pending_bytes == expected_bytes
@@ -2250,7 +2250,7 @@ async def test_subscription_pending_method(client):
     await subscription.next(timeout=1.0)
 
     # Check pending decreased
-    pending_msgs, pending_bytes = subscription.pending()
+    pending_msgs, pending_bytes = subscription.pending
     assert pending_msgs == len(messages) - 1
     assert pending_bytes == expected_bytes - len(messages[0])
 
@@ -2259,7 +2259,7 @@ async def test_subscription_pending_method(client):
     await subscription.next(timeout=1.0)
 
     # Check pending is zero again
-    pending_msgs, pending_bytes = subscription.pending()
+    pending_msgs, pending_bytes = subscription.pending
     assert pending_msgs == 0
     assert pending_bytes == 0
 
