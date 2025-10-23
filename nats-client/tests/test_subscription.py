@@ -821,3 +821,104 @@ async def test_subscription_drain_processes_pending_messages(client):
     # Try to get a message - should fail since subscription is closed
     with pytest.raises(RuntimeError, match="Subscription is closed"):
         await subscription.next(timeout=0.5)
+
+
+@pytest.mark.asyncio
+async def test_reconnect_preserves_subscription_during_publishing():
+    """Test that subscriptions remain active after reconnection during active publishing.
+
+    This ensures that the client properly re-establishes subscriptions on the
+    new connection so that messages published after reconnection are received.
+    """
+    # Start initial server
+    server = await run(port=0)
+    server_port = server.port
+
+    # Events
+    disconnect_event = asyncio.Event()
+    reconnect_event = asyncio.Event()
+
+    # Connect client
+    client = await connect(
+        server.client_url,
+        timeout=1.0,
+        allow_reconnect=True,
+        reconnect_time_wait=0.1,
+    )
+
+    client.add_disconnected_callback(disconnect_event.set)
+    client.add_reconnected_callback(reconnect_event.set)
+
+    # Create subscription
+    test_subject = f"test.reconnect.subscription.{uuid.uuid4()}"
+    subscription = await client.subscribe(test_subject)
+    await client.flush()
+
+    messages_received = []
+    receive_task_running = True
+
+    async def receive_messages():
+        """Continuously receive messages."""
+        while receive_task_running:
+            try:
+                msg = await subscription.next(timeout=0.1)
+                messages_received.append(msg.data.decode())
+            except TimeoutError:
+                continue
+            except Exception:
+                # Expected during disconnect
+                await asyncio.sleep(0.05)
+
+    # Start receiver
+    receive_task = asyncio.create_task(receive_messages())
+
+    # Publishing control
+    publish_task_running = True
+
+    async def publish_messages():
+        """Publish messages continuously."""
+        counter = 0
+        while publish_task_running:
+            await client.publish(test_subject, f"message_{counter}".encode())
+            counter += 1
+            await asyncio.sleep(0.05)
+
+    publish_task = asyncio.create_task(publish_messages())
+
+    try:
+        # Let some messages flow
+        await asyncio.sleep(0.3)
+        messages_before_disconnect = len(messages_received)
+        assert messages_before_disconnect > 0, "Should receive messages before disconnect"
+
+        # Trigger disconnect
+        await server.shutdown()
+        await asyncio.wait_for(disconnect_event.wait(), timeout=2.0)
+
+        # Restart server
+        new_server = await run(port=server_port)
+
+        try:
+            # Wait for reconnection
+            await asyncio.wait_for(reconnect_event.wait(), timeout=5.0)
+
+            # Wait for messages to flow again
+            await asyncio.sleep(0.5)
+
+            messages_after_reconnect = len(messages_received)
+
+            # Verify subscription is still active and receiving messages
+            assert messages_after_reconnect > messages_before_disconnect, (
+                f"Should receive messages after reconnect: "
+                f"before={messages_before_disconnect}, after={messages_after_reconnect}"
+            )
+
+        finally:
+            await new_server.shutdown()
+
+    finally:
+        publish_task_running = False
+        receive_task_running = False
+        await publish_task
+        await receive_task
+        await client.close()

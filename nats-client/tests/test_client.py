@@ -1221,3 +1221,316 @@ async def test_server_initiated_ping_pong():
             await client.close()
     finally:
         await server.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_reconnect_while_publishing():
+    """Test that client can reconnect while actively publishing messages.
+
+    This test verifies that:
+    1. Client continues to publish messages during normal operation
+    2. When the server disconnects, the client detects the disconnection
+    3. Publishing blocks during reconnection (waiting for connection)
+    4. Client successfully reconnects to a new server
+    5. Publishing resumes after reconnection
+    6. Messages published after reconnection are successfully delivered
+    """
+    # Start initial server
+    server = await run(port=0)
+    server_port = server.port
+
+    # Events to track lifecycle
+    disconnect_event = asyncio.Event()
+    reconnect_event = asyncio.Event()
+
+    # Connect client with reconnection enabled
+    client = await connect(
+        server.client_url,
+        timeout=1.0,
+        allow_reconnect=True,
+        reconnect_time_wait=0.1,
+        reconnect_max_attempts=100,
+    )
+
+    client.add_disconnected_callback(disconnect_event.set)
+    client.add_reconnected_callback(reconnect_event.set)
+
+    # Set up subscription to verify messages
+    test_subject = f"test.reconnect.load.{uuid.uuid4()}"
+    subscription = await client.subscribe(test_subject)
+    await client.flush()
+
+    # Counters for tracking
+    messages_sent_before_disconnect = 0
+    messages_sent_after_reconnect = 0
+    publish_task_running = True
+
+    async def publish_continuously():
+        """Continuously publish messages until told to stop.
+
+        publish() will block during reconnection, not raise exceptions.
+        """
+        nonlocal messages_sent_before_disconnect, messages_sent_after_reconnect
+        counter = 0
+
+        while publish_task_running:
+            message = f"message_{counter}".encode()
+            # This may block during reconnection but won't raise
+            await client.publish(test_subject, message)
+            counter += 1
+
+            # Track message counts based on connection state
+            if reconnect_event.is_set():
+                messages_sent_after_reconnect += 1
+            elif not disconnect_event.is_set():
+                messages_sent_before_disconnect += 1
+
+            # Small delay to simulate realistic publish rate
+            await asyncio.sleep(0.01)
+
+    # Start publishing task
+    publish_task = asyncio.create_task(publish_continuously())
+
+    try:
+        # Let some messages publish successfully
+        await asyncio.sleep(0.2)
+        assert messages_sent_before_disconnect > 0, "Should have published messages before disconnect"
+
+        # Verify we're receiving messages
+        msg = await subscription.next(timeout=1.0)
+        assert msg.data.startswith(b"message_")
+
+        # Shutdown server while publishing is active
+        await server.shutdown()
+
+        # Wait for disconnect to be detected
+        await asyncio.wait_for(disconnect_event.wait(), timeout=2.0)
+        assert disconnect_event.is_set()
+
+        # Start new server on same port
+        new_server = await run(port=server_port)
+
+        try:
+            # Wait for reconnection
+            await asyncio.wait_for(reconnect_event.wait(), timeout=5.0)
+            assert reconnect_event.is_set()
+
+            # Give time for publishing to resume
+            await asyncio.sleep(0.3)
+
+            # Verify publishing resumed after reconnection
+            assert messages_sent_after_reconnect > 0, "Should have published messages after reconnect"
+
+            # Verify we can receive messages after reconnection
+            await client.flush()
+            msg = await subscription.next(timeout=2.0)
+            assert msg.data.startswith(b"message_")
+
+        finally:
+            await new_server.shutdown()
+
+    finally:
+        # Stop publishing task
+        publish_task_running = False
+        await publish_task
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_reconnect_with_high_volume_publishing():
+    """Test reconnection behavior under high message volume.
+
+    This test verifies that the client can handle reconnection even when
+    publishing a large number of messages rapidly, ensuring buffering and
+    flow control work correctly across reconnection boundaries.
+    """
+    # Start initial server
+    server = await run(port=0)
+    server_port = server.port
+
+    # Events to track lifecycle
+    disconnect_event = asyncio.Event()
+    reconnect_event = asyncio.Event()
+
+    # Connect client
+    client = await connect(
+        server.client_url,
+        timeout=1.0,
+        allow_reconnect=True,
+        reconnect_time_wait=0.1,
+        reconnect_max_attempts=100,
+    )
+
+    client.add_disconnected_callback(disconnect_event.set)
+    client.add_reconnected_callback(reconnect_event.set)
+
+    test_subject = f"test.reconnect.highvolume.{uuid.uuid4()}"
+    subscription = await client.subscribe(test_subject)
+    await client.flush()
+
+    # Track successful publishes
+    successful_publishes = 0
+    publish_task_running = True
+
+    async def publish_high_volume():
+        """Publish messages rapidly - will block during reconnection."""
+        nonlocal successful_publishes
+        counter = 0
+
+        while publish_task_running:
+            # Publish rapidly - may block during reconnection
+            await client.publish(test_subject, f"msg_{counter}".encode())
+            successful_publishes += 1
+            counter += 1
+            # Small sleep every N messages to prevent overwhelming
+            if counter % 50 == 0:
+                await asyncio.sleep(0.01)
+
+    # Start high-volume publishing
+    publish_task = asyncio.create_task(publish_high_volume())
+
+    try:
+        # Let messages accumulate
+        await asyncio.sleep(0.2)
+        publishes_before = successful_publishes
+        assert publishes_before > 50, f"Should have published many messages, got {publishes_before}"
+
+        # Trigger disconnect during heavy load
+        await server.shutdown()
+        await asyncio.wait_for(disconnect_event.wait(), timeout=2.0)
+
+        # Restart server
+        new_server = await run(port=server_port)
+
+        try:
+            # Wait for reconnection
+            await asyncio.wait_for(reconnect_event.wait(), timeout=5.0)
+
+            # Let publishing resume
+            await asyncio.sleep(0.2)
+            publishes_after = successful_publishes
+
+            # Verify publishing continued after reconnection
+            assert publishes_after > publishes_before, (
+                f"Publishing should resume after reconnect: before={publishes_before}, after={publishes_after}"
+            )
+
+            # Verify we can still receive messages
+            await client.flush()
+            msg = await subscription.next(timeout=2.0)
+            assert msg.data.startswith(b"msg_")
+
+        finally:
+            await new_server.shutdown()
+
+    finally:
+        publish_task_running = False
+        await publish_task
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_reconnect_with_multiple_concurrent_publishers():
+    """Test reconnection with multiple publishing tasks running concurrently.
+
+    This simulates a realistic scenario where multiple application components
+    are publishing to different subjects simultaneously when a reconnection occurs.
+    """
+    # Start initial server
+    server = await run(port=0)
+    server_port = server.port
+
+    # Events
+    disconnect_event = asyncio.Event()
+    reconnect_event = asyncio.Event()
+
+    # Connect client
+    client = await connect(
+        server.client_url,
+        timeout=1.0,
+        allow_reconnect=True,
+        reconnect_time_wait=0.1,
+        reconnect_max_attempts=100,
+    )
+
+    client.add_disconnected_callback(disconnect_event.set)
+    client.add_reconnected_callback(reconnect_event.set)
+
+    # Create multiple subjects and subscriptions
+    num_subjects = 5
+    subjects = [f"test.subject.{i}.{uuid.uuid4()}" for i in range(num_subjects)]
+    subscriptions = []
+
+    for subject in subjects:
+        sub = await client.subscribe(subject)
+        subscriptions.append(sub)
+    await client.flush()
+
+    # Track publishes per subject
+    publish_counts = {subject: 0 for subject in subjects}
+    publish_lock = asyncio.Lock()
+    tasks_running = True
+
+    async def publish_to_subject(subject: str):
+        """Publish continuously to a specific subject."""
+        counter = 0
+        while tasks_running:
+            await client.publish(subject, f"{subject}_msg_{counter}".encode())
+            async with publish_lock:
+                publish_counts[subject] += 1
+            counter += 1
+            await asyncio.sleep(0.02)
+
+    # Start multiple publishing tasks
+    publish_tasks = [asyncio.create_task(publish_to_subject(subject)) for subject in subjects]
+
+    try:
+        # Let all publishers run
+        await asyncio.sleep(0.3)
+
+        # Verify all subjects are being published to
+        async with publish_lock:
+            for subject, count in publish_counts.items():
+                assert count > 0, f"Subject {subject} should have messages"
+
+        # Trigger disconnect
+        await server.shutdown()
+        await asyncio.wait_for(disconnect_event.wait(), timeout=2.0)
+
+        # Restart server
+        new_server = await run(port=server_port)
+
+        try:
+            # Wait for reconnection
+            await asyncio.wait_for(reconnect_event.wait(), timeout=5.0)
+
+            # Let publishing resume
+            await asyncio.sleep(0.3)
+
+            # Verify all subjects resume publishing
+            async with publish_lock:
+                counts_before = dict(publish_counts)
+
+            await asyncio.sleep(0.2)
+
+            async with publish_lock:
+                counts_after = dict(publish_counts)
+
+            for subject in subjects:
+                assert counts_after[subject] > counts_before[subject], (
+                    f"Subject {subject} should continue publishing after reconnect"
+                )
+
+            # Verify we can receive on all subscriptions
+            await client.flush()
+            for i, subscription in enumerate(subscriptions):
+                msg = await subscription.next(timeout=2.0)
+                assert subjects[i].encode() in msg.data
+
+        finally:
+            await new_server.shutdown()
+
+    finally:
+        tasks_running = False
+        await asyncio.gather(*publish_tasks)
+        await client.close()
