@@ -16,9 +16,135 @@ if TYPE_CHECKING:
     import types
 
     from nats.client import Client
+from nats.client.errors import MessageQueueFull
 from nats.client.message import Message
 
 T = TypeVar("T")
+
+
+class MessageQueue:
+    """A message queue with both message count and byte size limits.
+
+    This wraps asyncio.Queue to add byte-size tracking in addition to
+    the standard message count limit.
+    """
+
+    _queue: asyncio.Queue[Message]
+    _max_messages: int | None
+    _max_bytes: int | None
+    _pending_messages: int
+    _pending_bytes: int
+    _callbacks: list[Callable[[Message], None]]
+
+    def __init__(self, max_messages: int | None = None, max_bytes: int | None = None):
+        """Initialize the message queue.
+
+        Args:
+            max_messages: Maximum number of messages (None for unlimited)
+            max_bytes: Maximum total bytes of message payloads (None for unlimited)
+        """
+        # Create underlying queue with maxsize (0 means unlimited)
+        maxsize = max_messages if max_messages is not None else 0
+        self._queue = asyncio.Queue(maxsize=maxsize)
+        self._max_messages = max_messages
+        self._max_bytes = max_bytes
+        self._pending_messages = 0
+        self._pending_bytes = 0
+        self._callbacks = []
+
+    def put_nowait(self, msg: Message) -> None:
+        """Put a message in the queue without blocking.
+
+        Args:
+            msg: The message to enqueue
+
+        Raises:
+            MessageQueueFull: If message count or byte limit would be exceeded
+        """
+        msg_size = len(msg.data)
+
+        # Check byte limit before attempting to put
+        if self._max_bytes is not None and self._pending_bytes + msg_size > self._max_bytes:
+            raise MessageQueueFull("byte", self._pending_bytes + msg_size, self._max_bytes)
+
+        # Invoke callbacks before queuing
+        for callback in self._callbacks:
+            try:
+                callback(msg)
+            except Exception as e:
+                # Log callback errors but don't disrupt message flow
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.exception("Error in message callback: %s", e)
+
+        # Try to put in queue - will raise QueueFull if message limit exceeded
+        try:
+            self._queue.put_nowait(msg)
+        except asyncio.QueueFull:
+            # Convert to our custom exception
+            raise MessageQueueFull("message", self._pending_messages + 1, self._max_messages) from None
+
+        # Update counters after successful put
+        self._pending_messages += 1
+        self._pending_bytes += msg_size
+
+    async def get(self, timeout: float | None = None) -> Message:
+        """Get a message from the queue.
+
+        Args:
+            timeout: Timeout in seconds (None means wait forever)
+
+        Returns:
+            The next message
+
+        Raises:
+            asyncio.TimeoutError: If timeout is reached
+            asyncio.QueueShutDown: If queue is shut down
+        """
+        # Get message from queue first
+        if timeout is not None:
+            msg = await asyncio.wait_for(self._queue.get(), timeout)
+        else:
+            msg = await self._queue.get()
+
+        # Update counters after successful get (only if no exception)
+        self._pending_messages -= 1
+        self._pending_bytes -= len(msg.data)
+
+        return msg
+
+    def pending(self) -> tuple[int, int]:
+        """Get the number of pending messages and bytes.
+
+        Returns:
+            Tuple of (pending_messages, pending_bytes)
+        """
+        return (self._pending_messages, self._pending_bytes)
+
+    def shutdown(self, immediate: bool = False) -> None:
+        """Shutdown the queue.
+
+        Args:
+            immediate: If True, discard all pending messages
+        """
+        self._queue.shutdown(immediate=immediate)
+
+    def add_callback(self, callback: Callable[[Message], None]) -> None:
+        """Add a callback to be invoked when a message is received.
+
+        Args:
+            callback: Function to be called when a message is queued
+        """
+        self._callbacks.append(callback)
+
+    def remove_callback(self, callback: Callable[[Message], None]) -> None:
+        """Remove a callback from the queue.
+
+        Args:
+            callback: Function to remove from the callback list
+        """
+        with suppress(ValueError):
+            self._callbacks.remove(callback)
 
 
 class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscription"]):
@@ -43,16 +169,16 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
     _sid: str
     _queue_group: str
     _client: Client
-    _pending_queue: asyncio.Queue[Message]
+    _pending_queue: MessageQueue
     _closed: bool
-    _callbacks: list[Callable[[Message], None]]
+    _slow_consumer_reported: bool
 
     def __init__(
         self,
         subject: str,
         sid: str,
         queue_group: str,
-        pending_queue: asyncio.Queue,
+        pending_queue: MessageQueue,
         client: Client,
     ):
         self._subject = subject
@@ -61,7 +187,7 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
         self._client = client
         self._pending_queue = pending_queue
         self._closed = False
-        self._callbacks = []
+        self._slow_consumer_reported = False
 
     @property
     def subject(self) -> str:
@@ -78,6 +204,14 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
         """Get whether the subscription is closed."""
         return self._closed
 
+    def pending(self) -> tuple[int, int]:
+        """Get the number of pending messages and bytes.
+
+        Returns:
+            Tuple of (pending_messages, pending_bytes)
+        """
+        return self._pending_queue.pending()
+
     def add_callback(self, callback: Callable[[Message], None]) -> None:
         """Add a callback to be invoked when a message is received.
 
@@ -90,7 +224,7 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
         Args:
             callback: Function to be called when a message is received
         """
-        self._callbacks.append(callback)
+        self._pending_queue.add_callback(callback)
 
     def remove_callback(self, callback: Callable[[Message], None]) -> None:
         """Remove a callback from the subscription.
@@ -98,8 +232,7 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
         Args:
             callback: Function to remove from the callback list
         """
-        with suppress(ValueError):
-            self._callbacks.remove(callback)
+        self._pending_queue.remove_callback(callback)
 
     async def next(self, timeout: float | None = None) -> Message:
         """Get the next message from the subscription.
@@ -116,10 +249,7 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
             RuntimeError: If the subscription is closed and queue is empty
         """
         try:
-            if timeout is not None:
-                return await asyncio.wait_for(self._pending_queue.get(), timeout)
-
-            return await self._pending_queue.get()
+            return await self._pending_queue.get(timeout)
         except asyncio.QueueShutDown:
             msg = "Subscription is closed"
             raise RuntimeError(msg) from None

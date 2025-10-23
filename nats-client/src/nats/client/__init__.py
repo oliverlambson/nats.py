@@ -35,7 +35,7 @@ from typing import TYPE_CHECKING, Self
 from urllib.parse import urlparse
 
 from nats.client.connection import Connection, open_tcp_connection
-from nats.client.errors import NoRespondersError, StatusError
+from nats.client.errors import MessageQueueFull, NoRespondersError, SlowConsumerError, StatusError
 from nats.client.message import Headers, Message, Status
 from nats.client.protocol.command import (
     encode_connect,
@@ -53,7 +53,7 @@ from nats.client.protocol.types import (
 from nats.client.protocol.types import (
     ServerInfo as ProtocolServerInfo,
 )
-from nats.client.subscription import Subscription
+from nats.client.subscription import MessageQueue, Subscription
 
 if TYPE_CHECKING:
     import types
@@ -488,18 +488,36 @@ class Client(AbstractAsyncContextManager["Client"]):
 
         if sid in self._subscriptions:
             subscription = self._subscriptions[sid]
+
             msg = Message(subject=subject, data=payload, reply_to=reply_to)
 
-            for callback in subscription._callbacks:
-                try:
-                    callback(msg)
-                except Exception:
-                    logger.exception("Error in subscription callback for subject %s (sid %s)", subject, sid)
-
             try:
-                await subscription._pending_queue.put(msg)
-            except Exception:
-                logger.exception("Error putting message in queue for subject %s (sid %s)", subject, sid)
+                # Try to put message in queue (MessageQueue handles both limits and callbacks)
+                subscription._pending_queue.put_nowait(msg)
+
+                # Reset slow consumer flag if we successfully queued
+                if subscription._slow_consumer_reported:
+                    subscription._slow_consumer_reported = False
+
+            except MessageQueueFull as e:
+                # Drop message due to limit exceeded
+                pending_msgs, pending_bytes = subscription._pending_queue.pending()
+
+                logger.warning(
+                    "Slow consumer on subject %s (sid %s): %s limit exceeded, dropping message, "
+                    "%d pending messages, %d pending bytes",
+                    subject, sid, e.limit_type, pending_msgs, pending_bytes
+                )
+
+                # Only report once per slow consumer event to avoid noise
+                if not subscription._slow_consumer_reported:
+                    subscription._slow_consumer_reported = True
+                    error = SlowConsumerError(subject, sid, pending_msgs, pending_bytes)
+                    for callback in self._error_callbacks:
+                        try:
+                            callback(error)
+                        except Exception:
+                            logger.exception("Error in error callback")
 
     async def _handle_hmsg(
         self,
@@ -518,6 +536,7 @@ class Client(AbstractAsyncContextManager["Client"]):
 
         if sid in self._subscriptions:
             subscription = self._subscriptions[sid]
+
             status = None
             if status_code is not None:
                 status = Status(code=status_code, description=status_description)
@@ -530,16 +549,33 @@ class Client(AbstractAsyncContextManager["Client"]):
                 status=status,
             )
 
-            for callback in subscription._callbacks:
-                try:
-                    callback(msg)
-                except Exception:
-                    logger.exception("Error in subscription callback for subject %s (sid %s)", subject, sid)
-
             try:
-                await subscription._pending_queue.put(msg)
-            except Exception:
-                logger.exception("Error putting message in queue for subject %s (sid %s)", subject, sid)
+                # Try to put message in queue (MessageQueue handles both limits and callbacks)
+                subscription._pending_queue.put_nowait(msg)
+
+                # Reset slow consumer flag if we successfully queued
+                if subscription._slow_consumer_reported:
+                    subscription._slow_consumer_reported = False
+
+            except MessageQueueFull as e:
+                # Drop message due to limit exceeded
+                pending_msgs, pending_bytes = subscription._pending_queue.pending()
+
+                logger.warning(
+                    "Slow consumer on subject %s (sid %s): %s limit exceeded, dropping message, "
+                    "%d pending messages, %d pending bytes",
+                    subject, sid, e.limit_type, pending_msgs, pending_bytes
+                )
+
+                # Only report once per slow consumer event to avoid noise
+                if not subscription._slow_consumer_reported:
+                    subscription._slow_consumer_reported = True
+                    error = SlowConsumerError(subject, sid, pending_msgs, pending_bytes)
+                    for callback in self._error_callbacks:
+                        try:
+                            callback(error)
+                        except Exception:
+                            logger.exception("Error in error callback")
 
     async def _handle_info(self, info: dict) -> None:
         """Handle INFO from server."""
@@ -859,8 +895,25 @@ class Client(AbstractAsyncContextManager["Client"]):
         subject: str,
         *,
         queue_group: str = "",
+        max_pending_messages: int | None = 65536,
+        max_pending_bytes: int | None = 67108864,  # 64 MB
     ) -> Subscription:
-        """Subscribe to a subject."""
+        """Subscribe to a subject.
+
+        Args:
+            subject: The subject to subscribe to
+            queue_group: Optional queue group name for load balancing
+            max_pending_messages: Maximum number of pending messages before triggering
+                slow consumer error (default: 65536). Use None for unlimited.
+            max_pending_bytes: Maximum bytes of pending messages before triggering
+                slow consumer error (default: 64MB). Use None for unlimited.
+
+        Returns:
+            The subscription object
+
+        Raises:
+            RuntimeError: If the connection is closed
+        """
         if self._status == ClientStatus.CLOSED:
             msg = "Connection is closed"
             raise RuntimeError(msg)
@@ -868,7 +921,8 @@ class Client(AbstractAsyncContextManager["Client"]):
         sid = str(self._next_sid)
         self._next_sid += 1
 
-        message_queue = asyncio.Queue()
+        # Create message queue with limits
+        message_queue = MessageQueue(max_messages=max_pending_messages, max_bytes=max_pending_bytes)
 
         subscription = Subscription(
             subject,

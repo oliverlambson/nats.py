@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+__all__ = ["StatusError", "NoRespondersError", "SlowConsumerError"]
+
 
 class StatusError(Exception):
     """Base class for NATS status-related errors."""
@@ -54,3 +56,56 @@ class NoRespondersError(StatusError):
             subject: The subject that caused the error (optional)
         """
         super().__init__(status, description, subject)
+
+
+class SlowConsumerError(Exception):
+    """Error raised when a subscription cannot keep up with message flow.
+
+    This occurs when the subscription's pending message queue exceeds
+    the configured limits (pending_msgs_limit or pending_bytes_limit).
+    Messages will be dropped to prevent memory exhaustion.
+    """
+
+    subject: str
+    sid: str
+    pending_messages: int
+    pending_bytes: int
+
+    def __init__(self, subject: str, sid: str, pending_messages: int, pending_bytes: int) -> None:
+        """Initialize SlowConsumerError.
+
+        Args:
+            subject: The subscription subject
+            sid: The subscription ID
+            pending_messages: Number of pending messages in queue
+            pending_bytes: Number of pending bytes in queue
+        """
+        self.subject = subject
+        self.sid = sid
+        self.pending_messages = pending_messages
+        self.pending_bytes = pending_bytes
+        super().__init__(
+            f"Slow consumer on subject '{subject}': "
+            f"{pending_messages} pending messages, {pending_bytes} pending bytes"
+        )
+
+
+class MessageQueueFull(Exception):
+    """Error raised when the message queue is full.
+
+    This is raised when attempting to add a message to a queue that has
+    reached its maximum capacity (either message count or byte limit).
+    """
+
+    def __init__(self, limit_type: str, current: int, maximum: int) -> None:
+        """Initialize MessageQueueFull.
+
+        Args:
+            limit_type: Type of limit exceeded ("message" or "byte")
+            current: Current count/size
+            maximum: Maximum allowed count/size
+        """
+        self.limit_type = limit_type
+        self.current = current
+        self.maximum = maximum
+        super().__init__(f"{limit_type.capitalize()} limit exceeded: {current} >= {maximum}")
