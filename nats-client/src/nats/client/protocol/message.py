@@ -402,7 +402,7 @@ async def parse(reader: Reader) -> Message | None:
             return await pong()
         case b"INFO":
             return await parse_info(args)
-        case b"ERR":
+        case b"-ERR" | b"ERR":
             return await parse_err(args)
         case _:
             # Use repr for better error reporting with control characters

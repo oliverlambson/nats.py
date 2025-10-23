@@ -24,6 +24,151 @@ async def test_connect_fails_with_invalid_url():
 
 
 @pytest.mark.asyncio
+async def test_connect_to_auth_token_server_with_correct_token():
+    """Test that client can connect to an auth token server with the correct token."""
+    import os
+
+    # Start server with token authentication
+    config_path = os.path.join(os.path.dirname(__file__), "configs", "server_auth_token.conf")
+    server = await run(config_path=config_path, port=0, timeout=5.0)
+
+    try:
+        # Connect with correct token should succeed
+        client = await connect(server.client_url, timeout=1.0, auth_token="test_token_123")
+        assert client.status == ClientStatus.CONNECTED
+        assert client.server_info is not None
+
+        # Verify we can publish and receive messages with valid auth
+        test_subject = f"test.auth.{uuid.uuid4()}"
+        subscription = await client.subscribe(test_subject)
+        await client.flush()
+
+        await client.publish(test_subject, b"test")
+        await client.flush()
+
+        msg = await subscription.next(timeout=1.0)
+        assert msg.data == b"test"
+
+        await client.close()
+    finally:
+        await server.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_connect_to_auth_token_server_with_incorrect_token():
+    """Test that connect raises an error when using an incorrect token."""
+    import os
+
+    # Start server with token authentication
+    config_path = os.path.join(os.path.dirname(__file__), "configs", "server_auth_token.conf")
+    server = await run(config_path=config_path, port=0, timeout=5.0)
+
+    try:
+        # Connect with incorrect token should raise ConnectionError
+        with pytest.raises(ConnectionError) as exc_info:
+            await connect(server.client_url, timeout=1.0, auth_token="wrong_token", allow_reconnect=False)
+
+        # Verify the error message mentions authorization
+        assert "authorization" in str(exc_info.value).lower()
+    finally:
+        await server.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_connect_to_auth_token_server_with_missing_token():
+    """Test that connect raises an error when connecting without a token to a secured server."""
+    import os
+
+    # Start server with token authentication
+    config_path = os.path.join(os.path.dirname(__file__), "configs", "server_auth_token.conf")
+    server = await run(config_path=config_path, port=0, timeout=5.0)
+
+    try:
+        # Connect without token should raise ConnectionError
+        with pytest.raises(ConnectionError) as exc_info:
+            await connect(server.client_url, timeout=1.0, allow_reconnect=False)
+
+        # Verify the error message mentions authorization
+        assert "authorization" in str(exc_info.value).lower()
+    finally:
+        await server.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_reconnect_with_auth_token():
+    """Test that client can reconnect to an auth token server after disconnection."""
+    import os
+
+    # Start server with token authentication
+    config_path = os.path.join(os.path.dirname(__file__), "configs", "server_auth_token.conf")
+    server = await run(config_path=config_path, port=0, timeout=5.0)
+
+    try:
+        # Events to track callback invocations
+        disconnect_event = asyncio.Event()
+        reconnect_event = asyncio.Event()
+
+        # Connect client with auth token and reconnection enabled
+        client = await connect(
+            server.client_url,
+            timeout=1.0,
+            auth_token="test_token_123",
+            allow_reconnect=True,
+            reconnect_time_wait=0.1,
+        )
+
+        # Register callbacks
+        def on_disconnect():
+            disconnect_event.set()
+
+        def on_reconnect():
+            reconnect_event.set()
+
+        client.add_disconnected_callback(on_disconnect)
+        client.add_reconnected_callback(on_reconnect)
+
+        # Verify client is working before disconnect
+        test_subject = f"test.reconnect.auth.{uuid.uuid4()}"
+        subscription = await client.subscribe(test_subject)
+        await client.publish(test_subject, b"before disconnect")
+        await client.flush()
+        msg = await subscription.next(timeout=1.0)
+        assert msg.data == b"before disconnect"
+
+        # Save the server port to reuse it after shutdown
+        server_port = server.port
+
+        # Stop the server to trigger disconnect
+        await server.shutdown()
+
+        # Wait for disconnect callback
+        await asyncio.wait_for(disconnect_event.wait(), timeout=2.0)
+        assert disconnect_event.is_set()
+
+        # Start a new server on the same port with same auth config
+        new_server = await run(config_path=config_path, port=server_port, timeout=5.0)
+        try:
+            # Wait for reconnect callback
+            await asyncio.wait_for(reconnect_event.wait(), timeout=2.0)
+            assert reconnect_event.is_set()
+
+            # Verify client works after reconnection with auth token preserved
+            await client.publish(test_subject, b"after reconnect")
+            await client.flush()
+            msg = await subscription.next(timeout=1.0)
+            assert msg.data == b"after reconnect"
+        finally:
+            await new_server.shutdown()
+            await client.close()
+    finally:
+        # Ensure original server is shutdown if still running
+        try:
+            await server.shutdown()
+        except Exception:
+            pass
+
+
+@pytest.mark.asyncio
 async def test_publish_delivers_message_to_subscriber(client):
     """Test that a published message is delivered to a subscriber."""
     test_subject = f"test.{uuid.uuid4()}"

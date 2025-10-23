@@ -170,6 +170,9 @@ class Client(AbstractAsyncContextManager["Client"]):
     # Inbox prefix
     _inbox_prefix: str
 
+    # Authentication
+    _auth_token: str | None
+
     # Background tasks
     _read_task: asyncio.Task[None]
     _write_task: asyncio.Task[None]
@@ -190,6 +193,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         inbox_prefix: str = "_INBOX",
         ping_interval: float = 120.0,
         max_outstanding_pings: int = 2,
+        auth_token: str | None = None,
     ):
         """Initialize the client.
 
@@ -207,6 +211,7 @@ class Client(AbstractAsyncContextManager["Client"]):
             inbox_prefix: Prefix for inbox subjects (default: "_INBOX")
             ping_interval: Interval between PINGs in seconds (default: 120.0)
             max_outstanding_pings: Maximum number of outstanding PINGs before disconnecting (default: 2)
+            auth_token: Authentication token for the server
         """
         self._connection = connection
         self._server_info = server_info
@@ -229,6 +234,7 @@ class Client(AbstractAsyncContextManager["Client"]):
             raise ValueError("inbox_prefix cannot end with '.'")
 
         self._inbox_prefix = inbox_prefix
+        self._auth_token = auth_token
         self._status = ClientStatus.CONNECTING
         self._subscriptions = {}
         self._next_sid = 1
@@ -603,6 +609,11 @@ class Client(AbstractAsyncContextManager["Client"]):
                                     protocol=1,
                                     headers=True,
                                 )
+
+                                # Add authentication if provided
+                                if self._auth_token:
+                                    connect_info["auth_token"] = self._auth_token
+
                                 logger.debug("->> CONNECT %s", json.dumps(connect_info))
                                 await connection.write(encode_connect(connect_info))
 
@@ -969,6 +980,11 @@ class Client(AbstractAsyncContextManager["Client"]):
             protocol=1,
             headers=True,
         )
+
+        # Add authentication if provided
+        if self._auth_token:
+            connect_info["auth_token"] = self._auth_token
+
         logger.debug("->> CONNECT %s", json.dumps(connect_info))
         await self._connection.write(encode_connect(connect_info))
         self._status = ClientStatus.CONNECTED
@@ -988,6 +1004,7 @@ async def connect(
     inbox_prefix: str = "_INBOX",
     ping_interval: float = 120.0,
     max_outstanding_pings: int = 2,
+    auth_token: str | None = None,
 ) -> Client:
     """Connect to a NATS server.
 
@@ -1004,6 +1021,7 @@ async def connect(
         inbox_prefix: Prefix for inbox subjects (default: "_INBOX")
         ping_interval: Interval between PINGs in seconds (default: 120.0)
         max_outstanding_pings: Maximum number of outstanding PINGs before disconnecting (default: 2)
+        auth_token: Authentication token for the server
 
     Returns:
         Client instance
@@ -1067,7 +1085,62 @@ async def connect(
     if server_info.connect_urls:
         servers.extend(server_info.connect_urls)
 
-    # Create client (validation happens here)
+    # Send CONNECT message (complete handshake before creating Client)
+    connect_info = ConnectInfo(
+        verbose=False,
+        pedantic=False,
+        tls_required=False,
+        lang="python",
+        version=__version__,
+        protocol=1,
+        headers=True,
+        no_responders=True,
+    )
+
+    # Add authentication if provided
+    if auth_token:
+        connect_info["auth_token"] = auth_token
+
+    logger.debug("->> CONNECT %s", json.dumps(connect_info))
+    await connection.write(encode_connect(connect_info))
+
+    # Send a PING and wait for PONG to verify the handshake completed successfully
+    # If auth fails, the server will send -ERR before we get a PONG
+    await connection.write(encode_ping())
+
+    # Wait for response to verify connection is good
+    try:
+        response = await asyncio.wait_for(parse(connection), timeout=timeout)
+
+        # Check if we got an error response
+        if response and response.op == "ERR":
+            await connection.close()
+            error_msg = response.error
+
+            # Check for authorization errors
+            if "authorization" in error_msg.lower():
+                msg = f"Authorization failed: {error_msg}"
+                raise ConnectionError(msg)
+            else:
+                msg = f"Connection error: {error_msg}"
+                raise ConnectionError(msg)
+
+        # If we got PONG or INFO or any other non-error message, connection is good
+        # (Server may send additional INFO messages after CONNECT)
+
+    except asyncio.TimeoutError:
+        await connection.close()
+        msg = "Server did not respond to PING"
+        raise ConnectionError(msg)
+    except ConnectionError:
+        # Re-raise connection errors from error checking above
+        raise
+    except Exception as e:
+        await connection.close()
+        msg = f"Failed to verify connection: {e}"
+        raise ConnectionError(msg)
+
+    # Handshake complete - now create the Client with background tasks
     client = Client(
         connection,
         server_info,
@@ -1082,21 +1155,9 @@ async def connect(
         inbox_prefix=inbox_prefix,
         ping_interval=ping_interval,
         max_outstanding_pings=max_outstanding_pings,
+        auth_token=auth_token,
     )
 
-    # Send CONNECT message
-    connect_info = ConnectInfo(
-        verbose=False,
-        pedantic=False,
-        tls_required=False,
-        lang="python",
-        version=__version__,
-        protocol=1,
-        headers=True,
-        no_responders=True,
-    )
-    logger.debug("->> CONNECT %s", json.dumps(connect_info))
-    await connection.write(encode_connect(connect_info))
     client._status = ClientStatus.CONNECTED
 
     return client
