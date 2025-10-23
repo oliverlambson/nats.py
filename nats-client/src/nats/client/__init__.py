@@ -35,7 +35,7 @@ from typing import TYPE_CHECKING, Self
 from urllib.parse import urlparse
 
 from nats.client.connection import Connection, open_tcp_connection
-from nats.client.errors import MessageQueueFull, NoRespondersError, SlowConsumerError, StatusError
+from nats.client.errors import NoRespondersError, SlowConsumerError, StatusError
 from nats.client.message import Headers, Message, Status
 from nats.client.protocol.command import (
     encode_connect,
@@ -53,7 +53,7 @@ from nats.client.protocol.types import (
 from nats.client.protocol.types import (
     ServerInfo as ProtocolServerInfo,
 )
-from nats.client.subscription import MessageQueue, Subscription
+from nats.client.subscription import Subscription
 
 if TYPE_CHECKING:
     import types
@@ -492,23 +492,21 @@ class Client(AbstractAsyncContextManager["Client"]):
             msg = Message(subject=subject, data=payload, reply_to=reply_to)
 
             try:
-                # Try to put message in queue (MessageQueue handles both limits and callbacks)
-                subscription._pending_queue.put_nowait(msg)
+                # Try to enqueue message (handles limits and callbacks)
+                subscription._enqueue(msg)
 
                 # Reset slow consumer flag if we successfully queued
                 if subscription._slow_consumer_reported:
                     subscription._slow_consumer_reported = False
 
-            except MessageQueueFull as e:
+            except (asyncio.QueueFull, ValueError):
                 # Drop message due to limit exceeded
-                pending_msgs, pending_bytes = subscription._pending_queue.pending()
+                pending_msgs, pending_bytes = subscription.pending()
 
                 logger.warning(
-                    "Slow consumer on subject %s (sid %s): %s limit exceeded, dropping message, "
-                    "%d pending messages, %d pending bytes",
+                    "Slow consumer on subject %s (sid %s): dropping message, %d pending messages, %d pending bytes",
                     subject,
                     sid,
-                    e.limit_type,
                     pending_msgs,
                     pending_bytes,
                 )
@@ -554,23 +552,21 @@ class Client(AbstractAsyncContextManager["Client"]):
             )
 
             try:
-                # Try to put message in queue (MessageQueue handles both limits and callbacks)
-                subscription._pending_queue.put_nowait(msg)
+                # Try to enqueue message (handles limits and callbacks)
+                subscription._enqueue(msg)
 
                 # Reset slow consumer flag if we successfully queued
                 if subscription._slow_consumer_reported:
                     subscription._slow_consumer_reported = False
 
-            except MessageQueueFull as e:
+            except (asyncio.QueueFull, ValueError):
                 # Drop message due to limit exceeded
-                pending_msgs, pending_bytes = subscription._pending_queue.pending()
+                pending_msgs, pending_bytes = subscription.pending()
 
                 logger.warning(
-                    "Slow consumer on subject %s (sid %s): %s limit exceeded, dropping message, "
-                    "%d pending messages, %d pending bytes",
+                    "Slow consumer on subject %s (sid %s): dropping message, %d pending messages, %d pending bytes",
                     subject,
                     sid,
-                    e.limit_type,
                     pending_msgs,
                     pending_bytes,
                 )
@@ -929,15 +925,13 @@ class Client(AbstractAsyncContextManager["Client"]):
         sid = str(self._next_sid)
         self._next_sid += 1
 
-        # Create message queue with limits
-        message_queue = MessageQueue(max_messages=max_pending_messages, max_bytes=max_pending_bytes)
-
         subscription = Subscription(
             subject,
             sid,
             queue_group,
-            message_queue,
             self,
+            max_pending_messages=max_pending_messages,
+            max_pending_bytes=max_pending_bytes,
         )
 
         self._subscriptions[sid] = subscription

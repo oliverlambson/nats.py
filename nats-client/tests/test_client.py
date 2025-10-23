@@ -2325,5 +2325,5 @@ async def test_subscription_default_limits(client):
 
     # Verify internal limits are set to defaults
     # Default: 65536 messages, 64 MB
-    assert subscription._pending_queue._max_messages == 65536
-    assert subscription._pending_queue._max_bytes == 67108864  # 64 * 1024 * 1024
+    assert subscription._max_pending_messages == 65536
+    assert subscription._max_pending_bytes == 67108864  # 64 * 1024 * 1024

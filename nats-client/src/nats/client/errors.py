@@ -87,24 +87,3 @@ class SlowConsumerError(Exception):
         super().__init__(
             f"Slow consumer on subject '{subject}': {pending_messages} pending messages, {pending_bytes} pending bytes"
         )
-
-
-class MessageQueueFull(Exception):
-    """Error raised when the message queue is full.
-
-    This is raised when attempting to add a message to a queue that has
-    reached its maximum capacity (either message count or byte limit).
-    """
-
-    def __init__(self, limit_type: str, current: int, maximum: int) -> None:
-        """Initialize MessageQueueFull.
-
-        Args:
-            limit_type: Type of limit exceeded ("message" or "byte")
-            current: Current count/size
-            maximum: Maximum allowed count/size
-        """
-        self.limit_type = limit_type
-        self.current = current
-        self.maximum = maximum
-        super().__init__(f"{limit_type.capitalize()} limit exceeded: {current} >= {maximum}")
