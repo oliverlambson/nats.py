@@ -172,6 +172,8 @@ class Client(AbstractAsyncContextManager["Client"]):
 
     # Authentication
     _auth_token: str | None
+    _user: str | None
+    _password: str | None
 
     # Background tasks
     _read_task: asyncio.Task[None]
@@ -194,6 +196,8 @@ class Client(AbstractAsyncContextManager["Client"]):
         ping_interval: float = 120.0,
         max_outstanding_pings: int = 2,
         auth_token: str | None = None,
+        user: str | None = None,
+        password: str | None = None,
     ):
         """Initialize the client.
 
@@ -212,6 +216,8 @@ class Client(AbstractAsyncContextManager["Client"]):
             ping_interval: Interval between PINGs in seconds (default: 120.0)
             max_outstanding_pings: Maximum number of outstanding PINGs before disconnecting (default: 2)
             auth_token: Authentication token for the server
+            user: Username for authentication
+            password: Password for authentication
         """
         self._connection = connection
         self._server_info = server_info
@@ -235,6 +241,8 @@ class Client(AbstractAsyncContextManager["Client"]):
 
         self._inbox_prefix = inbox_prefix
         self._auth_token = auth_token
+        self._user = user
+        self._password = password
         self._status = ClientStatus.CONNECTING
         self._subscriptions = {}
         self._next_sid = 1
@@ -613,6 +621,10 @@ class Client(AbstractAsyncContextManager["Client"]):
                                 # Add authentication if provided
                                 if self._auth_token:
                                     connect_info["auth_token"] = self._auth_token
+                                if self._user:
+                                    connect_info["user"] = self._user
+                                if self._password:
+                                    connect_info["password"] = self._password
 
                                 logger.debug("->> CONNECT %s", json.dumps(connect_info))
                                 await connection.write(encode_connect(connect_info))
@@ -984,6 +996,10 @@ class Client(AbstractAsyncContextManager["Client"]):
         # Add authentication if provided
         if self._auth_token:
             connect_info["auth_token"] = self._auth_token
+        if self._user:
+            connect_info["user"] = self._user
+        if self._password:
+            connect_info["password"] = self._password
 
         logger.debug("->> CONNECT %s", json.dumps(connect_info))
         await self._connection.write(encode_connect(connect_info))
@@ -1005,6 +1021,8 @@ async def connect(
     ping_interval: float = 120.0,
     max_outstanding_pings: int = 2,
     auth_token: str | None = None,
+    user: str | None = None,
+    password: str | None = None,
 ) -> Client:
     """Connect to a NATS server.
 
@@ -1022,6 +1040,8 @@ async def connect(
         ping_interval: Interval between PINGs in seconds (default: 120.0)
         max_outstanding_pings: Maximum number of outstanding PINGs before disconnecting (default: 2)
         auth_token: Authentication token for the server
+        user: Username for authentication
+        password: Password for authentication
 
     Returns:
         Client instance
@@ -1100,6 +1120,10 @@ async def connect(
     # Add authentication if provided
     if auth_token:
         connect_info["auth_token"] = auth_token
+    if user:
+        connect_info["user"] = user
+    if password:
+        connect_info["password"] = password
 
     logger.debug("->> CONNECT %s", json.dumps(connect_info))
     await connection.write(encode_connect(connect_info))
@@ -1156,6 +1180,8 @@ async def connect(
         ping_interval=ping_interval,
         max_outstanding_pings=max_outstanding_pings,
         auth_token=auth_token,
+        user=user,
+        password=password,
     )
 
     client._status = ClientStatus.CONNECTED

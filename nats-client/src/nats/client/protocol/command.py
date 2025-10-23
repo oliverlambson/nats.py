@@ -23,7 +23,13 @@ def encode_connect(info: ConnectInfo) -> bytes:
     Returns:
         Encoded CONNECT command
     """
-    return f"CONNECT {json.dumps(info)}\r\n".encode()
+    # Convert 'password' to 'pass' for the NATS protocol
+    # (we use 'password' in Python since 'pass' is a reserved keyword)
+    connect_dict = dict(info)
+    if "password" in connect_dict:
+        connect_dict["pass"] = connect_dict.pop("password")
+
+    return f"CONNECT {json.dumps(connect_dict)}\r\n".encode()
 
 
 def encode_pub(

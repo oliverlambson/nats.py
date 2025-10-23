@@ -30,7 +30,7 @@ class ConnectInfo(TypedDict):
     """Authentication token (required if auth_required is true)"""
     user: NotRequired[str]
     """Connection username (required if auth_required is true)"""
-    pass_: NotRequired[str]
+    password: NotRequired[str]
     """Connection password (required if auth_required is true)"""
     name: NotRequired[str]
     """Optional client name"""
