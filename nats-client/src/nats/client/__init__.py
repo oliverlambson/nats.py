@@ -91,6 +91,7 @@ class ServerInfo:
     client_id: int | None = None
     connect_urls: list[str] | None = None
     jetstream: bool | None = None
+    nonce: str | None = None
 
     @classmethod
     def from_protocol(cls, info: ProtocolServerInfo) -> ServerInfo:
@@ -110,6 +111,7 @@ class ServerInfo:
             client_id=info.get("client_id"),
             connect_urls=info.get("connect_urls"),
             jetstream=info.get("jetstream"),
+            nonce=info.get("nonce"),
         )
 
 
@@ -174,6 +176,7 @@ class Client(AbstractAsyncContextManager["Client"]):
     _auth_token: str | None
     _user: str | None
     _password: str | None
+    _nkey_seed: str | None
 
     # Background tasks
     _read_task: asyncio.Task[None]
@@ -198,6 +201,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         auth_token: str | None = None,
         user: str | None = None,
         password: str | None = None,
+        nkey_seed: str | None = None,
     ):
         """Initialize the client.
 
@@ -218,6 +222,7 @@ class Client(AbstractAsyncContextManager["Client"]):
             auth_token: Authentication token for the server
             user: Username for authentication
             password: Password for authentication
+            nkey_seed: NKey seed for authentication
         """
         self._connection = connection
         self._server_info = server_info
@@ -243,6 +248,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         self._auth_token = auth_token
         self._user = user
         self._password = password
+        self._nkey_seed = nkey_seed
         self._status = ClientStatus.CONNECTING
         self._subscriptions = {}
         self._next_sid = 1
@@ -625,6 +631,21 @@ class Client(AbstractAsyncContextManager["Client"]):
                                     connect_info["user"] = self._user
                                 if self._password:
                                     connect_info["password"] = self._password
+                                if self._nkey_seed:
+                                    import nkeys
+
+                                    # Load the NKey from seed
+                                    kp = nkeys.from_seed(self._nkey_seed.encode())
+
+                                    # Add public key to connect info
+                                    connect_info["nkey"] = kp.public_key.decode()
+
+                                    # If server sent a nonce, sign it
+                                    if new_server_info.nonce:
+                                        sig = kp.sign(new_server_info.nonce.encode())
+                                        import base64
+
+                                        connect_info["sig"] = base64.b64encode(sig).decode()
 
                                 logger.debug("->> CONNECT %s", json.dumps(connect_info))
                                 await connection.write(encode_connect(connect_info))
@@ -1000,6 +1021,21 @@ class Client(AbstractAsyncContextManager["Client"]):
             connect_info["user"] = self._user
         if self._password:
             connect_info["password"] = self._password
+        if self._nkey_seed:
+            import nkeys
+
+            # Load the NKey from seed
+            kp = nkeys.from_seed(self._nkey_seed.encode())
+
+            # Add public key to connect info
+            connect_info["nkey"] = kp.public_key.decode()
+
+            # If server sent a nonce, sign it
+            if self._server_info.nonce:
+                sig = kp.sign(self._server_info.nonce.encode())
+                import base64
+
+                connect_info["sig"] = base64.b64encode(sig).decode()
 
         logger.debug("->> CONNECT %s", json.dumps(connect_info))
         await self._connection.write(encode_connect(connect_info))
@@ -1023,6 +1059,7 @@ async def connect(
     auth_token: str | None = None,
     user: str | None = None,
     password: str | None = None,
+    nkey_seed: str | None = None,
 ) -> Client:
     """Connect to a NATS server.
 
@@ -1042,6 +1079,7 @@ async def connect(
         auth_token: Authentication token for the server
         user: Username for authentication
         password: Password for authentication
+        nkey_seed: NKey seed for authentication
 
     Returns:
         Client instance
@@ -1124,6 +1162,21 @@ async def connect(
         connect_info["user"] = user
     if password:
         connect_info["password"] = password
+    if nkey_seed:
+        import nkeys
+
+        # Load the NKey from seed
+        kp = nkeys.from_seed(nkey_seed.encode())
+
+        # Add public key to connect info
+        connect_info["nkey"] = kp.public_key.decode()
+
+        # If server sent a nonce, sign it
+        if server_info.nonce:
+            sig = kp.sign(server_info.nonce.encode())
+            import base64
+
+            connect_info["sig"] = base64.b64encode(sig).decode()
 
     logger.debug("->> CONNECT %s", json.dumps(connect_info))
     await connection.write(encode_connect(connect_info))
@@ -1182,6 +1235,7 @@ async def connect(
         auth_token=auth_token,
         user=user,
         password=password,
+        nkey_seed=nkey_seed,
     )
 
     client._status = ClientStatus.CONNECTED

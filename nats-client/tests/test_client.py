@@ -244,6 +244,162 @@ async def test_reconnect_with_user_password():
 
 
 @pytest.mark.asyncio
+async def test_connect_to_nkey_server_with_correct_nkey():
+    """Test that client can connect to an NKey server with the correct NKey."""
+    import os
+
+    # Start server with NKey authentication
+    config_path = os.path.join(os.path.dirname(__file__), "configs", "server_auth_nkey.conf")
+    server = await run(config_path=config_path, port=0, timeout=5.0)
+
+    try:
+        # Connect with correct NKey should succeed
+        # Seed corresponds to public key UBABIZX6SZFAKHK2KGUFD6QH53FDAH5QVCH2R5MJLFPEVYAW22QWQQCX
+        nkey_seed = "SUAEIV5COV7ADQZE52WTYHVJQRV7WKJE5J7IBBJGATJTUUT2LVFGVXDPRQ"
+        client = await connect(server.client_url, timeout=1.0, nkey_seed=nkey_seed)
+        assert client.status == ClientStatus.CONNECTED
+        assert client.server_info is not None
+
+        # Verify we can publish and receive messages with valid auth
+        test_subject = f"test.nkey.{uuid.uuid4()}"
+        subscription = await client.subscribe(test_subject)
+        await client.flush()
+
+        await client.publish(test_subject, b"test")
+        await client.flush()
+
+        msg = await subscription.next(timeout=1.0)
+        assert msg.data == b"test"
+
+        await client.close()
+    finally:
+        await server.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_connect_to_nkey_server_with_incorrect_nkey():
+    """Test that connect raises an error when using an incorrect NKey."""
+    import os
+
+    import nkeys
+    from nacl.signing import SigningKey
+
+    # Start server with NKey authentication
+    config_path = os.path.join(os.path.dirname(__file__), "configs", "server_auth_nkey.conf")
+    server = await run(config_path=config_path, port=0, timeout=5.0)
+
+    try:
+        # Generate a different NKey (not authorized on server)
+        signing_key = SigningKey.generate().encode()
+        src = nkeys.encode_seed(signing_key, prefix=nkeys.PREFIX_BYTE_USER)
+        wrong_seed = nkeys.from_seed(src).seed.decode()
+
+        # Connect with incorrect NKey should raise ConnectionError
+        with pytest.raises(ConnectionError) as exc_info:
+            await connect(server.client_url, timeout=1.0, nkey_seed=wrong_seed, allow_reconnect=False)
+
+        # Verify the error message mentions authorization
+        assert "authorization" in str(exc_info.value).lower()
+    finally:
+        await server.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_connect_to_nkey_server_with_missing_nkey():
+    """Test that connect raises an error when connecting without an NKey to a secured server."""
+    import os
+
+    # Start server with NKey authentication
+    config_path = os.path.join(os.path.dirname(__file__), "configs", "server_auth_nkey.conf")
+    server = await run(config_path=config_path, port=0, timeout=5.0)
+
+    try:
+        # Connect without NKey should raise ConnectionError
+        with pytest.raises(ConnectionError) as exc_info:
+            await connect(server.client_url, timeout=1.0, allow_reconnect=False)
+
+        # Verify the error message mentions authorization
+        assert "authorization" in str(exc_info.value).lower()
+    finally:
+        await server.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_reconnect_with_nkey():
+    """Test that client can reconnect to an NKey server after disconnection."""
+    import os
+
+    # Start server with NKey authentication
+    config_path = os.path.join(os.path.dirname(__file__), "configs", "server_auth_nkey.conf")
+    server = await run(config_path=config_path, port=0, timeout=5.0)
+
+    try:
+        # Events to track callback invocations
+        disconnect_event = asyncio.Event()
+        reconnect_event = asyncio.Event()
+
+        # Connect client with NKey and reconnection enabled
+        nkey_seed = "SUAEIV5COV7ADQZE52WTYHVJQRV7WKJE5J7IBBJGATJTUUT2LVFGVXDPRQ"
+        client = await connect(
+            server.client_url,
+            timeout=1.0,
+            nkey_seed=nkey_seed,
+            allow_reconnect=True,
+            reconnect_time_wait=0.1,
+        )
+
+        # Register callbacks
+        def on_disconnect():
+            disconnect_event.set()
+
+        def on_reconnect():
+            reconnect_event.set()
+
+        client.add_disconnected_callback(on_disconnect)
+        client.add_reconnected_callback(on_reconnect)
+
+        # Verify client is working before disconnect
+        test_subject = f"test.reconnect.nkey.{uuid.uuid4()}"
+        subscription = await client.subscribe(test_subject)
+        await client.publish(test_subject, b"before disconnect")
+        await client.flush()
+        msg = await subscription.next(timeout=1.0)
+        assert msg.data == b"before disconnect"
+
+        # Save the server port to reuse it after shutdown
+        server_port = server.port
+
+        # Stop the server to trigger disconnect
+        await server.shutdown()
+
+        # Wait for disconnect callback
+        await asyncio.wait_for(disconnect_event.wait(), timeout=2.0)
+        assert disconnect_event.is_set()
+
+        # Start a new server on the same port with same auth config
+        new_server = await run(config_path=config_path, port=server_port, timeout=5.0)
+        try:
+            # Wait for reconnect callback
+            await asyncio.wait_for(reconnect_event.wait(), timeout=2.0)
+            assert reconnect_event.is_set()
+
+            # Verify client works after reconnection with NKey preserved
+            await client.publish(test_subject, b"after reconnect")
+            await client.flush()
+            msg = await subscription.next(timeout=1.0)
+            assert msg.data == b"after reconnect"
+        finally:
+            await new_server.shutdown()
+            await client.close()
+    finally:
+        # Ensure original server is shutdown if still running
+        try:
+            await server.shutdown()
+        except Exception:
+            pass
+
+
+@pytest.mark.asyncio
 async def test_connect_to_user_pass_server_with_correct_credentials():
     """Test that client can connect to a user/pass server with correct credentials."""
     import os
