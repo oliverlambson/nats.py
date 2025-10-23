@@ -69,6 +69,8 @@ class ClientStatus(Enum):
     CONNECTING = "connecting"
     CONNECTED = "connected"
     RECONNECTING = "reconnecting"
+    DRAINING = "draining"  # Draining subscribers
+    DRAINED = "drained"    # Subscribers drained, flushing publishes
     CLOSING = "closing"
     CLOSED = "closed"
 
@@ -915,6 +917,64 @@ class Client(AbstractAsyncContextManager["Client"]):
 
         finally:
             await self._unsubscribe(sub._sid)
+
+    async def drain(self, timeout: float = 30.0) -> None:
+        """Drain the connection.
+
+        Draining a connection puts it into a drain state where:
+        1. All subscriptions are drained (unsubscribed but pending messages can be processed)
+        2. No new messages can be published
+        3. Pending messages in the write buffer are flushed
+        4. The connection is closed
+
+        This allows for graceful shutdown without losing messages. After drain completes,
+        the connection will be closed automatically.
+
+        This method is idempotent - calling it multiple times is safe and will not raise
+        errors. Subsequent calls after the first will return immediately without error.
+
+        Args:
+            timeout: Maximum time to wait for drain to complete (default: 30.0 seconds)
+
+        Raises:
+            TimeoutError: If drain does not complete within the timeout
+        """
+        # Idempotent: if already draining, drained, closing, or closed, return without error
+        if self._status in (ClientStatus.DRAINING, ClientStatus.DRAINED, ClientStatus.CLOSING, ClientStatus.CLOSED):
+            return
+
+        logger.info("Draining connection")
+        self._status = ClientStatus.DRAINING
+
+        # Disable reconnection during drain
+        self._allow_reconnect = False
+
+        try:
+            # Step 1: Drain all subscriptions (DRAINING phase)
+            # Get a snapshot of current subscriptions to avoid modification during iteration
+            subscriptions_to_drain = list(self._subscriptions.values())
+
+            if subscriptions_to_drain:
+                logger.debug("Draining %s subscriptions", len(subscriptions_to_drain))
+                drain_tasks = [sub.drain() for sub in subscriptions_to_drain]
+                await asyncio.wait_for(asyncio.gather(*drain_tasks, return_exceptions=True), timeout=timeout)
+
+            # Step 2: Transition to DRAINED and flush pending publishes
+            self._status = ClientStatus.DRAINED
+
+            if self._pending_messages:
+                logger.debug("Flushing pending messages")
+                await asyncio.wait_for(self.flush(), timeout=timeout)
+
+            # Step 3: Close the connection
+            await self.close()
+
+        except asyncio.TimeoutError:
+            logger.error("Drain timeout after %s seconds", timeout)
+            # Force close on timeout
+            await self.close()
+            msg = f"Drain operation timed out after {timeout} seconds"
+            raise TimeoutError(msg)
 
     async def close(self) -> None:
         """Close the connection."""

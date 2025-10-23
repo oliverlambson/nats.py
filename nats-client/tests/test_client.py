@@ -1534,3 +1534,319 @@ async def test_reconnect_with_multiple_concurrent_publishers():
         tasks_running = False
         await asyncio.gather(*publish_tasks)
         await client.close()
+
+
+@pytest.mark.asyncio
+async def test_client_drain_closes_connection(client):
+    """Test that drain closes the connection."""
+    # Verify client is connected
+    assert client.status == ClientStatus.CONNECTED
+
+    # Drain the client
+    await client.drain()
+
+    # Verify client is closed
+    assert client.status == ClientStatus.CLOSED
+
+
+@pytest.mark.asyncio
+async def test_client_drain_processes_pending_messages(server):
+    """Test that drain allows pending messages in subscriptions to be processed."""
+    client = await connect(server.client_url, timeout=1.0)
+
+    try:
+        test_subject = f"test.drain.pending.{uuid.uuid4()}"
+
+        # Create subscription
+        subscription = await client.subscribe(test_subject)
+        await client.flush()
+
+        # Publish multiple messages
+        message_count = 10
+        for i in range(message_count):
+            await client.publish(test_subject, f"message-{i}".encode())
+        await client.flush()
+
+        # Wait for messages to arrive
+        await asyncio.sleep(0.1)
+
+        # Drain the client (should allow pending messages to be processed)
+        drain_task = asyncio.create_task(client.drain())
+
+        # Read all pending messages before drain completes
+        messages_received = []
+        try:
+            while len(messages_received) < message_count:
+                msg = await asyncio.wait_for(subscription.next(), timeout=1.0)
+                messages_received.append(msg.data.decode())
+        except (RuntimeError, asyncio.TimeoutError):
+            # Expected when subscription is drained
+            pass
+
+        # Wait for drain to complete
+        await drain_task
+
+        # Verify we received all messages
+        assert len(messages_received) == message_count
+        for i in range(message_count):
+            assert f"message-{i}" in messages_received
+
+    finally:
+        if client.status != ClientStatus.CLOSED:
+            await client.close()
+
+
+@pytest.mark.asyncio
+async def test_client_drain_flushes_pending_publishes(server):
+    """Test that drain flushes pending published messages."""
+    # Create two clients: one publisher, one subscriber
+    publisher = await connect(server.client_url, timeout=1.0)
+    subscriber = await connect(server.client_url, timeout=1.0)
+
+    try:
+        test_subject = f"test.drain.flush.{uuid.uuid4()}"
+
+        # Create subscription on subscriber client
+        subscription = await subscriber.subscribe(test_subject)
+        await subscriber.flush()
+
+        # Publish messages without flushing
+        message_count = 5
+        for i in range(message_count):
+            await publisher.publish(test_subject, f"message-{i}".encode())
+
+        # Drain should flush these pending messages
+        await publisher.drain()
+
+        # Verify subscriber receives all messages
+        messages_received = []
+        for _ in range(message_count):
+            try:
+                msg = await asyncio.wait_for(subscription.next(), timeout=2.0)
+                messages_received.append(msg.data.decode())
+            except asyncio.TimeoutError:
+                break
+
+        assert len(messages_received) == message_count, f"Expected {message_count} messages, got {len(messages_received)}"
+        for i in range(message_count):
+            assert f"message-{i}" in messages_received
+
+    finally:
+        if publisher.status != ClientStatus.CLOSED:
+            await publisher.close()
+        if subscriber.status != ClientStatus.CLOSED:
+            await subscriber.close()
+
+
+@pytest.mark.asyncio
+async def test_client_drain_multiple_subscriptions(server):
+    """Test that drain handles multiple subscriptions correctly."""
+    client = await connect(server.client_url, timeout=1.0)
+
+    try:
+        # Create multiple subscriptions
+        num_subscriptions = 5
+        subjects = [f"test.drain.multi.{uuid.uuid4()}.{i}" for i in range(num_subscriptions)]
+        subscriptions = []
+
+        for subject in subjects:
+            sub = await client.subscribe(subject)
+            subscriptions.append(sub)
+        await client.flush()
+
+        # Publish messages to each subscription
+        messages_per_sub = 3
+        for subject in subjects:
+            for i in range(messages_per_sub):
+                await client.publish(subject, f"{subject}-msg-{i}".encode())
+        await client.flush()
+
+        # Wait for messages to arrive
+        await asyncio.sleep(0.1)
+
+        # Drain the client
+        drain_task = asyncio.create_task(client.drain())
+
+        # Collect messages from all subscriptions
+        all_messages = []
+
+        async def collect_messages(sub):
+            messages = []
+            try:
+                while True:
+                    msg = await asyncio.wait_for(sub.next(), timeout=1.0)
+                    messages.append(msg.data.decode())
+            except (RuntimeError, asyncio.TimeoutError):
+                pass
+            return messages
+
+        # Collect from all subscriptions concurrently
+        collection_tasks = [asyncio.create_task(collect_messages(sub)) for sub in subscriptions]
+        results = await asyncio.gather(*collection_tasks, return_exceptions=True)
+
+        for result in results:
+            if isinstance(result, list):
+                all_messages.extend(result)
+
+        # Wait for drain to complete
+        await drain_task
+
+        # Verify we received all messages
+        expected_count = num_subscriptions * messages_per_sub
+        assert len(all_messages) == expected_count
+
+    finally:
+        if client.status != ClientStatus.CLOSED:
+            await client.close()
+
+
+@pytest.mark.asyncio
+async def test_client_drain_with_custom_timeout(server):
+    """Test that drain accepts a custom timeout parameter."""
+    client = await connect(server.client_url, timeout=1.0)
+
+    try:
+        test_subject = f"test.drain.timeout.{uuid.uuid4()}"
+
+        # Create subscription
+        await client.subscribe(test_subject)
+        await client.flush()
+
+        # Publish a few messages
+        for i in range(5):
+            await client.publish(test_subject, f"message-{i}".encode())
+        await client.flush()
+
+        # Drain with a generous timeout - should complete successfully
+        await client.drain(timeout=5.0)
+
+        # Client should be closed
+        assert client.status == ClientStatus.CLOSED
+
+    finally:
+        if client.status != ClientStatus.CLOSED:
+            await client.close()
+
+
+@pytest.mark.asyncio
+async def test_client_drain_on_already_closed_client(server):
+    """Test that drain is idempotent when called on already closed client."""
+    client = await connect(server.client_url, timeout=1.0)
+
+    # Close the client
+    await client.close()
+    assert client.status == ClientStatus.CLOSED
+
+    # Try to drain - should return without error (idempotent behavior, matching Go)
+    await client.drain()
+
+    # Should still be closed
+    assert client.status == ClientStatus.CLOSED
+
+
+@pytest.mark.asyncio
+async def test_client_drain_multiple_calls_idempotent(server):
+    """Test that calling drain multiple times is idempotent (following Go semantics)."""
+    client = await connect(server.client_url, timeout=1.0)
+
+    try:
+        test_subject = f"test.drain.multiple.{uuid.uuid4()}"
+
+        # Create subscription
+        await client.subscribe(test_subject)
+        await client.flush()
+
+        # Call drain multiple times - all should succeed without error
+        await client.drain()
+        await client.drain()  # Second call - should be no-op
+        await client.drain()  # Third call - should be no-op
+
+        # Verify client is closed
+        assert client.status == ClientStatus.CLOSED
+
+    finally:
+        if client.status != ClientStatus.CLOSED:
+            await client.close()
+
+
+@pytest.mark.asyncio
+async def test_client_drain_disables_reconnect(server):
+    """Test that drain disables automatic reconnection."""
+    client = await connect(
+        server.client_url,
+        timeout=1.0,
+        allow_reconnect=True,
+        reconnect_max_attempts=10,
+    )
+
+    try:
+        # Verify reconnect is enabled
+        assert client._allow_reconnect is True
+
+        # Start draining
+        await client.drain()
+
+        # Verify reconnect has been disabled
+        assert client._allow_reconnect is False
+        assert client.status == ClientStatus.CLOSED
+
+    finally:
+        if client.status != ClientStatus.CLOSED:
+            await client.close()
+
+
+@pytest.mark.asyncio
+async def test_client_drain_with_no_subscriptions(server):
+    """Test that drain works correctly even with no active subscriptions."""
+    client = await connect(server.client_url, timeout=1.0)
+
+    try:
+        # Drain without any subscriptions
+        await client.drain()
+
+        # Client should be closed
+        assert client.status == ClientStatus.CLOSED
+
+    finally:
+        if client.status != ClientStatus.CLOSED:
+            await client.close()
+
+
+@pytest.mark.asyncio
+async def test_client_drain_preferred_over_close(server):
+    """Test that drain is the preferred way to shutdown (following Go semantics)."""
+    # This test demonstrates the recommended usage pattern
+    client = await connect(server.client_url, timeout=1.0)
+
+    test_subject = f"test.drain.preferred.{uuid.uuid4()}"
+
+    # Create subscription and publish messages
+    subscription = await client.subscribe(test_subject)
+    await client.flush()
+
+    for i in range(5):
+        await client.publish(test_subject, f"message-{i}".encode())
+    await client.flush()
+
+    # Wait for messages to arrive
+    await asyncio.sleep(0.1)
+
+    # Use drain instead of close - this is the preferred pattern
+    drain_task = asyncio.create_task(client.drain())
+
+    # Can still process pending messages during drain
+    messages = []
+    try:
+        while True:
+            msg = await asyncio.wait_for(subscription.next(), timeout=0.5)
+            messages.append(msg.data.decode())
+    except (RuntimeError, asyncio.TimeoutError):
+        pass
+
+    await drain_task
+
+    # Verify we processed messages before shutdown
+    assert len(messages) > 0
+    assert client.status == ClientStatus.CLOSED
+
+    # Note: No need to call close() after drain() - drain handles it
