@@ -173,7 +173,7 @@ class Client(AbstractAsyncContextManager["Client"]):
     _inbox_prefix: str
 
     # Authentication
-    _auth_token: str | None
+    _token: str | None
     _user: str | None
     _password: str | None
     _nkey_seed: str | None
@@ -198,7 +198,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         inbox_prefix: str = "_INBOX",
         ping_interval: float = 120.0,
         max_outstanding_pings: int = 2,
-        auth_token: str | None = None,
+        token: str | None = None,
         user: str | None = None,
         password: str | None = None,
         nkey_seed: str | None = None,
@@ -219,7 +219,7 @@ class Client(AbstractAsyncContextManager["Client"]):
             inbox_prefix: Prefix for inbox subjects (default: "_INBOX")
             ping_interval: Interval between PINGs in seconds (default: 120.0)
             max_outstanding_pings: Maximum number of outstanding PINGs before disconnecting (default: 2)
-            auth_token: Authentication token for the server
+            token: Authentication token for the server
             user: Username for authentication
             password: Password for authentication
             nkey_seed: NKey seed for authentication
@@ -245,7 +245,7 @@ class Client(AbstractAsyncContextManager["Client"]):
             raise ValueError("inbox_prefix cannot end with '.'")
 
         self._inbox_prefix = inbox_prefix
-        self._auth_token = auth_token
+        self._token = token
         self._user = user
         self._password = password
         self._nkey_seed = nkey_seed
@@ -625,8 +625,8 @@ class Client(AbstractAsyncContextManager["Client"]):
                                 )
 
                                 # Add authentication if provided
-                                if self._auth_token:
-                                    connect_info["auth_token"] = self._auth_token
+                                if self._token:
+                                    connect_info["auth_token"] = self._token
                                 if self._user:
                                     connect_info["user"] = self._user
                                 if self._password:
@@ -1015,8 +1015,8 @@ class Client(AbstractAsyncContextManager["Client"]):
         )
 
         # Add authentication if provided
-        if self._auth_token:
-            connect_info["auth_token"] = self._auth_token
+        if self._token:
+            connect_info["auth_token"] = self._token
         if self._user:
             connect_info["user"] = self._user
         if self._password:
@@ -1056,7 +1056,7 @@ async def connect(
     inbox_prefix: str = "_INBOX",
     ping_interval: float = 120.0,
     max_outstanding_pings: int = 2,
-    auth_token: str | None = None,
+    token: str | None = None,
     user: str | None = None,
     password: str | None = None,
     nkey_seed: str | None = None,
@@ -1076,7 +1076,7 @@ async def connect(
         inbox_prefix: Prefix for inbox subjects (default: "_INBOX")
         ping_interval: Interval between PINGs in seconds (default: 120.0)
         max_outstanding_pings: Maximum number of outstanding PINGs before disconnecting (default: 2)
-        auth_token: Authentication token for the server
+        token: Authentication token for the server
         user: Username for authentication
         password: Password for authentication
         nkey_seed: NKey seed for authentication
@@ -1156,8 +1156,8 @@ async def connect(
     )
 
     # Add authentication if provided
-    if auth_token:
-        connect_info["auth_token"] = auth_token
+    if token:
+        connect_info["auth_token"] = token
     if user:
         connect_info["user"] = user
     if password:
@@ -1232,7 +1232,7 @@ async def connect(
         inbox_prefix=inbox_prefix,
         ping_interval=ping_interval,
         max_outstanding_pings=max_outstanding_pings,
-        auth_token=auth_token,
+        token=token,
         user=user,
         password=password,
         nkey_seed=nkey_seed,

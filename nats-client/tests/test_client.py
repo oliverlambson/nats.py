@@ -24,7 +24,7 @@ async def test_connect_fails_with_invalid_url():
 
 
 @pytest.mark.asyncio
-async def test_connect_to_auth_token_server_with_correct_token():
+async def test_connect_to_token_server_with_correct_token():
     """Test that client can connect to an auth token server with the correct token."""
     import os
 
@@ -34,7 +34,7 @@ async def test_connect_to_auth_token_server_with_correct_token():
 
     try:
         # Connect with correct token should succeed
-        client = await connect(server.client_url, timeout=1.0, auth_token="test_token_123")
+        client = await connect(server.client_url, timeout=1.0, token="test_token_123")
         assert client.status == ClientStatus.CONNECTED
         assert client.server_info is not None
 
@@ -55,7 +55,7 @@ async def test_connect_to_auth_token_server_with_correct_token():
 
 
 @pytest.mark.asyncio
-async def test_connect_to_auth_token_server_with_incorrect_token():
+async def test_connect_to_token_server_with_incorrect_token():
     """Test that connect raises an error when using an incorrect token."""
     import os
 
@@ -66,7 +66,7 @@ async def test_connect_to_auth_token_server_with_incorrect_token():
     try:
         # Connect with incorrect token should raise ConnectionError
         with pytest.raises(ConnectionError) as exc_info:
-            await connect(server.client_url, timeout=1.0, auth_token="wrong_token", allow_reconnect=False)
+            await connect(server.client_url, timeout=1.0, token="wrong_token", allow_reconnect=False)
 
         # Verify the error message mentions authorization
         assert "authorization" in str(exc_info.value).lower()
@@ -75,7 +75,7 @@ async def test_connect_to_auth_token_server_with_incorrect_token():
 
 
 @pytest.mark.asyncio
-async def test_connect_to_auth_token_server_with_missing_token():
+async def test_connect_to_token_server_with_missing_token():
     """Test that connect raises an error when connecting without a token to a secured server."""
     import os
 
@@ -95,7 +95,7 @@ async def test_connect_to_auth_token_server_with_missing_token():
 
 
 @pytest.mark.asyncio
-async def test_reconnect_with_auth_token():
+async def test_reconnect_with_token():
     """Test that client can reconnect to an auth token server after disconnection."""
     import os
 
@@ -112,7 +112,7 @@ async def test_reconnect_with_auth_token():
         client = await connect(
             server.client_url,
             timeout=1.0,
-            auth_token="test_token_123",
+            token="test_token_123",
             allow_reconnect=True,
             reconnect_time_wait=0.1,
         )
