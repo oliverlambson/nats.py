@@ -79,6 +79,46 @@ class TcpConnection:
         self._reader = reader
         self._writer = writer
 
+    async def upgrade_to_tls(
+        self,
+        ssl_context: ssl.SSLContext,
+        server_hostname: str | None = None,
+    ) -> None:
+        """Upgrade existing connection to TLS.
+
+        Args:
+            ssl_context: SSL context for TLS
+            server_hostname: Hostname for SSL certificate verification
+
+        Raises:
+            ConnectionError: If upgrade fails
+        """
+        if not self._writer:
+            msg = "Not connected"
+            raise ConnectionError(msg)
+
+        try:
+            # Get the transport and protocol from the writer
+            transport = self._writer.transport
+            protocol = transport.get_protocol()
+
+            # Start TLS upgrade on the transport
+            loop = asyncio.get_running_loop()
+            new_transport = await loop.start_tls(
+                transport,
+                protocol,
+                ssl_context,
+                server_hostname=server_hostname,
+            )
+
+            # Update the writer's transport
+            self._writer._transport = new_transport  # type: ignore[attr-defined]
+            logger.debug("Connection upgraded to TLS")
+
+        except Exception as e:
+            msg = f"Failed to upgrade connection to TLS: {e}"
+            raise ConnectionError(msg) from e
+
     async def close(self) -> None:
         """Close TCP connection."""
         if self._writer:
@@ -140,13 +180,19 @@ class TcpConnection:
         return await self._reader.readexactly(n)
 
 
-async def open_tcp_connection(host: str, port: int, ssl_context: ssl.SSLContext | None = None) -> TcpConnection:
+async def open_tcp_connection(
+    host: str,
+    port: int,
+    ssl_context: ssl.SSLContext | None = None,
+    server_hostname: str | None = None,
+) -> TcpConnection:
     """Open a TCP connection to a NATS server.
 
     Args:
         host: Server hostname
         port: Server port
         ssl_context: Optional SSL context for TLS
+        server_hostname: Hostname for SSL certificate verification (defaults to host)
 
     Returns:
         TCP connection
@@ -155,7 +201,7 @@ async def open_tcp_connection(host: str, port: int, ssl_context: ssl.SSLContext 
         ConnectionError: If connection fails
     """
     try:
-        reader, writer = await asyncio.open_connection(host, port, ssl=ssl_context)
+        reader, writer = await asyncio.open_connection(host, port, ssl=ssl_context, server_hostname=server_hostname)
         return TcpConnection(reader, writer)
     except Exception as e:
         msg = f"Failed to connect: {e}"

@@ -204,6 +204,10 @@ class Client(AbstractAsyncContextManager["Client"]):
     _password: str | None
     _nkey_seed: str | None
 
+    # TLS
+    _tls: ssl.SSLContext | None
+    _tls_hostname: str | None
+
     # Statistics
     _stats_in_msgs: int
     _stats_out_msgs: int
@@ -235,6 +239,8 @@ class Client(AbstractAsyncContextManager["Client"]):
         user: str | None = None,
         password: str | None = None,
         nkey_seed: str | None = None,
+        tls: ssl.SSLContext | None = None,
+        tls_hostname: str | None = None,
     ):
         """Initialize the client.
 
@@ -256,6 +262,8 @@ class Client(AbstractAsyncContextManager["Client"]):
             user: Username for authentication
             password: Password for authentication
             nkey_seed: NKey seed for authentication
+            tls: SSL context for TLS connections
+            tls_hostname: Hostname for TLS certificate verification
         """
         self._connection = connection
         self._server_info = server_info
@@ -282,6 +290,8 @@ class Client(AbstractAsyncContextManager["Client"]):
         self._user = user
         self._password = password
         self._nkey_seed = nkey_seed
+        self._tls = tls
+        self._tls_hostname = tls_hostname
         self._status = ClientStatus.CONNECTING
         self._subscriptions = {}
         self._next_sid = 1
@@ -615,7 +625,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         logger.info("Force disconnecting")
 
         old_status = self._status
-        self._status = ClientStatus.CLOSED
+        self._status = ClientStatus.DISCONNECTED
         if self._read_task and not self._read_task.done():
             self._read_task.cancel()
             with contextlib.suppress(asyncio.CancelledError, RuntimeError):
@@ -707,17 +717,29 @@ class Client(AbstractAsyncContextManager["Client"]):
                                 continue
 
                             try:
+                                # Determine SSL context for reconnection
+                                ssl_context = None
                                 if scheme in ("tls", "wss"):
-                                    ssl_context = ssl.create_default_context()
-                                    connection = await asyncio.wait_for(
-                                        open_tcp_connection(host, port, ssl_context=ssl_context),
-                                        timeout=self._reconnect_timeout,
-                                    )
-                                else:
-                                    connection = await asyncio.wait_for(
-                                        open_tcp_connection(host, port),
-                                        timeout=self._reconnect_timeout,
-                                    )
+                                    # Use stored TLS context or create default
+                                    ssl_context = self._tls if self._tls is not None else ssl.create_default_context()
+                                elif self._tls is not None:
+                                    # User explicitly provided TLS context
+                                    ssl_context = self._tls
+
+                                # Determine server hostname for TLS verification
+                                server_hostname = (
+                                    self._tls_hostname
+                                    if self._tls_hostname is not None
+                                    else (host if ssl_context else None)
+                                )
+
+                                # Connect with or without TLS
+                                connection = await asyncio.wait_for(
+                                    open_tcp_connection(
+                                        host, port, ssl_context=ssl_context, server_hostname=server_hostname
+                                    ),
+                                    timeout=self._reconnect_timeout,
+                                )
 
                                 msg = await parse(connection)
                                 if not msg or msg.op != "INFO":
@@ -823,10 +845,17 @@ class Client(AbstractAsyncContextManager["Client"]):
                 logger.error("Reconnection failed after maximum attempts")
                 self._reconnecting = False
                 self._status = ClientStatus.CLOSED
+            else:
+                # Not attempting reconnection, set status to CLOSED
+                self._status = ClientStatus.CLOSED
 
     async def _force_flush(self) -> None:
         """Flush pending messages to the server."""
         if not self._pending_messages:
+            return
+
+        # Check if we're connected before trying to write
+        if not self._connection.is_connected():
             return
 
         await self._connection.write(b"".join(self._pending_messages))
@@ -865,7 +894,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         headers: Headers | dict[str, str | list[str]] | None = None,
     ) -> None:
         """Publish a message to a subject."""
-        if self._status == ClientStatus.CLOSED:
+        if self._status in (ClientStatus.CLOSED, ClientStatus.CLOSING):
             msg = "Connection is closed"
             raise RuntimeError(msg)
 
@@ -1242,6 +1271,9 @@ async def connect(
     url: str = "nats://localhost:4222",
     *,
     timeout: float = 2.0,
+    tls: ssl.SSLContext | None = None,
+    tls_hostname: str | None = None,
+    tls_handshake_first: bool = False,
     allow_reconnect: bool = True,
     reconnect_max_attempts: int = 10,
     reconnect_time_wait: float = 2.0,
@@ -1262,6 +1294,9 @@ async def connect(
     Args:
         url: Server URL
         timeout: Connection timeout in seconds
+        tls: Custom SSL context for TLS connections (uses default if scheme is tls://)
+        tls_hostname: Override hostname for TLS certificate verification
+        tls_handshake_first: Perform TLS handshake before receiving INFO message
         allow_reconnect: Whether to automatically reconnect if the connection is lost
         reconnect_max_attempts: Maximum number of reconnection attempts (0 for unlimited)
         reconnect_time_wait: Initial wait time between reconnection attempts
@@ -1296,23 +1331,35 @@ async def connect(
 
     logger.info("Connecting to %s:%s", host, port)
 
+    # Determine SSL context
+    ssl_context = None
+    if parsed_url.scheme in ("tls", "wss"):
+        # Use provided SSL context or create default
+        ssl_context = tls if tls is not None else ssl.create_default_context()
+    elif tls is not None:
+        # User explicitly provided TLS context, use it even for nats:// scheme
+        ssl_context = tls
+
+    # Determine server hostname for TLS verification
+    server_hostname = tls_hostname if tls_hostname is not None else (host if ssl_context else None)
+
     # Open connection with timeout
+    # Track whether we've actually established TLS yet
+    tls_established = False
     try:
-        match parsed_url.scheme:
-            case "tls":
-                ssl_context = ssl.create_default_context()
-                connection = await asyncio.wait_for(
-                    open_tcp_connection(host, port, ssl_context=ssl_context),
-                    timeout=timeout,
-                )
-            case "nats":
-                connection = await asyncio.wait_for(
-                    open_tcp_connection(host, port),
-                    timeout=timeout,
-                )
-            case _:
-                msg = f"Unsupported scheme: {parsed_url.scheme}"
-                raise ValueError(msg)
+        if tls_handshake_first and ssl_context:
+            # TLS handshake first mode - establish TLS before reading INFO
+            connection = await asyncio.wait_for(
+                open_tcp_connection(host, port, ssl_context=ssl_context, server_hostname=server_hostname),
+                timeout=timeout,
+            )
+            tls_established = True
+        else:
+            # Plain connection - may upgrade to TLS after receiving INFO
+            connection = await asyncio.wait_for(
+                open_tcp_connection(host, port),
+                timeout=timeout,
+            )
     except asyncio.TimeoutError:
         msg = f"Connection timed out after {timeout} seconds"
         raise TimeoutError(msg)
@@ -1329,6 +1376,26 @@ async def connect(
 
         server_info = ServerInfo.from_protocol(msg.info)
         logger.info("Connected to %s (version %s)", server_info.server_id, server_info.version)
+
+        # Check if server requires TLS upgrade and we haven't established TLS yet
+        if server_info.tls_required and not tls_established:
+            logger.info("Server requires TLS, upgrading connection")
+            # Create SSL context if not provided
+            upgrade_ssl_context = tls if tls is not None else ssl.create_default_context()
+            upgrade_hostname = tls_hostname if tls_hostname is not None else host
+
+            # Upgrade the connection to TLS
+            if hasattr(connection, "upgrade_to_tls"):
+                await connection.upgrade_to_tls(upgrade_ssl_context, upgrade_hostname)
+                # Update our tracking
+                ssl_context = upgrade_ssl_context
+                server_hostname = upgrade_hostname
+                tls_established = True
+            else:
+                await connection.close()
+                msg = "Server requires TLS but connection does not support upgrade"
+                raise ConnectionError(msg)
+
     except Exception as e:
         await connection.close()
         msg = f"Failed to connect: {e}"
@@ -1343,7 +1410,7 @@ async def connect(
     connect_info = ConnectInfo(
         verbose=False,
         pedantic=False,
-        tls_required=False,
+        tls_required=tls_established,  # Tell server we're using TLS
         lang="python",
         version=__version__,
         protocol=1,
@@ -1414,6 +1481,7 @@ async def connect(
         raise ConnectionError(msg)
 
     # Handshake complete - now create the Client with background tasks
+    # Store the TLS context that was used (original or created during upgrade)
     client = Client(
         connection,
         server_info,
@@ -1432,6 +1500,8 @@ async def connect(
         user=user,
         password=password,
         nkey_seed=nkey_seed,
+        tls=ssl_context if ssl_context else tls,  # Use actual context if TLS was used
+        tls_hostname=server_hostname if server_hostname else tls_hostname,
     )
 
     client._status = ClientStatus.CONNECTED
