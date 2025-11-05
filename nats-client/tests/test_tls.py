@@ -101,6 +101,8 @@ async def test_tls_without_handshake_first():
 @pytest.mark.asyncio
 async def test_tls_reconnection_preserves_settings():
     """Test that TLS settings are preserved across reconnections."""
+    import asyncio
+
     config_path = os.path.join(os.path.dirname(__file__), "configs", "server_tls_handshake_first.conf")
     server = await run(config_path=config_path, port=0, timeout=5.0)
     server_port = server.port
@@ -111,12 +113,20 @@ async def test_tls_reconnection_preserves_settings():
         ssl_context.check_hostname = False
         ssl_context.verify_mode = ssl.CERT_NONE
 
+        # Use event to wait for reconnection
+        reconnected = asyncio.Event()
+
+        def on_reconnected():
+            reconnected.set()
+
         client = await connect(
             server.client_url,
             tls=ssl_context,
             tls_handshake_first=True,
             timeout=2.0,
         )
+
+        client.add_reconnected_callback(on_reconnected)
 
         # Publish a message to verify connection
         await client.publish("test.before", b"Before reconnect")
@@ -125,14 +135,12 @@ async def test_tls_reconnection_preserves_settings():
         # Shutdown server to trigger reconnection
         await server.shutdown()
 
-        # Start new server on same port
-        import asyncio
-
-        await asyncio.sleep(0.5)
+        # Start new server on same port (small delay for port to be released)
+        await asyncio.sleep(0.1)
         new_server = await run(config_path=config_path, port=server_port, timeout=5.0)
 
-        # Wait for reconnection
-        await asyncio.sleep(3.0)
+        # Wait for reconnection event (with timeout)
+        await asyncio.wait_for(reconnected.wait(), timeout=5.0)
 
         # Verify we can still publish over TLS after reconnection
         await client.publish("test.after", b"After reconnect")
@@ -189,10 +197,12 @@ async def test_tls_connection_without_ssl_context_fails():
     try:
         # Try to connect without SSL context to a TLS server
         # This should fail because the server expects TLS
+        # Use short timeout since we expect immediate failure
         with pytest.raises(Exception):  # Could be ConnectionError or timeout
             await connect(
                 server.client_url,
-                timeout=2.0,
+                timeout=0.5,
+                allow_reconnect=False,
             )
     finally:
         await server.shutdown()

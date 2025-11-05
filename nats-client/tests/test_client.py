@@ -1012,8 +1012,7 @@ async def test_cluster_reconnect_sequential_shutdown(cluster_size):
             except asyncio.TimeoutError:
                 pytest.fail(f"Client did not reconnect after shutting down server {i}")
 
-            # Give the client time to fully re-establish subscriptions
-            await asyncio.sleep(0.2)
+            # Flush ensures subscriptions are re-established (no sleep needed)
             await client.flush()
 
             # Verify client still works after reconnection

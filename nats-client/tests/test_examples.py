@@ -37,7 +37,7 @@ async def test_pub_sub_example(server: Server, examples_dir: Path):
 
     try:
         # Give subscriber time to connect
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.1)
 
         # Publish a message
         pub_result = subprocess.run(
@@ -58,7 +58,7 @@ async def test_pub_sub_example(server: Server, examples_dir: Path):
         assert "Published [test.subject]" in pub_result.stdout
 
         # Give subscriber time to receive
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.1)
 
     finally:
         sub_proc.terminate()
@@ -85,7 +85,7 @@ async def test_request_reply_example(server: Server, examples_dir: Path):
 
     try:
         # Give replier time to connect
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.1)
 
         # Send a request
         req_result = subprocess.run(
@@ -132,7 +132,7 @@ async def test_echo_example(server: Server, examples_dir: Path):
 
     try:
         # Give echo service time to connect
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.1)
 
         # Test echo functionality
         echo_result = subprocess.run(
@@ -210,7 +210,7 @@ async def test_queue_example(server: Server, examples_dir: Path):
 
     try:
         # Give subscribers time to connect
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.1)
 
         # Publish multiple messages
         for i in range(10):
@@ -230,7 +230,7 @@ async def test_queue_example(server: Server, examples_dir: Path):
             assert pub_result.returncode == 0
 
         # Give subscribers time to receive messages
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.2)
 
     finally:
         qsub1_proc.terminate()
