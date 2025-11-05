@@ -78,12 +78,10 @@ async def run_pub_benchmark(
         if track_latency:
             for _ in range(msg_count):
                 msg_start = time.perf_counter()
-                # Type checker sees nc as a union of both client types, so we need to ignore
                 await nc.publish(pub_subject, payload, headers=headers)  # type: ignore[arg-type]
                 latencies.append(time.perf_counter() - msg_start)  # type: ignore[union-attr]
         else:
             for _ in range(msg_count):
-                # Type checker sees nc as a union of both client types, so we need to ignore
                 await nc.publish(pub_subject, payload, headers=headers)  # type: ignore[arg-type]
 
         await nc.flush()

@@ -494,7 +494,6 @@ class Client(AbstractAsyncContextManager["Client"]):
 
     async def _handle_msg(self, subject: str, sid: str, reply: str | None, payload: bytes) -> None:
         """Handle MSG from server."""
-        # Update statistics
         self._stats_in_msgs += 1
         self._stats_in_bytes += len(payload)
 
@@ -504,15 +503,12 @@ class Client(AbstractAsyncContextManager["Client"]):
             msg = Message(subject=subject, data=payload, reply=reply)
 
             try:
-                # Try to enqueue message (handles limits and callbacks)
                 subscription._enqueue(msg)
 
-                # Reset slow consumer flag if we successfully queued
                 if subscription._slow_consumer_reported:
                     subscription._slow_consumer_reported = False
 
             except (asyncio.QueueFull, ValueError):
-                # Drop message due to limit exceeded
                 msg_size = len(payload)
                 subscription._dropped_messages += 1
                 subscription._dropped_bytes += msg_size
@@ -548,7 +544,6 @@ class Client(AbstractAsyncContextManager["Client"]):
         status_description: str | None = None,
     ) -> None:
         """Handle HMSG from server."""
-        # Update statistics
         self._stats_in_msgs += 1
         self._stats_in_bytes += len(payload)
 
@@ -568,15 +563,12 @@ class Client(AbstractAsyncContextManager["Client"]):
             )
 
             try:
-                # Try to enqueue message (handles limits and callbacks)
                 subscription._enqueue(msg)
 
-                # Reset slow consumer flag if we successfully queued
                 if subscription._slow_consumer_reported:
                     subscription._slow_consumer_reported = False
 
             except (asyncio.QueueFull, ValueError):
-                # Drop message due to limit exceeded
                 msg_size = len(payload)
                 subscription._dropped_messages += 1
                 subscription._dropped_bytes += msg_size
@@ -604,9 +596,7 @@ class Client(AbstractAsyncContextManager["Client"]):
     async def _handle_info(self, info: dict) -> None:
         """Handle INFO from server."""
         self._server_info = ServerInfo.from_protocol(info)
-        # Update server pool with new cluster URLs from INFO
         if self._server_info.connect_urls:
-            # Add new servers from connect_urls, avoiding duplicates
             for url in self._server_info.connect_urls:
                 if url not in self._server_pool:
                     self._server_pool.append(url)
@@ -929,7 +919,6 @@ class Client(AbstractAsyncContextManager["Client"]):
         self._pending_messages.append(message_data)
         self._pending_bytes += message_size
 
-        # Update statistics
         self._stats_out_msgs += 1
         self._stats_out_bytes += len(payload)
 
@@ -1021,7 +1010,6 @@ class Client(AbstractAsyncContextManager["Client"]):
         if sid in self._subscriptions:
             if self._status not in (ClientStatus.CLOSED, ClientStatus.CLOSING):
                 await self._connection.write(encode_unsub(sid))
-            # Remove from subscriptions map
             del self._subscriptions[sid]
 
     def new_inbox(self) -> str:
@@ -1119,8 +1107,6 @@ class Client(AbstractAsyncContextManager["Client"]):
         self._allow_reconnect = False
 
         try:
-            # Step 1: Drain all subscriptions (DRAINING phase)
-            # Get a snapshot of current subscriptions to avoid modification during iteration
             subscriptions_to_drain = list(self._subscriptions.values())
 
             if subscriptions_to_drain:
@@ -1128,19 +1114,16 @@ class Client(AbstractAsyncContextManager["Client"]):
                 drain_tasks = [sub.drain() for sub in subscriptions_to_drain]
                 await asyncio.wait_for(asyncio.gather(*drain_tasks, return_exceptions=True), timeout=timeout)
 
-            # Step 2: Transition to DRAINED and flush pending publishes
             self._status = ClientStatus.DRAINED
 
             if self._pending_messages:
                 logger.debug("Flushing pending messages")
                 await asyncio.wait_for(self.flush(), timeout=timeout)
 
-            # Step 3: Close the connection
             await self.close()
 
         except asyncio.TimeoutError:
             logger.error("Drain timeout after %s seconds", timeout)
-            # Force close on timeout
             await self.close()
             msg = f"Drain operation timed out after {timeout} seconds"
             raise TimeoutError(msg)
@@ -1255,13 +1238,9 @@ class Client(AbstractAsyncContextManager["Client"]):
         if self._nkey_seed:
             import nkeys
 
-            # Load the NKey from seed
             kp = nkeys.from_seed(self._nkey_seed.encode())
-
-            # Add public key to connect info
             connect_info["nkey"] = kp.public_key.decode()
 
-            # If server sent a nonce, sign it
             if self._server_info.nonce:
                 sig = kp.sign(self._server_info.nonce.encode())
                 import base64
@@ -1328,7 +1307,6 @@ async def connect(
         ConnectionError: Failed to connect
         ValueError: Invalid URL
     """
-    # Parse URL
     parsed_url = urlparse(url)
     if parsed_url.scheme not in ("nats", "tls", "ws", "wss"):
         msg = "URL scheme must be 'nats://', 'tls://', 'ws://', or 'wss://'"
@@ -1339,31 +1317,23 @@ async def connect(
 
     logger.info("Connecting to %s:%s", host, port)
 
-    # Determine SSL context
     ssl_context = None
     if parsed_url.scheme in ("tls", "wss"):
-        # Use provided SSL context or create default
         ssl_context = tls if tls is not None else ssl.create_default_context()
     elif tls is not None:
-        # User explicitly provided TLS context, use it even for nats:// scheme
         ssl_context = tls
 
-    # Determine server hostname for TLS verification
     server_hostname = tls_hostname if tls_hostname is not None else (host if ssl_context else None)
 
-    # Open connection with timeout
-    # Track whether we've actually established TLS yet
     tls_established = False
     try:
         if tls_handshake_first and ssl_context:
-            # TLS handshake first mode - establish TLS before reading INFO
             connection = await asyncio.wait_for(
                 open_tcp_connection(host, port, ssl_context=ssl_context, server_hostname=server_hostname),
                 timeout=timeout,
             )
             tls_established = True
         else:
-            # Plain connection - may upgrade to TLS after receiving INFO
             connection = await asyncio.wait_for(
                 open_tcp_connection(host, port),
                 timeout=timeout,
@@ -1375,7 +1345,6 @@ async def connect(
         msg = f"Failed to connect: {e}"
         raise ConnectionError(msg)
 
-    # Parse server INFO message
     try:
         msg = await parse(connection)
         if not msg or msg.op != "INFO":
@@ -1385,17 +1354,13 @@ async def connect(
         server_info = ServerInfo.from_protocol(msg.info)
         logger.info("Connected to %s (version %s)", server_info.server_id, server_info.version)
 
-        # Check if server requires TLS upgrade and we haven't established TLS yet
         if server_info.tls_required and not tls_established:
             logger.info("Server requires TLS, upgrading connection")
-            # Create SSL context if not provided
             upgrade_ssl_context = tls if tls is not None else ssl.create_default_context()
             upgrade_hostname = tls_hostname if tls_hostname is not None else host
 
-            # Upgrade the connection to TLS
             if hasattr(connection, "upgrade_to_tls"):
                 await connection.upgrade_to_tls(upgrade_ssl_context, upgrade_hostname)
-                # Update our tracking
                 ssl_context = upgrade_ssl_context
                 server_hostname = upgrade_hostname
                 tls_established = True
@@ -1409,25 +1374,22 @@ async def connect(
         msg = f"Failed to connect: {e}"
         raise ConnectionError(msg)
 
-    # Build server pool: start with the URL we connected to, then add cluster URLs
     servers = [f"{host}:{port}"]
     if server_info.connect_urls:
         servers.extend(server_info.connect_urls)
 
-    # Send CONNECT message (complete handshake before creating Client)
     connect_info = ConnectInfo(
         verbose=False,
         pedantic=False,
-        tls_required=tls_established,  # Tell server we're using TLS
+        tls_required=tls_established,
         lang="python",
         version=__version__,
         protocol=1,
         headers=True,
         no_responders=True,
-        echo=not no_echo,  # Server sends echo: true means client WILL receive own messages
+        echo=not no_echo,
     )
 
-    # Add authentication if provided
     if token:
         connect_info["auth_token"] = token
     if user:
@@ -1437,13 +1399,9 @@ async def connect(
     if nkey_seed:
         import nkeys
 
-        # Load the NKey from seed
         kp = nkeys.from_seed(nkey_seed.encode())
-
-        # Add public key to connect info
         connect_info["nkey"] = kp.public_key.decode()
 
-        # If server sent a nonce, sign it
         if server_info.nonce:
             sig = kp.sign(server_info.nonce.encode())
             import base64
