@@ -140,8 +140,8 @@ async def main():
                             print(f"[#{echo_count}] Echo request: {msg.data.decode()}")
 
                         # Echo back the message
-                        if msg.reply_to:
-                            await client.publish(msg.reply_to, msg.data)
+                        if msg.reply:
+                            await client.publish(msg.reply, msg.data)
 
                     except asyncio.TimeoutError:
                         continue
@@ -165,13 +165,13 @@ async def main():
                             print(f"[#{status_count}] Status request")
 
                         # Send status information
-                        if msg.reply_to:
+                        if msg.reply:
                             status_response = {
                                 **service_info,
                                 "echo_count": echo_count,
                                 "status_count": status_count,
                             }
-                            await client.publish(msg.reply_to, json.dumps(status_response).encode())
+                            await client.publish(msg.reply, json.dumps(status_response).encode())
 
                     except asyncio.TimeoutError:
                         continue

@@ -573,7 +573,7 @@ async def test_request_reply_with_single_responder(client):
         subscription = await client.subscribe(test_subject)
         await client.flush()
         message = await subscription.next(timeout=1.0)
-        await client.publish(message.reply_to, reply_payload)
+        await client.publish(message.reply, reply_payload)
 
     responder_task = asyncio.create_task(handle_request())
     await client.flush()
@@ -1074,18 +1074,18 @@ async def test_custom_inbox_prefix(server):
         reply_payload = b"Reply data"
 
         # Track the inbox subject used in the request
-        received_reply_to = None
+        received_reply = None
 
         # Setup responder that captures the reply-to subject
         subscription = await client.subscribe(test_subject)
         await client.flush()
 
         async def handle_request():
-            nonlocal received_reply_to
+            nonlocal received_reply
             message = await subscription.next(timeout=2.0)
-            received_reply_to = message.reply_to
-            assert received_reply_to is not None
-            await client.publish(received_reply_to, reply_payload)
+            received_reply = message.reply
+            assert received_reply is not None
+            await client.publish(received_reply, reply_payload)
 
         responder_task = asyncio.create_task(handle_request())
 
@@ -1097,9 +1097,9 @@ async def test_custom_inbox_prefix(server):
         await responder_task
 
         # Verify that the inbox used the custom prefix
-        assert received_reply_to is not None
-        assert received_reply_to.startswith(custom_prefix), (
-            f"Expected inbox to start with '{custom_prefix}', got '{received_reply_to}'"
+        assert received_reply is not None
+        assert received_reply.startswith(custom_prefix), (
+            f"Expected inbox to start with '{custom_prefix}', got '{received_reply}'"
         )
 
     finally:
@@ -1948,7 +1948,7 @@ async def test_statistics_request_reply(client):
 
     async def handle_request():
         msg = await sub.next(timeout=2.0)
-        await client.publish(msg.reply_to, b"Response")
+        await client.publish(msg.reply, b"Response")
 
     request_task = asyncio.create_task(handle_request())
     await asyncio.sleep(0.1)

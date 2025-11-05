@@ -33,7 +33,7 @@ async def test_parse_msg():
     msg = await parse_msg(reader, [b"foo.bar", b"1", b"5"])
     assert msg.subject == "foo.bar"
     assert msg.sid == "1"
-    assert msg.reply_to is None
+    assert msg.reply is None
     assert msg.payload == b"hello"
 
     # Test valid MSG with reply
@@ -44,7 +44,7 @@ async def test_parse_msg():
     msg = await parse_msg(reader, [b"foo.bar", b"1", b"reply.to", b"5"])
     assert msg.subject == "foo.bar"
     assert msg.sid == "1"
-    assert msg.reply_to == "reply.to"
+    assert msg.reply == "reply.to"
     assert msg.payload == b"hello"
 
     # Test invalid size
@@ -78,7 +78,7 @@ async def test_parse_hmsg():
     msg = await parse_hmsg(reader, [b"foo.bar", b"1", b"reply.to", str(header_size).encode(), str(total_size).encode()])
     assert msg.subject == "foo.bar"
     assert msg.sid == "1"
-    assert msg.reply_to == "reply.to"
+    assert msg.reply == "reply.to"
     assert msg.payload == b"hello"
     assert msg.headers == {}
 
@@ -171,7 +171,7 @@ def test_encode_pub():
     assert command == [b"PUB foo.bar 5\r\n", b"hello", b"\r\n"]
 
     # Test with reply
-    command = encode_pub("foo.bar", b"hello", reply_to="reply.to")
+    command = encode_pub("foo.bar", b"hello", reply="reply.to")
     assert command == [b"PUB foo.bar reply.to 5\r\n", b"hello", b"\r\n"]
 
 
@@ -189,7 +189,7 @@ def test_encode_hpub():
     assert command[3] == b"\r\n"
 
     # Test with reply
-    command = encode_hpub("foo.bar", payload, reply_to="reply.to", headers=headers)
+    command = encode_hpub("foo.bar", payload, reply="reply.to", headers=headers)
     assert len(command) == 4
     assert command[0].startswith(b"HPUB foo.bar reply.to")
     assert command[1].startswith(b"NATS/1.0\r\n")

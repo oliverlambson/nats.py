@@ -32,9 +32,9 @@ def test_bench_encode_pub_with_reply(benchmark):
     """Benchmark encoding PUB command with reply subject."""
     subject = "test.subject"
     payload = b"hello world"
-    reply_to = "reply.subject"
+    reply = "reply.subject"
 
-    benchmark(command.encode_pub, subject, payload, reply_to=reply_to)
+    benchmark(command.encode_pub, subject, payload, reply=reply)
 
 
 def test_bench_encode_hpub_single_header(benchmark):
@@ -77,10 +77,10 @@ def test_bench_encode_hpub_with_reply(benchmark):
     """Benchmark encoding HPUB command with reply subject and headers."""
     subject = "test.subject"
     payload = b"hello world"
-    reply_to = "reply.subject"
+    reply = "reply.subject"
     headers = {"X-Custom": "value"}
 
-    benchmark(command.encode_hpub, subject, payload, reply_to=reply_to, headers=headers)
+    benchmark(command.encode_hpub, subject, payload, reply=reply, headers=headers)
 
 
 def test_bench_encode_sub(benchmark):

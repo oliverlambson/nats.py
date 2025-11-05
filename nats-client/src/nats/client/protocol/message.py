@@ -66,7 +66,7 @@ class Msg(NamedTuple):
     op: Literal["MSG"]
     subject: str
     sid: str
-    reply_to: str | None
+    reply: str | None
     payload: bytes
 
 
@@ -76,7 +76,7 @@ class HMsg(NamedTuple):
     op: Literal["HMSG"]
     subject: str
     sid: str
-    reply_to: str | None
+    reply: str | None
     headers: dict[str, list[str]]
     payload: bytes
     status_code: str | None
@@ -200,11 +200,11 @@ async def parse_msg(reader: Reader, args: list[bytes]) -> Msg:
 
     if len(args) == MIN_MSG_ARGS:
         # No reply subject
-        reply_to_bytes = None
+        reply_bytes = None
         size = int(args[2])
     else:
         # With reply subject
-        reply_to_bytes = args[2]
+        reply_bytes = args[2]
         size = int(args[3])
 
     # Check payload size limit
@@ -219,9 +219,9 @@ async def parse_msg(reader: Reader, args: list[bytes]) -> Msg:
     # Only convert to strings at the last moment
     subject = subject_bytes.decode()
     sid = sid_bytes.decode()
-    reply_to = reply_to_bytes.decode() if reply_to_bytes is not None else None
+    reply = reply_bytes.decode() if reply_bytes is not None else None
 
-    return Msg("MSG", subject, sid, reply_to, payload)
+    return Msg("MSG", subject, sid, reply, payload)
 
 
 async def parse_hmsg(reader: Reader, args: list[bytes]) -> HMsg:
@@ -247,12 +247,12 @@ async def parse_hmsg(reader: Reader, args: list[bytes]) -> HMsg:
 
     if len(args) == MIN_HMSG_ARGS:
         # No reply subject
-        reply_to_bytes = None
+        reply_bytes = None
         header_size = int(args[2])
         total_size = int(args[3])
     else:
         # With reply subject
-        reply_to_bytes = args[2]
+        reply_bytes = args[2]
         header_size = int(args[3])
         total_size = int(args[4])
 
@@ -281,9 +281,9 @@ async def parse_hmsg(reader: Reader, args: list[bytes]) -> HMsg:
     # Convert remaining bytes to strings only at the final step
     subject = subject_bytes.decode()
     sid = sid_bytes.decode()
-    reply_to = reply_to_bytes.decode() if reply_to_bytes is not None else None
+    reply = reply_bytes.decode() if reply_bytes is not None else None
 
-    return HMsg("HMSG", subject, sid, reply_to, headers, payload, status_code, status_description)
+    return HMsg("HMSG", subject, sid, reply, headers, payload, status_code, status_description)
 
 
 async def parse_info(args: list[bytes]) -> Info:

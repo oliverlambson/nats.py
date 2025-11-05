@@ -386,15 +386,13 @@ class Client(AbstractAsyncContextManager["Client"]):
                         break
 
                     match msg:
-                        case ("MSG", subject, sid, reply_to, payload):
-                            logger.debug(
-                                "<<- MSG %s %s %s %s", subject, sid, reply_to if reply_to else "", len(payload)
-                            )
-                            await self._handle_msg(subject, sid, reply_to, payload)
-                        case ("HMSG", subject, sid, reply_to, headers, payload, status_code, status_description):
-                            logger.debug("<<- HMSG %s %s %s %s %s", subject, sid, reply_to, len(headers), len(payload))
+                        case ("MSG", subject, sid, reply, payload):
+                            logger.debug("<<- MSG %s %s %s %s", subject, sid, reply if reply else "", len(payload))
+                            await self._handle_msg(subject, sid, reply, payload)
+                        case ("HMSG", subject, sid, reply, headers, payload, status_code, status_description):
+                            logger.debug("<<- HMSG %s %s %s %s %s", subject, sid, reply, len(headers), len(payload))
                             await self._handle_hmsg(
-                                subject, sid, reply_to, headers, payload, status_code, status_description
+                                subject, sid, reply, headers, payload, status_code, status_description
                             )
                         case ("PING",):
                             logger.debug("<<- PING")
@@ -490,7 +488,7 @@ class Client(AbstractAsyncContextManager["Client"]):
                     logger.exception("Error during final flush")
             return
 
-    async def _handle_msg(self, subject: str, sid: str, reply_to: str | None, payload: bytes) -> None:
+    async def _handle_msg(self, subject: str, sid: str, reply: str | None, payload: bytes) -> None:
         """Handle MSG from server."""
         # Update statistics
         self._stats_in_msgs += 1
@@ -499,7 +497,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         if sid in self._subscriptions:
             subscription = self._subscriptions[sid]
 
-            msg = Message(subject=subject, data=payload, reply_to=reply_to)
+            msg = Message(subject=subject, data=payload, reply=reply)
 
             try:
                 # Try to enqueue message (handles limits and callbacks)
@@ -539,7 +537,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         self,
         subject: str,
         sid: str,
-        reply_to: str,
+        reply: str,
         headers: dict[str, list[str]],
         payload: bytes,
         status_code: str | None = None,
@@ -560,7 +558,7 @@ class Client(AbstractAsyncContextManager["Client"]):
             msg = Message(
                 subject=subject,
                 data=payload,
-                reply_to=reply_to,
+                reply=reply,
                 headers=Headers(headers) if headers else None,  # type: ignore[arg-type]
                 status=status,
             )
@@ -890,7 +888,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         subject: str,
         payload: bytes,
         *,
-        reply_to: str | None = None,
+        reply: str | None = None,
         headers: Headers | dict[str, str | list[str]] | None = None,
     ) -> None:
         """Publish a message to a subject."""
@@ -903,14 +901,14 @@ class Client(AbstractAsyncContextManager["Client"]):
             command_parts = encode_hpub(
                 subject,
                 payload,
-                reply_to=reply_to,
+                reply=reply,
                 headers=headers_dict,  # type: ignore[arg-type]
             )
         else:
             command_parts = encode_pub(
                 subject,
                 payload,
-                reply_to=reply_to,
+                reply=reply,
             )
 
         message_data = b"".join(command_parts)
@@ -1064,7 +1062,7 @@ class Client(AbstractAsyncContextManager["Client"]):
 
         sub = await self.subscribe(inbox)
         try:
-            await self.publish(subject, payload, reply_to=inbox, headers=headers)
+            await self.publish(subject, payload, reply=inbox, headers=headers)
 
             try:
                 response = await asyncio.wait_for(sub.next(), timeout)

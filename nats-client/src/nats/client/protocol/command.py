@@ -36,20 +36,20 @@ def encode_pub(
     subject: str,
     payload: bytes,
     *,
-    reply_to: str | None = None,
+    reply: str | None = None,
 ) -> list[bytes]:
     """Encode PUB command.
 
     Args:
         subject: Subject to publish to
         payload: Message payload
-        reply_to: Optional reply subject
+        reply: Optional reply subject
 
     Returns:
         List of byte strings to write in sequence
     """
     # PUB format: PUB <subject> [reply-to] <#bytes>
-    command = f"PUB {subject} {reply_to} {len(payload)}\r\n" if reply_to else f"PUB {subject} {len(payload)}\r\n"
+    command = f"PUB {subject} {reply} {len(payload)}\r\n" if reply else f"PUB {subject} {len(payload)}\r\n"
 
     return [command.encode(), payload, b"\r\n"]
 
@@ -58,7 +58,7 @@ def encode_hpub(
     subject: str,
     payload: bytes,
     *,
-    reply_to: str | None = None,
+    reply: str | None = None,
     headers: dict[str, str | list[str]],
 ) -> list[bytes]:
     """Encode HPUB command.
@@ -66,7 +66,7 @@ def encode_hpub(
     Args:
         subject: Subject to publish to
         payload: Message payload
-        reply_to: Optional reply subject
+        reply: Optional reply subject
         headers: Headers to include with the message
 
     Returns:
@@ -81,8 +81,8 @@ def encode_hpub(
     header_data = ("\r\n".join(header_lines) + "\r\n\r\n").encode()
 
     # HPUB format: HPUB <subject> [reply-to] <#header bytes> <#total bytes>
-    if reply_to:
-        command = f"HPUB {subject} {reply_to} {len(header_data)} {len(header_data) + len(payload)}\r\n"
+    if reply:
+        command = f"HPUB {subject} {reply} {len(header_data)} {len(header_data) + len(payload)}\r\n"
     else:
         command = f"HPUB {subject} {len(header_data)} {len(header_data) + len(payload)}\r\n"
 

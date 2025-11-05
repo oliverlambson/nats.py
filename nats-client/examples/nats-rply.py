@@ -126,8 +126,8 @@ async def main():
                         print(f"[#{count}] Received request on [{msg.subject}]: {msg.data.decode()}")
 
                     # Send the reply if a reply subject is provided
-                    if msg.reply_to:
-                        await client.publish(msg.reply_to, args.response.encode())
+                    if msg.reply:
+                        await client.publish(msg.reply, args.response.encode())
                         if args.timestamp:
                             timestamp = datetime.now().strftime("%H:%M:%S")
                             print(f"[#{count} {timestamp}] Sent reply: {args.response}")

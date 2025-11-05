@@ -135,13 +135,13 @@ class Message:
     Attributes:
         subject: The subject the message was published to
         data: The message payload as bytes
-        reply_to: Optional reply subject for request-reply messaging
+        reply: Optional reply subject for request-reply messaging
         headers: Optional message headers
         status: Optional NATS status information
     """
 
     subject: str
     data: bytes
-    reply_to: str | None = None
+    reply: str | None = None
     headers: Headers | None = None
     status: Status | None = None
