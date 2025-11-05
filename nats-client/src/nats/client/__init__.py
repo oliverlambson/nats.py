@@ -158,6 +158,7 @@ class Client(AbstractAsyncContextManager["Client"]):
     _reconnect_jitter: float
     _reconnect_timeout: float
     _no_randomize: bool
+    _no_echo: bool
 
     # Server pool management
     _server_pool: list[str]
@@ -232,6 +233,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         reconnect_jitter: float = 0.1,
         reconnect_timeout: float = 2.0,
         no_randomize: bool = False,
+        no_echo: bool = False,
         inbox_prefix: str = "_INBOX",
         ping_interval: float = 120.0,
         max_outstanding_pings: int = 2,
@@ -255,6 +257,7 @@ class Client(AbstractAsyncContextManager["Client"]):
             reconnect_jitter: Jitter factor for reconnection attempts
             reconnect_timeout: Timeout for reconnection attempts
             no_randomize: Whether to disable randomizing the server pool
+            no_echo: If True, the server will not send messages published by this connection back to it
             inbox_prefix: Prefix for inbox subjects (default: "_INBOX")
             ping_interval: Interval between PINGs in seconds (default: 120.0)
             max_outstanding_pings: Maximum number of outstanding PINGs before disconnecting (default: 2)
@@ -274,6 +277,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         self._reconnect_jitter = reconnect_jitter
         self._reconnect_timeout = reconnect_timeout
         self._no_randomize = no_randomize
+        self._no_echo = no_echo
 
         # Validate inbox prefix (same rules as nats.go)
         if not inbox_prefix:
@@ -757,6 +761,8 @@ class Client(AbstractAsyncContextManager["Client"]):
                                     version=__version__,
                                     protocol=1,
                                     headers=True,
+                                    no_responders=True,
+                                    echo=not self._no_echo,
                                 )
 
                                 # Add authentication if provided
@@ -1235,6 +1241,8 @@ class Client(AbstractAsyncContextManager["Client"]):
             version=__version__,
             protocol=1,
             headers=True,
+            no_responders=True,
+            echo=not self._no_echo,
         )
 
         # Add authentication if provided
@@ -1279,6 +1287,7 @@ async def connect(
     reconnect_jitter: float = 0.1,
     reconnect_timeout: float | None = None,
     no_randomize: bool = False,
+    no_echo: bool = False,
     inbox_prefix: str = "_INBOX",
     ping_interval: float = 120.0,
     max_outstanding_pings: int = 2,
@@ -1302,6 +1311,7 @@ async def connect(
         reconnect_jitter: Jitter factor for reconnection attempts
         reconnect_timeout: Timeout for individual reconnection attempts (defaults to timeout value)
         no_randomize: Whether to disable randomizing the server pool
+        no_echo: If True, the server will not send messages published by this connection back to it (default: False)
         inbox_prefix: Prefix for inbox subjects (default: "_INBOX")
         ping_interval: Interval between PINGs in seconds (default: 120.0)
         max_outstanding_pings: Maximum number of outstanding PINGs before disconnecting (default: 2)
@@ -1414,6 +1424,7 @@ async def connect(
         protocol=1,
         headers=True,
         no_responders=True,
+        echo=not no_echo,  # Server sends echo: true means client WILL receive own messages
     )
 
     # Add authentication if provided
@@ -1491,6 +1502,7 @@ async def connect(
         reconnect_jitter=reconnect_jitter,
         reconnect_timeout=reconnect_timeout if reconnect_timeout is not None else timeout,
         no_randomize=no_randomize,
+        no_echo=no_echo,
         inbox_prefix=inbox_prefix,
         ping_interval=ping_interval,
         max_outstanding_pings=max_outstanding_pings,

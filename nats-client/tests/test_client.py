@@ -511,6 +511,49 @@ async def test_connect_to_user_pass_server_with_password_only():
 
 
 @pytest.mark.asyncio
+async def test_no_echo_prevents_receiving_own_messages(server):
+    """Test that no_echo prevents the client from receiving its own published messages."""
+    # Create two clients: one with no_echo, one without
+    client_no_echo = await connect(server.client_url, timeout=1.0, no_echo=True)
+    client_with_echo = await connect(server.client_url, timeout=1.0)
+
+    try:
+        test_subject = f"test.no_echo.{uuid.uuid4()}"
+        test_message = b"Test message"
+
+        # Subscribe with no_echo client
+        sub_no_echo = await client_no_echo.subscribe(test_subject)
+        await client_no_echo.flush()
+
+        # Subscribe with normal client
+        sub_normal = await client_with_echo.subscribe(test_subject)
+        await client_with_echo.flush()
+
+        # Publish from no_echo client
+        await client_no_echo.publish(test_subject, test_message)
+        await client_no_echo.flush()
+
+        # Normal client should receive the message
+        msg = await sub_normal.next(timeout=1.0)
+        assert msg.data == test_message
+
+        # no_echo client should NOT receive its own message
+        with pytest.raises(asyncio.TimeoutError):
+            await sub_no_echo.next(timeout=0.5)
+
+        # Verify no_echo client can still receive messages from other clients
+        await client_with_echo.publish(test_subject, b"from normal")
+        await client_with_echo.flush()
+
+        msg = await sub_no_echo.next(timeout=1.0)
+        assert msg.data == b"from normal"
+
+    finally:
+        await client_no_echo.close()
+        await client_with_echo.close()
+
+
+@pytest.mark.asyncio
 async def test_publish_delivers_message_to_subscriber(client):
     """Test that a published message is delivered to a subscriber."""
     test_subject = f"test.{uuid.uuid4()}"
