@@ -2372,6 +2372,31 @@ async def test_subscription_default_limits(client):
 
 
 @pytest.mark.asyncio
+async def test_subscription_messages_property(client):
+    """Test that subscription.messages property works for API compatibility with nats-py."""
+    test_subject = f"test.messages_property.{uuid.uuid4()}"
+
+    subscription = await client.subscribe(test_subject)
+    await client.flush()
+
+    # Publish some messages
+    for i in range(3):
+        await client.publish(test_subject, f"message {i}".encode())
+    await client.flush()
+
+    # Use the messages property (nats-py style)
+    received = []
+    async for msg in subscription.messages:
+        received.append(msg.data.decode())
+        if len(received) == 3:
+            break
+
+    assert received == ["message 0", "message 1", "message 2"]
+
+    await subscription.unsubscribe()
+
+
+@pytest.mark.asyncio
 async def test_subscription_dropped_counters(client):
     """Test that dropped message counters are updated when messages are dropped."""
     test_subject = f"test.dropped.{uuid.uuid4()}"

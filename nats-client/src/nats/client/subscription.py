@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterable, AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, suppress
 from typing import TYPE_CHECKING, Self, TypeVar
 
@@ -24,7 +24,7 @@ T = TypeVar("T")
 logger = logging.getLogger(__name__)
 
 
-class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscription"]):
+class Subscription(AsyncIterable[Message], AbstractAsyncContextManager["Subscription"]):
     """A subscription to a NATS subject.
 
     This class represents an active subscription to a NATS subject.
@@ -94,6 +94,43 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
     def queue(self) -> str:
         """Get the queue group name."""
         return self._queue
+
+    def __aiter__(self) -> AsyncIterator[Message]:
+        """Return an async iterator for messages.
+
+        This allows using the subscription as an async iterable:
+            async for msg in subscription:
+                process(msg)
+
+        Returns:
+            An async iterator that yields messages
+        """
+        return self.messages
+
+    @property
+    def messages(self) -> AsyncIterator[Message]:
+        """Get an async iterator for messages.
+
+        This property provides API compatibility with nats-py, allowing:
+            async for msg in subscription.messages:
+                process(msg)
+
+        This is equivalent to iterating directly on the subscription:
+            async for msg in subscription:
+                process(msg)
+
+        Returns:
+            An async iterator that yields messages
+        """
+
+        async def iterator():
+            while True:
+                try:
+                    yield await self.next()
+                except RuntimeError:
+                    break
+
+        return iterator()
 
     @property
     def closed(self) -> bool:
@@ -206,18 +243,6 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
         except asyncio.QueueShutDown:
             msg = "Subscription is closed"
             raise RuntimeError(msg) from None
-
-    async def __anext__(self) -> Message:
-        """Get the next message from the subscription.
-
-        This allows using the subscription as an async iterator:
-            async for msg in subscription:
-                ...
-        """
-        try:
-            return await self.next()
-        except RuntimeError:
-            raise StopAsyncIteration from None
 
     async def unsubscribe(self) -> None:
         """Unsubscribe from this subscription.

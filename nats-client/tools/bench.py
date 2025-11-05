@@ -156,9 +156,8 @@ async def run_sub_benchmark(
         sub = await nc.subscribe(sub_subject)
         start_time = time.perf_counter()
 
-        # Receive messages - handle different iterator styles
-        iterator = sub.messages if client_type == "aio" else sub  # type: ignore[attr-defined]
-        async for msg in iterator:  # type: ignore[misc]
+        # Receive messages
+        async for msg in sub.messages:  # type: ignore[attr-defined]
             msg_time = time.perf_counter()
             if received == 0:
                 first_msg_time = msg_time
