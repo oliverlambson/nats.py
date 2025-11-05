@@ -31,12 +31,12 @@ async def test_subscription_with_queue_receives_subset_of_messages_different_cli
 
     try:
         test_subject = f"test.queue.{uuid.uuid4()}"
-        queue_group = "test_queue"
+        queue = "test_queue"
         message_count = 20  # Send enough messages to ensure distribution
 
         # Set up subscriptions with the same queue group
-        sub1 = await client1.subscribe(test_subject, queue_group=queue_group)
-        sub2 = await client2.subscribe(test_subject, queue_group=queue_group)
+        sub1 = await client1.subscribe(test_subject, queue=queue)
+        sub2 = await client2.subscribe(test_subject, queue=queue)
         await client1.flush()
         await client2.flush()  # Ensure subscriptions are registered
 
@@ -87,12 +87,12 @@ async def test_subscription_with_queue_receives_subset_of_messages_different_cli
 async def test_subscription_with_queue_receives_subset_of_messages_same_client(client):
     """Test that subscriptions from the same client with queue group receives only a subset of messages."""
     test_subject = f"test.queue_same_client.{uuid.uuid4()}"
-    queue_group = "test_queue_same_client"
+    queue = "test_queue_same_client"
     message_count = 20  # Send enough messages to ensure distribution
 
     # Set up subscriptions with the same queue group from the same client
-    sub1 = await client.subscribe(test_subject, queue_group=queue_group)
-    sub2 = await client.subscribe(test_subject, queue_group=queue_group)
+    sub1 = await client.subscribe(test_subject, queue=queue)
+    sub2 = await client.subscribe(test_subject, queue=queue)
     await client.flush()  # Ensure subscriptions are registered
 
     # Add small delay to ensure subscriptions are fully registered on server

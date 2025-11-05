@@ -44,9 +44,9 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
 
     _subject: str
     _sid: str
-    _queue_group: str
+    _queue: str
     _client: Client
-    _queue: asyncio.Queue[Message]
+    _pending_queue: asyncio.Queue[Message]
     _max_pending_messages: int | None
     _max_pending_bytes: int | None
     _pending_messages: int
@@ -61,19 +61,19 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
         self,
         subject: str,
         sid: str,
-        queue_group: str,
+        queue: str,
         client: Client,
         max_pending_messages: int | None = None,
         max_pending_bytes: int | None = None,
     ):
         self._subject = subject
         self._sid = sid
-        self._queue_group = queue_group
+        self._queue = queue
         self._client = client
 
         # Create underlying queue with maxsize (0 means unlimited)
         maxsize = max_pending_messages if max_pending_messages is not None else 0
-        self._queue = asyncio.Queue(maxsize=maxsize)
+        self._pending_queue = asyncio.Queue(maxsize=maxsize)
         self._max_pending_messages = max_pending_messages
         self._max_pending_bytes = max_pending_bytes
         self._pending_messages = 0
@@ -91,9 +91,9 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
         return self._subject
 
     @property
-    def queue_group(self) -> str:
+    def queue(self) -> str:
         """Get the queue group name."""
-        return self._queue_group
+        return self._queue
 
     @property
     def closed(self) -> bool:
@@ -171,7 +171,7 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
                 logger.exception("Error in message callback: %s", e)
 
         # Try to put in queue - will raise QueueFull if message limit exceeded
-        self._queue.put_nowait(msg)
+        self._pending_queue.put_nowait(msg)
 
         # Update counters after successful put
         self._pending_messages += 1
@@ -194,9 +194,9 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
         try:
             # Get message from queue
             if timeout is not None:
-                msg = await asyncio.wait_for(self._queue.get(), timeout)
+                msg = await asyncio.wait_for(self._pending_queue.get(), timeout)
             else:
-                msg = await self._queue.get()
+                msg = await self._pending_queue.get()
 
             # Update counters after successful get
             self._pending_messages -= 1
@@ -229,7 +229,7 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
             # Send UNSUB to server and remove from client's subscription map
             await self._client._unsubscribe(self._sid)
             # Shutdown queue immediately (discard pending messages)
-            self._queue.shutdown(immediate=True)
+            self._pending_queue.shutdown(immediate=True)
             # Mark as closed
             self._closed = True
 
@@ -244,7 +244,7 @@ class Subscription(AsyncIterator[Message], AbstractAsyncContextManager["Subscrip
             # Send UNSUB to server to stop new messages
             await self._client._unsubscribe(self._sid)
             # Shutdown queue gracefully (allow pending messages to be consumed)
-            self._queue.shutdown(immediate=False)
+            self._pending_queue.shutdown(immediate=False)
             # Keep in client's subscription list until queue is drained
             # Mark as closed
             self._closed = True

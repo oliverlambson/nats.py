@@ -89,19 +89,19 @@ def encode_hpub(
     return [command.encode(), header_data, payload, b"\r\n"]
 
 
-def encode_sub(subject: str, sid: str, queue_group: str | None = None) -> bytes:
+def encode_sub(subject: str, sid: str, queue: str | None = None) -> bytes:
     """Encode SUB command.
 
     Args:
         subject: Subject to subscribe to
         sid: Subscription ID
-        queue_group: Optional queue group
+        queue: Optional queue group
 
     Returns:
         Encoded SUB command
     """
-    if queue_group:
-        return f"SUB {subject} {queue_group} {sid}\r\n".encode()
+    if queue:
+        return f"SUB {subject} {queue} {sid}\r\n".encode()
     return f"SUB {subject} {sid}\r\n".encode()
 
 

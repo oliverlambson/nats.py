@@ -177,7 +177,7 @@ async def test_echo_example(server: Server, examples_dir: Path):
 
 
 @pytest.mark.asyncio
-async def test_queue_group_example(server: Server, examples_dir: Path):
+async def test_queue_example(server: Server, examples_dir: Path):
     """Test that nats-qsub distributes messages across queue members."""
     # Start two queue subscribers
     qsub1_proc = subprocess.Popen(

@@ -799,9 +799,9 @@ class Client(AbstractAsyncContextManager["Client"]):
 
                                 for sid, subscription in list(self._subscriptions.items()):
                                     subject = subscription.subject
-                                    queue_group = subscription.queue_group
-                                    logger.debug("->> SUB %s %s %s", subject, sid, queue_group)
-                                    await self._connection.write(encode_sub(subject, sid, queue_group))
+                                    queue = subscription.queue
+                                    logger.debug("->> SUB %s %s %s", subject, sid, queue)
+                                    await self._connection.write(encode_sub(subject, sid, queue))
 
                                 await self._force_flush()
 
@@ -933,7 +933,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         self,
         subject: str,
         *,
-        queue_group: str = "",
+        queue: str = "",
         max_pending_messages: int | None = 65536,
         max_pending_bytes: int | None = 67108864,  # 64 MB
     ) -> Subscription:
@@ -941,7 +941,7 @@ class Client(AbstractAsyncContextManager["Client"]):
 
         Args:
             subject: The subject to subscribe to
-            queue_group: Optional queue group name for load balancing
+            queue: Optional queue group name for load balancing
             max_pending_messages: Maximum number of pending messages before triggering
                 slow consumer error (default: 65536). Use None for unlimited.
             max_pending_bytes: Maximum bytes of pending messages before triggering
@@ -963,7 +963,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         subscription = Subscription(
             subject,
             sid,
-            queue_group,
+            queue,
             self,
             max_pending_messages=max_pending_messages,
             max_pending_bytes=max_pending_bytes,
@@ -971,9 +971,9 @@ class Client(AbstractAsyncContextManager["Client"]):
 
         self._subscriptions[sid] = subscription
 
-        command = encode_sub(subject, sid, queue_group)
-        if queue_group:
-            logger.debug("->> SUB %s %s %s", subject, queue_group, sid)
+        command = encode_sub(subject, sid, queue)
+        if queue:
+            logger.debug("->> SUB %s %s %s", subject, queue, sid)
         else:
             logger.debug("->> SUB %s %s", subject, sid)
 
@@ -981,28 +981,28 @@ class Client(AbstractAsyncContextManager["Client"]):
 
         return subscription
 
-    async def _subscribe(self, subject: str, sid: str, queue_group: str | None) -> asyncio.Queue:
+    async def _subscribe(self, subject: str, sid: str, queue: str | None) -> asyncio.Queue:
         """Create a subscription on the server and return the message queue.
 
         Args:
             subject: The subject to subscribe to
             sid: The subscription ID
-            queue_group: Optional queue group for load balancing
+            queue: Optional queue group for load balancing
 
         Returns:
             An asyncio.Queue that will receive messages for this subscription
         """
-        queue = asyncio.Queue()
+        msg_queue = asyncio.Queue()
 
-        command = encode_sub(subject, sid, queue_group)
-        if queue_group:
-            logger.debug("->> SUB %s %s %s", subject, queue_group, sid)
+        command = encode_sub(subject, sid, queue)
+        if queue:
+            logger.debug("->> SUB %s %s %s", subject, queue, sid)
         else:
             logger.debug("->> SUB %s %s", subject, sid)
 
         await self._connection.write(command)
 
-        return queue
+        return msg_queue
 
     async def _unsubscribe(self, sid: str) -> None:
         """Send UNSUB command to server for a subscription.

@@ -105,7 +105,7 @@ async def main():
         print(f"Listening on [{args.subject}] in queue group [{args.queue}] (PID: {pid})")
 
         # Subscribe to the subject with queue group
-        subscription = await client.subscribe(args.subject, queue_group=args.queue)
+        subscription = await client.subscribe(args.subject, queue=args.queue)
 
         # Message counter
         count = 0

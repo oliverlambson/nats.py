@@ -114,7 +114,7 @@ async def main():
         print(f"Status available on [{args.subject}.status]")
 
         # Subscribe to the echo subject (with queue group for load balancing)
-        echo_subscription = await client.subscribe(args.subject, queue_group="echo-service")
+        echo_subscription = await client.subscribe(args.subject, queue="echo-service")
 
         # Subscribe to the status subject (without queue group, all instances respond)
         status_subject = f"{args.subject}.status"

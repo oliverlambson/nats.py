@@ -95,9 +95,9 @@ def test_bench_encode_sub_with_queue(benchmark):
     """Benchmark encoding SUB command with queue group."""
     subject = "test.subject"
     sid = "1"
-    queue_group = "test-queue"
+    queue = "test-queue"
 
-    benchmark(command.encode_sub, subject, sid, queue_group)
+    benchmark(command.encode_sub, subject, sid, queue)
 
 
 def test_bench_encode_unsub(benchmark):
