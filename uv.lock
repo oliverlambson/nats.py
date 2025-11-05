@@ -439,9 +439,15 @@ name = "nats-client"
 version = "0.0.0"
 source = { editable = "nats-client" }
 
+[package.optional-dependencies]
+nkeys = [
+    { name = "nkeys" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "nats-server" },
+    { name = "nkeys" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-benchmark" },
@@ -450,10 +456,13 @@ dev = [
 ]
 
 [package.metadata]
+requires-dist = [{ name = "nkeys", marker = "extra == 'nkeys'", specifier = ">=0.1.0" }]
+provides-extras = ["nkeys"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "nats-server", editable = "nats-server" },
+    { name = "nkeys", specifier = ">=0.1.0" },
     { name = "pytest", specifier = ">=7.0.0" },
     { name = "pytest-asyncio", specifier = ">=0.21.0" },
     { name = "pytest-benchmark" },

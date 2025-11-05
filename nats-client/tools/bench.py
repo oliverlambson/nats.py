@@ -267,9 +267,7 @@ def main():
     parser.add_argument("--pub", action="store_true", help="Run publisher benchmark")
     parser.add_argument("--sub", action="store_true", help="Run subscriber benchmark")
     parser.add_argument("--headers", type=int, help="Number of headers to add to messages")
-    parser.add_argument(
-        "--latency", action="store_true", help="Track per-message latency (may impact performance)"
-    )
+    parser.add_argument("--latency", action="store_true", help="Track per-message latency (may impact performance)")
 
     args = parser.parse_args()
 
