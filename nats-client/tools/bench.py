@@ -30,7 +30,7 @@ class BenchmarkResults:
         result = (
             f"\nTest completed: {self.msg_count:,} messages, "
             f"{self.msg_bytes:,} bytes, {self.duration:.2f} seconds\n"
-            f"  Throughput: {self.throughput:,.0f} msgs/sec, "
+            f"  Throughput: {self.throughput:,.0f} messages/sec, "
             f"{self.mb_per_sec:.2f} MB/sec"
         )
         if self.avg_latency is not None:
@@ -258,7 +258,7 @@ def main():
         help="Client type to use: 'client' (nats-client) or 'aio' (nats.aio)",
     )
     parser.add_argument("--url", default="nats://localhost:4222", help="NATS server URL")
-    parser.add_argument("--msgs", type=int, default=100_000, help="Number of messages to publish")
+    parser.add_argument("--messages", type=int, default=100_000, help="Number of messages to publish")
     parser.add_argument("--size", type=int, default=128, help="Size of the message payload")
     parser.add_argument("--subject", default="test", help="Subject to use for messages")
     parser.add_argument("--pub", action="store_true", help="Run publisher benchmark")
@@ -287,12 +287,12 @@ def main():
         client_name = "nats-client" if args.client == "client" else "nats.aio"
         if args.pub and args.sub:
             sys.stdout.write(
-                f"\nStarting pub/sub benchmark with {client_name} [msgs={args.msgs:,}, size={args.size:,} B]\n"
+                f"\nStarting pub/sub benchmark with {client_name} [msgs={args.messages:,}, size={args.size:,} B]\n"
             )
             pub_results, sub_results = await run_pubsub_benchmark(
                 client_type=args.client,
                 url=args.url,
-                msg_count=args.msgs,
+                msg_count=args.messages,
                 msg_size=args.size,
                 subject=args.subject,
                 headers=headers,
@@ -303,12 +303,12 @@ def main():
 
         elif args.pub:
             sys.stdout.write(
-                f"\nStarting publisher benchmark with {client_name} [msgs={args.msgs:,}, size={args.size:,} B]\n"
+                f"\nStarting publisher benchmark with {client_name} [msgs={args.messages:,}, size={args.size:,} B]\n"
             )
             results = await run_pub_benchmark(
                 client_type=args.client,
                 url=args.url,
-                msg_count=args.msgs,
+                msg_count=args.messages,
                 msg_size=args.size,
                 pub_subject=args.subject,
                 headers=headers,
@@ -317,11 +317,11 @@ def main():
             sys.stdout.write(f"\nResults: {results}\n")
 
         elif args.sub:
-            sys.stdout.write(f"\nStarting subscriber benchmark with {client_name} [msgs={args.msgs:,}]\n")
+            sys.stdout.write(f"\nStarting subscriber benchmark with {client_name} [msgs={args.messages:,}]\n")
             results = await run_sub_benchmark(
                 client_type=args.client,
                 url=args.url,
-                msg_count=args.msgs,
+                msg_count=args.messages,
                 sub_subject=args.subject,
                 track_latency=args.latency,
             )

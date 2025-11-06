@@ -115,19 +115,21 @@ async def main():
             while not shutdown_event.is_set():
                 try:
                     # Wait for message with timeout to allow checking shutdown_event
-                    msg = await asyncio.wait_for(subscription.next(), timeout=0.5)
+                    message = await asyncio.wait_for(subscription.next(), timeout=0.5)
                     count += 1
 
                     # Log the received request
                     if args.timestamp:
                         timestamp = datetime.now().strftime("%H:%M:%S")
-                        print(f"[#{count} {timestamp}] Received request on [{msg.subject}]: {msg.data.decode()}")
+                        print(
+                            f"[#{count} {timestamp}] Received request on [{message.subject}]: {message.data.decode()}"
+                        )
                     else:
-                        print(f"[#{count}] Received request on [{msg.subject}]: {msg.data.decode()}")
+                        print(f"[#{count}] Received request on [{message.subject}]: {message.data.decode()}")
 
                     # Send the reply if a reply subject is provided
-                    if msg.reply:
-                        await client.publish(msg.reply, args.response.encode())
+                    if message.reply:
+                        await client.publish(message.reply, args.response.encode())
                         if args.timestamp:
                             timestamp = datetime.now().strftime("%H:%M:%S")
                             print(f"[#{count} {timestamp}] Sent reply: {args.response}")

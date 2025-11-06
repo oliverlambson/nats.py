@@ -1015,7 +1015,7 @@ async def test_multiple_concurrent_consumers_using_async_for(client):
             consumer_messages[consumer_id].append(msg.data.decode())
 
             # Stop when we've received all expected messages across all consumers
-            total = sum(len(msgs) for msgs in consumer_messages.values())
+            total = sum(len(messages) for messages in consumer_messages.values())
             if total >= message_count:
                 break
             if stop_event.is_set():
@@ -1039,7 +1039,7 @@ async def test_multiple_concurrent_consumers_using_async_for(client):
         # Wait for all messages to be consumed (with timeout)
         max_wait = 5.0
         start = asyncio.get_event_loop().time()
-        while sum(len(msgs) for msgs in consumer_messages.values()) < message_count:
+        while sum(len(messages) for messages in consumer_messages.values()) < message_count:
             if asyncio.get_event_loop().time() - start > max_wait:
                 break
             await asyncio.sleep(0.1)

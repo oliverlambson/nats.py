@@ -114,19 +114,19 @@ async def main():
             while not shutdown_event.is_set():
                 try:
                     # Wait for message with timeout to allow checking shutdown_event
-                    msg = await asyncio.wait_for(subscription.next(), timeout=0.5)
+                    message = await asyncio.wait_for(subscription.next(), timeout=0.5)
                     count += 1
 
                     # Format output
                     if args.timestamp:
                         timestamp = datetime.now().strftime("%H:%M:%S")
                         print(
-                            f"[#{count} {timestamp}] Received on [{msg.subject}] "
-                            f"Queue[{args.queue}] Pid[{pid}]: {msg.data.decode()}"
+                            f"[#{count} {timestamp}] Received on [{message.subject}] "
+                            f"Queue[{args.queue}] Pid[{pid}]: {message.data.decode()}"
                         )
                     else:
                         print(
-                            f"[#{count}] Received on [{msg.subject}] Queue[{args.queue}] Pid[{pid}]: {msg.data.decode()}"
+                            f"[#{count}] Received on [{message.subject}] Queue[{args.queue}] Pid[{pid}]: {message.data.decode()}"
                         )
 
                 except asyncio.TimeoutError:

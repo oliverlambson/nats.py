@@ -125,10 +125,10 @@ class ClientStatistics:
     All fields are monotonically increasing counters.
     """
 
-    in_msgs: int = 0
+    in_messages: int = 0
     """Number of incoming messages received."""
 
-    out_msgs: int = 0
+    out_messages: int = 0
     """Number of outgoing messages published."""
 
     in_bytes: int = 0
@@ -210,8 +210,8 @@ class Client(AbstractAsyncContextManager["Client"]):
     _tls_hostname: str | None
 
     # Statistics
-    _stats_in_msgs: int
-    _stats_out_msgs: int
+    _stats_in_messages: int
+    _stats_out_messages: int
     _stats_in_bytes: int
     _stats_out_bytes: int
     _stats_reconnects: int
@@ -334,8 +334,8 @@ class Client(AbstractAsyncContextManager["Client"]):
         self._error_callbacks = []
 
         # Statistics
-        self._stats_in_msgs = 0
-        self._stats_out_msgs = 0
+        self._stats_in_messages = 0
+        self._stats_out_messages = 0
         self._stats_in_bytes = 0
         self._stats_out_bytes = 0
         self._stats_reconnects = 0
@@ -371,8 +371,8 @@ class Client(AbstractAsyncContextManager["Client"]):
                 and number of reconnections.
         """
         return ClientStatistics(
-            in_msgs=self._stats_in_msgs,
-            out_msgs=self._stats_out_msgs,
+            in_messages=self._stats_in_messages,
+            out_messages=self._stats_out_messages,
             in_bytes=self._stats_in_bytes,
             out_bytes=self._stats_out_bytes,
             reconnects=self._stats_reconnects,
@@ -383,13 +383,13 @@ class Client(AbstractAsyncContextManager["Client"]):
         try:
             while True:
                 try:
-                    msg = await parse(self._connection)
+                    protocol_message = await parse(self._connection)
 
-                    if not msg:
+                    if not protocol_message:
                         logger.info("Connection closed by server")
                         break
 
-                    match msg:
+                    match protocol_message:
                         case ("MSG", subject, sid, reply, payload):
                             logger.debug("<<- MSG %s %s %s %s", subject, sid, reply if reply else "", len(payload))
                             await self._handle_msg(subject, sid, reply, payload)
@@ -494,39 +494,39 @@ class Client(AbstractAsyncContextManager["Client"]):
 
     async def _handle_msg(self, subject: str, sid: str, reply: str | None, payload: bytes) -> None:
         """Handle MSG from server."""
-        self._stats_in_msgs += 1
+        self._stats_in_messages += 1
         self._stats_in_bytes += len(payload)
 
         if sid in self._subscriptions:
             subscription = self._subscriptions[sid]
 
-            msg = Message(subject=subject, data=payload, reply=reply)
+            message = Message(subject=subject, data=payload, reply=reply)
 
             try:
-                subscription._enqueue(msg)
+                subscription._enqueue(message)
 
                 if subscription._slow_consumer_reported:
                     subscription._slow_consumer_reported = False
 
             except (asyncio.QueueFull, ValueError):
-                msg_size = len(payload)
+                message_size = len(payload)
                 subscription._dropped_messages += 1
-                subscription._dropped_bytes += msg_size
+                subscription._dropped_bytes += message_size
 
-                pending_msgs, pending_bytes = subscription.pending
+                pending_messages, pending_bytes = subscription.pending
 
                 logger.warning(
                     "Slow consumer on subject %s (sid %s): dropping message, %d pending messages, %d pending bytes",
                     subject,
                     sid,
-                    pending_msgs,
+                    pending_messages,
                     pending_bytes,
                 )
 
                 # Only report once per slow consumer event to avoid noise
                 if not subscription._slow_consumer_reported:
                     subscription._slow_consumer_reported = True
-                    error = SlowConsumerError(subject, sid, pending_msgs, pending_bytes)
+                    error = SlowConsumerError(subject, sid, pending_messages, pending_bytes)
                     for callback in self._error_callbacks:
                         try:
                             callback(error)
@@ -544,7 +544,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         status_description: str | None = None,
     ) -> None:
         """Handle HMSG from server."""
-        self._stats_in_msgs += 1
+        self._stats_in_messages += 1
         self._stats_in_bytes += len(payload)
 
         if sid in self._subscriptions:
@@ -554,7 +554,7 @@ class Client(AbstractAsyncContextManager["Client"]):
             if status_code is not None:
                 status = Status(code=status_code, description=status_description)
 
-            msg = Message(
+            message = Message(
                 subject=subject,
                 data=payload,
                 reply=reply,
@@ -563,30 +563,30 @@ class Client(AbstractAsyncContextManager["Client"]):
             )
 
             try:
-                subscription._enqueue(msg)
+                subscription._enqueue(message)
 
                 if subscription._slow_consumer_reported:
                     subscription._slow_consumer_reported = False
 
             except (asyncio.QueueFull, ValueError):
-                msg_size = len(payload)
+                message_size = len(payload)
                 subscription._dropped_messages += 1
-                subscription._dropped_bytes += msg_size
+                subscription._dropped_bytes += message_size
 
-                pending_msgs, pending_bytes = subscription.pending
+                pending_messages, pending_bytes = subscription.pending
 
                 logger.warning(
                     "Slow consumer on subject %s (sid %s): dropping message, %d pending messages, %d pending bytes",
                     subject,
                     sid,
-                    pending_msgs,
+                    pending_messages,
                     pending_bytes,
                 )
 
                 # Only report once per slow consumer event to avoid noise
                 if not subscription._slow_consumer_reported:
                     subscription._slow_consumer_reported = True
-                    error = SlowConsumerError(subject, sid, pending_msgs, pending_bytes)
+                    error = SlowConsumerError(subject, sid, pending_messages, pending_bytes)
                     for callback in self._error_callbacks:
                         try:
                             callback(error)
@@ -733,12 +733,12 @@ class Client(AbstractAsyncContextManager["Client"]):
                                     timeout=self._reconnect_timeout,
                                 )
 
-                                msg = await parse(connection)
-                                if not msg or msg.op != "INFO":
+                                protocol_message = await parse(connection)
+                                if not protocol_message or protocol_message.op != "INFO":
                                     msg = "Expected INFO message"
                                     raise RuntimeError(msg)
 
-                                new_server_info = ServerInfo.from_protocol(msg.info)
+                                new_server_info = ServerInfo.from_protocol(protocol_message.info)
                                 logger.info(
                                     "Reconnected to %s (version %s)", new_server_info.server_id, new_server_info.version
                                 )
@@ -919,7 +919,7 @@ class Client(AbstractAsyncContextManager["Client"]):
         self._pending_messages.append(message_data)
         self._pending_bytes += message_size
 
-        self._stats_out_msgs += 1
+        self._stats_out_messages += 1
         self._stats_out_bytes += len(payload)
 
         self._flush_waker.set()
@@ -1346,12 +1346,12 @@ async def connect(
         raise ConnectionError(msg)
 
     try:
-        msg = await parse(connection)
-        if not msg or msg.op != "INFO":
+        protocol_message = await parse(connection)
+        if not protocol_message or protocol_message.op != "INFO":
             msg = "Expected INFO message"
             raise RuntimeError(msg)
 
-        server_info = ServerInfo.from_protocol(msg.info)
+        server_info = ServerInfo.from_protocol(protocol_message.info)
         logger.info("Connected to %s (version %s)", server_info.server_id, server_info.version)
 
         if server_info.tls_required and not tls_established:

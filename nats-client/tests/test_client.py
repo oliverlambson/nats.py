@@ -1902,8 +1902,8 @@ async def test_statistics_initial_values(client):
     stats = client.stats()
 
     assert isinstance(stats, ClientStatistics)
-    assert stats.in_msgs == 0
-    assert stats.out_msgs == 0
+    assert stats.in_messages == 0
+    assert stats.out_messages == 0
     assert stats.in_bytes == 0
     assert stats.out_bytes == 0
     assert stats.reconnects == 0
@@ -1917,7 +1917,7 @@ async def test_statistics_publish_counts(client):
     await client.flush()
 
     stats = client.stats()
-    assert stats.out_msgs == 2
+    assert stats.out_messages == 2
     assert stats.out_bytes == len(b"Hello") + len(b"World!")
 
 
@@ -1933,9 +1933,9 @@ async def test_statistics_subscribe_counts(client):
     assert msg.data == b"Test message"
 
     stats = client.stats()
-    assert stats.in_msgs == 1
+    assert stats.in_messages == 1
     assert stats.in_bytes == len(b"Test message")
-    assert stats.out_msgs == 1
+    assert stats.out_messages == 1
 
 
 @pytest.mark.asyncio
@@ -1956,8 +1956,8 @@ async def test_statistics_multiple_messages(client):
     assert received == messages
 
     stats = client.stats()
-    assert stats.in_msgs == 3
-    assert stats.out_msgs == 3
+    assert stats.in_messages == 3
+    assert stats.out_messages == 3
 
     total_bytes = sum(len(m) for m in messages)
     assert stats.in_bytes == total_bytes
@@ -2001,8 +2001,8 @@ async def test_statistics_request_reply(client):
     await request_task
 
     stats = client.stats()
-    assert stats.out_msgs == 2
-    assert stats.in_msgs == 2
+    assert stats.out_messages == 2
+    assert stats.in_messages == 2
     assert stats.out_bytes == len(b"Request") + len(b"Response")
 
 
@@ -2016,9 +2016,9 @@ async def test_statistics_snapshot(client):
 
     stats2 = client.stats()
 
-    assert stats1.out_msgs == 0
+    assert stats1.out_messages == 0
     assert stats1.out_bytes == 0
-    assert stats2.out_msgs == 1
+    assert stats2.out_messages == 1
     assert stats2.out_bytes == len(b"Data")
 
 

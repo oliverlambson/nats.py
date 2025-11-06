@@ -130,18 +130,18 @@ async def main():
             async with echo_subscription:
                 while not shutdown_event.is_set():
                     try:
-                        msg = await asyncio.wait_for(echo_subscription.next(), timeout=0.5)
+                        message = await asyncio.wait_for(echo_subscription.next(), timeout=0.5)
                         echo_count += 1
 
                         if args.timestamp:
                             timestamp = datetime.now().strftime("%H:%M:%S")
-                            print(f"[#{echo_count} {timestamp}] Echo request: {msg.data.decode()}")
+                            print(f"[#{echo_count} {timestamp}] Echo request: {message.data.decode()}")
                         else:
-                            print(f"[#{echo_count}] Echo request: {msg.data.decode()}")
+                            print(f"[#{echo_count}] Echo request: {message.data.decode()}")
 
                         # Echo back the message
-                        if msg.reply:
-                            await client.publish(msg.reply, msg.data)
+                        if message.reply:
+                            await client.publish(message.reply, message.data)
 
                     except asyncio.TimeoutError:
                         continue
@@ -155,7 +155,7 @@ async def main():
             async with status_subscription:
                 while not shutdown_event.is_set():
                     try:
-                        msg = await asyncio.wait_for(status_subscription.next(), timeout=0.5)
+                        message = await asyncio.wait_for(status_subscription.next(), timeout=0.5)
                         status_count += 1
 
                         if args.timestamp:
@@ -165,13 +165,13 @@ async def main():
                             print(f"[#{status_count}] Status request")
 
                         # Send status information
-                        if msg.reply:
+                        if message.reply:
                             status_response = {
                                 **service_info,
                                 "echo_count": echo_count,
                                 "status_count": status_count,
                             }
-                            await client.publish(msg.reply, json.dumps(status_response).encode())
+                            await client.publish(message.reply, json.dumps(status_response).encode())
 
                     except asyncio.TimeoutError:
                         continue

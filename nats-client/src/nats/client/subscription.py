@@ -33,13 +33,13 @@ class Subscription(AsyncIterable[Message], AbstractAsyncContextManager["Subscrip
 
     Examples:
         # As an async iterator
-        async for msg in subscription:
-            process(msg)
+        async for message in subscription:
+            process(message)
 
         # As a context manager
         async with await client.subscribe("my.subject") as subscription:
-            msg = await subscription.next()
-            process(msg)
+            message = await subscription.next()
+            process(message)
     """
 
     _subject: str
@@ -99,8 +99,8 @@ class Subscription(AsyncIterable[Message], AbstractAsyncContextManager["Subscrip
         """Return an async iterator for messages.
 
         This allows using the subscription as an async iterable:
-            async for msg in subscription:
-                process(msg)
+            async for message in subscription:
+                process(message)
 
         Returns:
             An async iterator that yields messages
@@ -112,12 +112,12 @@ class Subscription(AsyncIterable[Message], AbstractAsyncContextManager["Subscrip
         """Get an async iterator for messages.
 
         This property provides API compatibility with nats-py, allowing:
-            async for msg in subscription.messages:
-                process(msg)
+            async for message in subscription.messages:
+                process(message)
 
         This is equivalent to iterating directly on the subscription:
-            async for msg in subscription:
-                process(msg)
+            async for message in subscription:
+                process(message)
 
         Returns:
             An async iterator that yields messages
@@ -181,38 +181,38 @@ class Subscription(AsyncIterable[Message], AbstractAsyncContextManager["Subscrip
         with suppress(ValueError):
             self._callbacks.remove(callback)
 
-    def _enqueue(self, msg: Message) -> None:
+    def _enqueue(self, message: Message) -> None:
         """Enqueue a message without blocking.
 
         This is an internal method called by the Client when dispatching messages.
 
         Args:
-            msg: The message to enqueue
+            message: The message to enqueue
 
         Raises:
             asyncio.QueueFull: If message count limit would be exceeded
             ValueError: If byte limit would be exceeded
         """
-        msg_size = len(msg.data)
+        message_size = len(message.data)
 
         # Check byte limit before attempting to put
-        if self._max_pending_bytes is not None and self._pending_bytes + msg_size > self._max_pending_bytes:
-            raise ValueError(f"Byte limit exceeded: {self._pending_bytes + msg_size} > {self._max_pending_bytes}")
+        if self._max_pending_bytes is not None and self._pending_bytes + message_size > self._max_pending_bytes:
+            raise ValueError(f"Byte limit exceeded: {self._pending_bytes + message_size} > {self._max_pending_bytes}")
 
         # Invoke callbacks before queuing
         for callback in self._callbacks:
             try:
-                callback(msg)
+                callback(message)
             except Exception as e:
                 # Log callback errors but don't disrupt message flow
                 logger.exception("Error in message callback: %s", e)
 
         # Try to put in queue - will raise QueueFull if message limit exceeded
-        self._pending_queue.put_nowait(msg)
+        self._pending_queue.put_nowait(message)
 
         # Update counters after successful put
         self._pending_messages += 1
-        self._pending_bytes += msg_size
+        self._pending_bytes += message_size
 
     async def next(self, timeout: float | None = None) -> Message:
         """Get the next message from the subscription.
@@ -231,15 +231,15 @@ class Subscription(AsyncIterable[Message], AbstractAsyncContextManager["Subscrip
         try:
             # Get message from queue
             if timeout is not None:
-                msg = await asyncio.wait_for(self._pending_queue.get(), timeout)
+                message = await asyncio.wait_for(self._pending_queue.get(), timeout)
             else:
-                msg = await self._pending_queue.get()
+                message = await self._pending_queue.get()
 
             # Update counters after successful get
             self._pending_messages -= 1
-            self._pending_bytes -= len(msg.data)
+            self._pending_bytes -= len(message.data)
 
-            return msg
+            return message
         except asyncio.QueueShutDown:
             msg = "Subscription is closed"
             raise RuntimeError(msg) from None
