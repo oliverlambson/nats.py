@@ -181,9 +181,17 @@ class JetStreamContext(JetStreamManager):
         timeout: Optional[float] = None,
         stream: Optional[str] = None,
         headers: Optional[Dict[str, Any]] = None,
+        msg_ttl: Optional[float] = None,
     ) -> api.PubAck:
         """
         publish emits a new message to JetStream and waits for acknowledgement.
+
+        :param subject: Subject to publish to.
+        :param payload: Message payload.
+        :param timeout: Request timeout in seconds.
+        :param stream: Expected stream name.
+        :param headers: Message headers.
+        :param msg_ttl: Per-message TTL in seconds (requires NATS Server 2.11+).
         """
         hdr = headers
         if timeout is None:
@@ -191,6 +199,10 @@ class JetStreamContext(JetStreamManager):
         if stream is not None:
             hdr = hdr or {}
             hdr[api.Header.EXPECTED_STREAM] = stream
+        if msg_ttl is not None:
+            hdr = hdr or {}
+            # TTL header accepts seconds as integer or duration string
+            hdr[api.Header.MSG_TTL] = str(int(msg_ttl))
 
         try:
             msg = await self._nc.request(
@@ -214,9 +226,17 @@ class JetStreamContext(JetStreamManager):
         wait_stall: Optional[float] = None,
         stream: Optional[str] = None,
         headers: Optional[Dict] = None,
+        msg_ttl: Optional[float] = None,
     ) -> asyncio.Future[api.PubAck]:
         """
         emits a new message to JetStream and returns a future that can be awaited for acknowledgement.
+
+        :param subject: Subject to publish to.
+        :param payload: Message payload.
+        :param wait_stall: Maximum time to wait for semaphore in seconds.
+        :param stream: Expected stream name.
+        :param headers: Message headers.
+        :param msg_ttl: Per-message TTL in seconds (requires NATS Server 2.11+).
         """
 
         if not self._async_reply_prefix:
@@ -227,6 +247,10 @@ class JetStreamContext(JetStreamManager):
         if stream is not None:
             hdr = hdr or {}
             hdr[api.Header.EXPECTED_STREAM] = stream
+        if msg_ttl is not None:
+            hdr = hdr or {}
+            # TTL header accepts seconds as integer or duration string
+            hdr[api.Header.MSG_TTL] = str(int(msg_ttl))
 
         try:
             await asyncio.wait_for(self._publish_async_pending_semaphore.acquire(), timeout=wait_stall)
@@ -413,8 +437,9 @@ class JetStreamContext(JetStreamManager):
                 deliver = self._nc.new_inbox()
                 config.deliver_subject = deliver
 
-            # Auto created consumers use the filter subject.
-            config.filter_subject = subject
+            # Auto created consumers use the filter subject, unless filter_subjects is set.
+            if not config.filter_subjects:
+                config.filter_subject = subject
 
             # Heartbeats / FlowControl
             config.flow_control = flow_control
@@ -569,9 +594,10 @@ class JetStreamContext(JetStreamManager):
             if config is None:
                 config = api.ConsumerConfig()
 
-            # Auto created consumers use the filter subject.
-            # config.name = durable
-            config.filter_subject = subject
+            # Auto created consumers use the filter subject, unless filter_subjects is set.
+            if not config.filter_subjects:
+                config.filter_subject = subject
+
             if durable:
                 config.name = durable
                 config.durable_name = durable
